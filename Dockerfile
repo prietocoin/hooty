@@ -8,17 +8,23 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN mkdir -p /out && CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w" \
     -o /out/hooty \
     ./cmd/server
 
-# Runtime mínimo: binario estático + CA roots para Evolution/Gemini/R2.
-FROM gcr.io/distroless/static-debian12:nonroot
+# Runtime con shell y /bin/bash: Easypanel puede ejecutar `./out` desde /app.
+FROM debian:bookworm-slim
 
-COPY --from=build /out/hooty /hooty
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /out/hooty /app/out
+RUN chmod 0755 /app/out
 
 EXPOSE 8080
 
-ENTRYPOINT ["/hooty"]
+CMD ["/app/out"]

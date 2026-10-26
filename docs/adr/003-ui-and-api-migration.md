@@ -609,7 +609,15 @@ La UI se sirve desde el propio binario Go:
 - `fs.Sub(embeddedUI, "ui")` quita el prefijo `ui/`: el FileServer ve
   `/comprobantes/`, no `/ui/comprobantes/`.
 - `Dockerfile` usa un build multi-stage, copia todo el contexto (incluido
-  `ui/`) y compila `./cmd/server`; el runtime es distroless con CA roots.
+  `ui/`), compila `./cmd/server` a `/out/hooty`, copia a `/app/out`, aplica
+  `chmod 0755` y arranca con `CMD ["/app/out"]`.
+- `nixpacks.toml` fija el build de Easypanel en `go build -o out ./cmd/server`
+  y el start en `./out`. Sin esto, Nixpacks detecta el paquete Go de la raíz
+  (`ui_assets.go`) y genera un archivo no ejecutable, causando
+  `./out: Permission denied`.
+- El runtime del Dockerfile usa Debian slim con shell y CA roots; así el start
+  command de Easypanel (`./out`) funciona desde `/app`.
+- `out` está en `.gitignore` y `.dockerignore`; no se versiona ningún binario.
 
 Tests:
 

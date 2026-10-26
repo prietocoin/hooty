@@ -7,6 +7,7 @@
 docs
 bin
 dist
+out
 *.exe
 *.test
 *.out

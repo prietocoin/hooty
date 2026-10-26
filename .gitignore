@@ -1,6 +1,7 @@
 # Binarios y artefactos locales
 /bin/
 /dist/
+/out
 *.exe
 *.test
 *.out
