@@ -53,7 +53,6 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/tasas/monitor/{$}", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/reportes/filtros", h.ReportFilters)
 	mux.HandleFunc("GET /api/v1/reportes/filtros/{$}", h.ReportFilters)
-	mux.HandleFunc("OPTIONS /api/v1/", h.Options)
 }
 
 // ServeHTTP conserva el router de compatibilidad para tests y consumidores

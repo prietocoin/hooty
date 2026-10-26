@@ -454,8 +454,12 @@ mux.HandleFunc("GET /api/v1/comprobantes/{hash}/{$}", h.GetComprobante)
 mux.HandleFunc("GET /api/v1/perfiles", h.ListPerfiles)
 mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
 mux.HandleFunc("GET /api/v1/reportes/filtros", h.ReportFilters)
-mux.HandleFunc("OPTIONS /api/v1/", h.Options)
 ```
+
+Los preflight `OPTIONS` se resuelven en el middleware global `api.CORS(mux)`,
+no con un patrón `OPTIONS /api/v1/`. Go 1.22+ rechaza ese patrón cuando
+convive con rutas más específicas del mismo subárbol, como
+`/api/v1/webhooks/hooty`.
 
 Cabeceras de paginación y CORS:
 
@@ -573,14 +577,15 @@ GET /api/v1/comprobantes/{hash}/
 GET /api/v1/perfiles
 GET /api/v1/tasas/monitor
 GET /api/v1/reportes/filtros
-OPTIONS /api/v1/
+OPTIONS (middleware global api.CORS, sin patrón en ServeMux)
 ```
 
 Validación local:
 
 ```text
-TestRegisterRutasExactasYBarraFinal  OK
-TestRegisterRechazaMetodoNoPermitido OK
+TestRegisterRutasExactasYBarraFinal        OK
+TestRegisterNoPaniegaConWebhookYCORSGlobal OK
+TestRegisterRechazaMetodoNoPermitido       OK
 ```
 
 Si tras el redespliegue el 404 continúa, revisar:

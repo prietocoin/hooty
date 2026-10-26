@@ -260,6 +260,40 @@ func TestServidorHTTPResponde200EnComprobantes(t *testing.T) {
 	}
 }
 
+func TestRegisterNoPaniegaConWebhookYCORSGlobal(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.Handle("/api/v1/webhooks/hooty", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	newTestHandler(testStore()).Register(mux)
+	server := httptest.NewServer(CORS(mux))
+	defer server.Close()
+
+	req, _ := http.NewRequest(http.MethodOptions, server.URL+"/api/v1/comprobantes", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("OPTIONS: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("OPTIONS status = %d", resp.StatusCode)
+	}
+	if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("CORS = %q", resp.Header.Get("Access-Control-Allow-Origin"))
+	}
+
+	resp, err = http.Get(server.URL + "/api/v1/comprobantes")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET status = %d", resp.StatusCode)
+	}
+}
+
 func TestRegisterRechazaMetodoNoPermitido(t *testing.T) {
 	t.Parallel()
 
