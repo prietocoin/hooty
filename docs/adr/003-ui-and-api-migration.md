@@ -628,3 +628,39 @@ go test -race ./...                             OK
 go vet ./...                                    OK
 go build ./...                                  OK
 ```
+
+## 13. Instalación PWA en móviles
+
+La UI principal (`/comprobantes/`) emite una invitación de instalación solo
+cuando el navegador dispara `beforeinstallprompt`:
+
+- `ui/comprobantes/js/pwa.js` captura el evento, ejecuta `preventDefault()` y
+  conserva el `deferredPrompt`.
+- Un banner flotante con `safe-area-inset-bottom` aparece únicamente si el
+  evento fue capturado y la app no está en modo `standalone`.
+- El botón "Instalar App" invoca `deferredPrompt.prompt()` y escucha
+  `userChoice`.
+- `appinstalled` oculta y limpia el prompt.
+- El cierre del banner se recuerda en `sessionStorage`.
+
+Soporte de instalación:
+
+- `manifest.json` declara `id`, nombre, `start_url`, `scope`, `display:
+  standalone`, orientación e íconos 192/512.
+- `index.html` incluye `manifest`, `apple-touch-icon`,
+  `apple-mobile-web-app-capable` y `apple-mobile-web-app-title` para Safari.
+- `sw.js` se registra con `?v=` y se sirve desde el `embed.FS`; el Service
+  Worker no intercepta la API contable.
+- Safari iOS no soporta `beforeinstallprompt`; la instalación se realiza con
+  "Añadir a pantalla de inicio" usando los metas y el manifest.
+
+Verificación:
+
+```text
+TestManifestYServiceWorkerEmbebidos    OK
+GET /comprobantes/manifest.json        200
+GET /comprobantes/sw.js                200
+GET /comprobantes/icon-192.png         200
+GET /comprobantes/js/pwa.js            200
+node --check pwa.js                    OK
+```

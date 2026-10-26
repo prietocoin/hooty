@@ -1,7 +1,9 @@
 package hooty
 
 import (
+	"encoding/json"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -44,8 +46,15 @@ func TestUIHandlerSirveLaRaizYLosAssets(t *testing.T) {
 		}
 	})
 
-	t.Run("config y vendor", func(t *testing.T) {
-		for _, path := range []string{"/config.js", "/shared/js/api-base.js"} {
+	t.Run("config, vendor y PWA", func(t *testing.T) {
+		for _, path := range []string{
+			"/config.js",
+			"/shared/js/api-base.js",
+			"/comprobantes/manifest.json",
+			"/comprobantes/sw.js",
+			"/comprobantes/icon-192.png",
+			"/comprobantes/js/pwa.js",
+		} {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
@@ -63,6 +72,53 @@ func TestUIHandlerSirveLaRaizYLosAssets(t *testing.T) {
 			t.Fatalf("status = %d", rec.Code)
 		}
 	})
+}
+
+func TestManifestYServiceWorkerEmbebidos(t *testing.T) {
+	t.Parallel()
+
+	raw, err := fs.ReadFile(uiAssets, "ui/comprobantes/manifest.json")
+	if err != nil {
+		t.Fatalf("leer manifest: %v", err)
+	}
+	var manifest struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		StartURL string `json:"start_url"`
+		Display  string `json:"display"`
+		Icons    []struct {
+			Src   string `json:"src"`
+			Sizes string `json:"sizes"`
+			Type  string `json:"type"`
+		} `json:"icons"`
+	}
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		t.Fatalf("manifest inválido: %v", err)
+	}
+	if manifest.ID != "/comprobantes/" || manifest.Name == "" || manifest.StartURL == "" {
+		t.Fatalf("manifest incompleto: %+v", manifest)
+	}
+	if manifest.Display != "standalone" || len(manifest.Icons) < 2 {
+		t.Fatalf("manifest no instalable: display=%q icons=%d", manifest.Display, len(manifest.Icons))
+	}
+
+	sw, err := fs.ReadFile(uiAssets, "ui/comprobantes/sw.js")
+	if err != nil {
+		t.Fatalf("leer sw.js: %v", err)
+	}
+	if !strings.Contains(string(sw), "addEventListener") {
+		t.Fatal("sw.js no registra listeners")
+	}
+
+	pwa, err := fs.ReadFile(uiAssets, "ui/comprobantes/js/pwa.js")
+	if err != nil {
+		t.Fatalf("leer pwa.js: %v", err)
+	}
+	for _, fragment := range []string{"beforeinstallprompt", "deferredPrompt.prompt()", "appinstalled"} {
+		if !strings.Contains(string(pwa), fragment) {
+			t.Fatalf("pwa.js no contiene %q", fragment)
+		}
+	}
 }
 
 func TestMuxEstaticoNoColisionaConAPIYWebhooks(t *testing.T) {

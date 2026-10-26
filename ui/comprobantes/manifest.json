@@ -1,12 +1,17 @@
 {
+  "id": "/comprobantes/",
   "name": "Glaukov Engine",
   "short_name": "Glaukov",
   "description": "Auditoría centralizada y gestión de comprobantes Fundablock",
+  "lang": "es",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
   "background_color": "#030611",
   "theme_color": "#030611",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "./icon-192.png",
