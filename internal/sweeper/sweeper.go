@@ -28,6 +28,7 @@ const advisoryLockKey int64 = 0x484F4F54595357
 type Result struct {
 	Procesados int64
 	Huerfanos  int64
+	Pares      int64
 	Duration   time.Duration
 }
 
@@ -149,12 +150,13 @@ func (s *Sweeper) runAndLog(ctx context.Context) {
 		s.opts.Logger.Warn("hooty.sweeper.error", "error", err)
 		return
 	}
-	if result.Procesados == 0 && result.Huerfanos == 0 && result.Duration == 0 {
+	if result.Procesados == 0 && result.Huerfanos == 0 && result.Pares == 0 && result.Duration == 0 {
 		return
 	}
 	s.opts.Logger.Info("hooty.sweeper",
 		"procesados", result.Procesados,
 		"huerfanos", result.Huerfanos,
+		"pares", result.Pares,
 		"duracion_ms", result.Duration.Milliseconds(),
 	)
 }
@@ -206,6 +208,10 @@ func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("sweeper: borrar huérfanos: %w", err)
 	}
+	pairs, err := tx.Exec(ctx, sqlDeleteFailedPairs, orphanCutoff)
+	if err != nil {
+		return Result{}, fmt.Errorf("sweeper: borrar pares fallidos: %w", err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("sweeper: commit: %w", err)
 	}
@@ -213,6 +219,7 @@ func (s *Sweeper) RunOnce(ctx context.Context) (Result, error) {
 	return Result{
 		Procesados: processed.RowsAffected(),
 		Huerfanos:  orphans.RowsAffected(),
+		Pares:      pairs.RowsAffected(),
 		Duration:   time.Since(started),
 	}, nil
 }

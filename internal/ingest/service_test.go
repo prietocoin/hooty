@@ -257,8 +257,8 @@ func TestSegundoGrupoDescargaUnaVezYLiquida(t *testing.T) {
 	if liq.input.Grupo1 != "120363000000000001@g.us" || liq.input.Grupo2 != "120363000000000002@g.us" {
 		t.Fatalf("grupos enviados al liquidador: %+v", liq.input)
 	}
-	if !liq.input.FechaOperacion.Equal(first) {
-		t.Fatalf("fecha_operacion = %v, se esperaba %v", liq.input.FechaOperacion, first)
+	if !liq.input.FechaOperacion.Equal(testNow) {
+		t.Fatalf("fecha_operacion = %v, se esperaba el segundo impacto %v", liq.input.FechaOperacion, testNow)
 	}
 	if len(store.guardados) != 1 {
 		t.Fatalf("comprobantes guardados = %d", len(store.guardados))
@@ -266,6 +266,10 @@ func TestSegundoGrupoDescargaUnaVezYLiquida(t *testing.T) {
 	saved := store.guardados[0]
 	if saved.HashLargo != "8a3ef79788979e878129e00ded237dcd" || saved.URLImagen == "" {
 		t.Fatalf("snapshot incompleto: %+v", saved)
+	}
+	if !saved.FechaOperacion.Equal(testNow) {
+		t.Fatalf("comprobante.fecha_operacion = %v, se esperaba el segundo impacto %v",
+			saved.FechaOperacion, testNow)
 	}
 	if saved.Grupo1 == saved.Grupo2 || saved.Socio1 == saved.Socio2 {
 		t.Fatalf("snapshot no es un binomio: %+v", saved)

@@ -206,7 +206,7 @@ func (s *Service) process(ctx context.Context, pair []domain.Impacto, event Even
 		Grupo2:         second.IDGrupo,
 		Caption1:       first.Caption,
 		Caption2:       caption2,
-		FechaOperacion: first.RecibidoEn,
+		FechaOperacion: second.RecibidoEn,
 		RecibidoEn:     now,
 	})
 	if err != nil {
@@ -230,7 +230,9 @@ func (s *Service) process(ctx context.Context, pair []domain.Impacto, event Even
 	comprobante.Grupo2 = second.IDGrupo
 	comprobante.Caption1 = first.Caption
 	comprobante.Caption2 = caption2
-	comprobante.FechaOperacion = first.RecibidoEn
+	// La validez contable del binomio la determina el segundo impacto: es el
+	// mensaje que cierra el par. Su recibido_en es la fecha de operación.
+	comprobante.FechaOperacion = second.RecibidoEn
 	comprobante.CreadoEn = now
 	comprobante.ActualizadoEn = now
 	comprobante = domain.NormalizeComprobante(comprobante)
