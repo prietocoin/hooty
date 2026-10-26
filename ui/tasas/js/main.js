@@ -11,6 +11,12 @@ document.addEventListener('click', (evento) => {
 
 initPWA();
 
-window.addEventListener('load', async () => {
+async function iniciarMonitor() {
   await monitor.refresh();
-});
+}
+
+if (document.readyState === 'complete') {
+  iniciarMonitor();
+} else {
+  window.addEventListener('load', iniciarMonitor, { once: true });
+}

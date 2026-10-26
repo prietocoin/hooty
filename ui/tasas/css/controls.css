@@ -5,17 +5,17 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border-radius: var(--radius-xl);
+  border-radius: 10px;
   font-size: 12px;
   font-weight: 700;
   line-height: 1rem;
-  transition: background .15s, border-color .15s, transform .1s, filter .15s;
+  transition: background .16s, border-color .16s, color .16s, transform .1s;
 }
 
 .btn:active,
 .soft-btn:active,
 .install-btn:active {
-  transform: scale(.97);
+  transform: translateY(1px);
 }
 
 .btn {
@@ -26,41 +26,46 @@
 .btn:hover,
 .soft-btn:hover,
 .install-btn:hover {
-  filter: brightness(1.12);
+  border-color: rgba(255, 255, 255, .16);
 }
 
 .btn-green {
   padding: 7px 12px;
-  border: 1px solid rgba(34, 211, 238, .24);
+  border: 1px solid rgba(34, 211, 238, .28);
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(8, 145, 178, .4), rgba(5, 150, 105, .4));
-  color: #cffafe;
+  background: var(--accent-cyan);
+  color: #04121a;
   font-weight: 800;
-  box-shadow: 0 10px 24px -18px rgba(34, 211, 238, .8);
+}
+
+.btn-green:hover {
+  background: #67e8f9;
 }
 
 .btn-save {
   padding: 9px 16px;
-  border-color: rgba(34, 211, 238, .42);
-  background: linear-gradient(135deg, rgba(8, 145, 178, .35), rgba(16, 185, 129, .25));
-  color: #a5f3fc;
+  border-color: rgba(34, 211, 238, .5);
+  background: linear-gradient(135deg, #0891b2, #06b6d4);
+  color: #03121a;
   font-weight: 900;
-  box-shadow: 0 12px 30px -20px rgba(34, 211, 238, .9);
 }
 
 .btn-publish {
   padding: 9px 16px;
   border: 1px solid rgba(251, 146, 60, .45);
-  background: linear-gradient(135deg, #f59e0b, #fb923c);
+  background: var(--accent-orange);
   color: #170a02;
   font-weight: 900;
-  box-shadow: 0 12px 30px -18px rgba(251, 146, 60, .8);
+}
+
+.btn-publish:hover {
+  background: #fdba74;
 }
 
 .btn-purple {
   padding: 8px 14px;
-  border: 1px solid rgba(168, 85, 247, .4);
-  background: rgba(168, 85, 247, .2);
+  border: 1px solid rgba(192, 132, 252, .35);
+  background: rgba(192, 132, 252, .12);
   color: #d8b4fe;
   font-weight: 800;
 }
@@ -75,42 +80,41 @@
   background: #e11d48;
   color: var(--white);
   font-weight: 800;
-  box-shadow: 0 10px 15px -3px rgba(136, 19, 55, .4);
 }
 
 .soft-btn {
   padding: 8px 12px;
   border: 1px solid var(--border-dark);
-  background: var(--slate-800);
+  background: var(--slate-900);
   color: var(--slate-200);
 }
 
 .danger-soft {
   padding: 6px;
-  border-color: rgba(244, 63, 94, .4);
-  background: rgba(244, 63, 94, .1);
+  border-color: rgba(251, 113, 133, .35);
+  background: rgba(251, 113, 133, .08);
   color: var(--accent-red);
 }
 
 .install-btn {
   padding: 7px 12px;
-  border: 1px solid rgba(34, 211, 238, .36);
-  border-radius: var(--radius-xl);
+  border: 1px solid rgba(34, 211, 238, .3);
+  border-radius: 10px;
   background: rgba(34, 211, 238, .1);
   color: var(--accent-cyan);
   font-size: 12px;
   font-weight: 800;
-  box-shadow: 0 0 24px -16px rgba(34, 211, 238, .9);
 }
 
 .lote-badge {
   padding: 6px 13px;
-  border: 1px solid rgba(34, 211, 238, .34);
+  border: 1px solid rgba(34, 211, 238, .3);
   border-radius: 9999px;
-  background: rgba(8, 145, 178, .16);
+  background: rgba(34, 211, 238, .08);
   color: #a5f3fc;
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1rem;
   white-space: nowrap;
   letter-spacing: .02em;
@@ -122,8 +126,8 @@
   gap: 8px;
   padding: 6px 12px;
   border: 1px solid var(--border-dark);
-  border-radius: var(--radius-xl);
-  background: var(--slate-800);
+  border-radius: 10px;
+  background: var(--slate-900);
   color: var(--accent-cyan);
   font-size: 12px;
   font-weight: 700;

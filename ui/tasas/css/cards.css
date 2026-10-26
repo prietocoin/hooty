@@ -137,4 +137,23 @@
   border-color: var(--accent-purple);
 }
 
+.monitor-state {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 28px 16px;
+  border: 1px dashed var(--border-dark);
+  border-radius: var(--radius-2xl);
+  background: rgba(15, 23, 42, .45);
+  color: var(--slate-400);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.monitor-state.is-error {
+  border-color: rgba(251, 113, 133, .35);
+  background: rgba(251, 113, 133, .06);
+  color: #fda4af;
+}
+
 

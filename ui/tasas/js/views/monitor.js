@@ -6,6 +6,20 @@ import { abrirModal, cerrarModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
 import { renderMonitorGrid } from '../components/monitor-grid.js';
 
+function alHacer(selector, evento, manejador) {
+  const elemento = qs(selector);
+  elemento?.addEventListener(evento, manejador);
+  return elemento;
+}
+
+function mostrarEstadoGrid(grid, mensaje, esError = false) {
+  if (!grid) return;
+  const aviso = document.createElement('p');
+  aviso.className = esError ? 'monitor-state is-error' : 'monitor-state';
+  aviso.textContent = mensaje;
+  grid.replaceChildren(aviso);
+}
+
 export function initMonitor() {
   const etiquetaLote = qs('#lblLoteActual');
   const grid = qs('#gridMonitor');
@@ -21,7 +35,7 @@ export function initMonitor() {
   }
 
   function actualizarEtiquetaLote() {
-    etiquetaLote.textContent = `Lote en Prod: ${state.loteActualCodigo}`;
+    if (etiquetaLote) etiquetaLote.textContent = `Lote en Prod: ${state.loteActualCodigo}`;
   }
 
   async function refresh() {
@@ -30,8 +44,12 @@ export function initMonitor() {
       state.loteActualCodigo = datos.id_tasa || 'T000';
       actualizarEtiquetaLote();
       aplicarMapa(datos.tasas || {});
+      return true;
     } catch (error) {
       console.error('Error monitor:', error);
+      mostrarEstadoGrid(grid, `No se pudieron cargar las tasas (${error.message}).`, true);
+      showToast(`❌ No se pudieron cargar las tasas: ${error.message}`);
+      return false;
     }
   }
 
@@ -58,17 +76,21 @@ export function initMonitor() {
   }
 
   async function traerBorradorHoo() {
-    showToast('📑 Leyendo datos de HOO...');
+    showToast('📑 Leyendo el lote vigente de Hooty...');
     try {
       const datos = await api.borradorHoo();
-      if (!datos.borrador) {
-        showToast('❌ No se recibieron datos de HOO');
+      if (!datos.borrador || Object.keys(datos.borrador).length === 0) {
+        showToast('❌ No se recibieron tasas desde Hooty');
         return;
       }
+      if (datos.id_tasa) {
+        state.loteActualCodigo = datos.id_tasa;
+        actualizarEtiquetaLote();
+      }
       aplicarMapa(datos.borrador);
-      showToast('✅ Borrador cargado desde HOO');
+      showToast('✅ Lote vigente cargado desde Hooty');
     } catch (error) {
-      showToast('❌ Error de conexión al leer HOO');
+      showToast(`❌ Error de conexión al leer HOO: ${error.message}`);
     }
   }
 
@@ -83,12 +105,12 @@ export function initMonitor() {
   }
 
   function abrirBorrado() {
-    entradaBorrado.value = state.loteActualCodigo;
+    if (entradaBorrado) entradaBorrado.value = state.loteActualCodigo;
     abrirModal('modalDeleteBatch');
   }
 
   async function confirmarBorrado() {
-    const batchId = entradaBorrado.value.trim();
+    const batchId = entradaBorrado?.value.trim() || '';
     if (!batchId) {
       showToast('⚠️ Ingrese un ID de lote válido');
       return;
@@ -110,15 +132,17 @@ export function initMonitor() {
     showToast(`Prueba Lote: ${checked ? 'ON' : 'OFF'}`);
   }
 
-  qs('#btnGuardarLote').addEventListener('click', guardarLote);
-  qs('#btnPublicar').addEventListener('click', publicarLote);
-  qs('#btnHoo').addEventListener('click', traerBorradorHoo);
-  qs('#btnRemesas').addEventListener('click', enviarTasaRemesas);
-  qs('#btnBorrarLote').addEventListener('click', abrirBorrado);
-  qs('#btnConfirmarBorrar').addEventListener('click', confirmarBorrado);
-  qs('#globalTestSwitch').addEventListener('change', (evento) => {
-    cambiarModoPrueba(evento.target.checked);
-  });
+  alHacer('#btnGuardarLote', 'click', guardarLote);
+  alHacer('#btnPublicar', 'click', publicarLote);
+  alHacer('#btnHoo', 'click', traerBorradorHoo);
+  alHacer('#btnRemesas', 'click', enviarTasaRemesas);
+  alHacer('#btnBorrarLote', 'click', abrirBorrado);
+  alHacer('#btnConfirmarBorrar', 'click', confirmarBorrado);
+  alHacer('#globalTestSwitch', 'change', (evento) => cambiarModoPrueba(evento.target.checked));
+
+  if (grid && !grid.childElementCount) {
+    mostrarEstadoGrid(grid, 'Cargando tasas del lote vigente...');
+  }
 
   return { refresh, aplicarMapa };
 }
