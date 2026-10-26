@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <base href="/comprobantes/">
+  <title>Fundablock - Glauk2 Engine</title>
+
+  <!-- PWA Y CONFIGURACIÓN TEMÁTICA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#030611">
+
+  <link rel="icon" type="image/png" href="./logo-fundablock.png">
+  <link rel="stylesheet" href="/shared/vendor/glauk2/tailwind.css?v=20261025_02">
+  <link rel="stylesheet" href="/shared/css/mobile.css?v=20261025_02">
+
+  <!-- CLIENTE MODULAR Y ALPINE.JS -->
+  <script src="../config.js?v=20261025_02"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261025_02"></script>
+  <script type="module" src="./js/pwa.js?v=20261025_02"></script>
+  <script src="/shared/vendor/glauk2/alpine.min.js?v=20261025_02" defer></script>
+  <script src="/shared/vendor/html2canvas.min.js?v=20261025_02"></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #030611; }
+    ::-webkit-scrollbar-thumb { background: #16224f; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+    input, select, textarea { font-size: 14px !important; }
+
+    /* Documento de estado de cuenta: hoja blanca plana, sin sombras,
+       gradientes, máscaras ni pseudo-elementos que oscurezcan las filas. */
+    #reporte-html-documento {
+      background: #ffffff !important;
+      background-image: none !important;
+      color: #0f172a !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      filter: none !important;
+      /* Nitidez tipográfica al rasterizar a 2x (Retina): sin suavizado de
+         subpíxeles ni ligaduras ópticas que emborronen cifras pequeñas. */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      -webkit-mask-image: none !important;
+      mask-image: none !important;
+      text-shadow: none !important;
+    }
+
+    #reporte-html-documento::before,
+    #reporte-html-documento::after,
+    #reporte-html-documento *::before,
+    #reporte-html-documento *::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    /* Ningún descendiente puede reintroducir una sombra, gradiente o máscara
+       oscura sobre la tabla: la hoja es blanca de inicio a fin. */
+    #reporte-html-documento * {
+      background-image: none !important;
+      box-shadow: none !important;
+      filter: none !important;
+      -webkit-mask-image: none !important;
+      mask-image: none !important;
+      text-shadow: none !important;
+    }
+
+    #reporte-html-documento [class*="rounded"] {
+      border-radius: 0 !important;
+    }
+
+    #reporte-html-documento table,
+    #reporte-html-documento tbody,
+    #reporte-html-documento tr,
+    #reporte-html-documento td,
+    #reporte-html-documento th {
+      background-image: none !important;
+    }
+
+    #reporte-html-documento tbody tr {
+      background-color: #ffffff !important;
+    }
+
+    #reporte-html-documento td,
+    #reporte-html-documento th {
+      border-color: #e2e8f0 !important;
+    }
+
+    /* La tabla siempre cabe en los 800 px del documento: columnas fijas y
+       texto largo con salto para que ninguna fila se recorte por la derecha. */
+    #reporte-html-documento table {
+      width: 100% !important;
+      table-layout: fixed !important;
+    }
+
+    #reporte-html-documento th,
+    #reporte-html-documento td {
+      vertical-align: top;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    #reporte-html-documento th:nth-child(1),
+    #reporte-html-documento td:nth-child(1) { width: 11%; }
+
+    #reporte-html-documento th:nth-child(2),
+    #reporte-html-documento td:nth-child(2) { width: 6%; }
+
+    #reporte-html-documento th:nth-child(3),
+    #reporte-html-documento td:nth-child(3) { width: 12%; }
+
+    #reporte-html-documento th:nth-child(4),
+    #reporte-html-documento td:nth-child(4) { width: 17%; }
+
+    #reporte-html-documento th:nth-child(5),
+    #reporte-html-documento td:nth-child(5) { width: 8%; }
+
+    #reporte-html-documento th:nth-child(6),
+    #reporte-html-documento td:nth-child(6) { width: 28%; }
+
+    #reporte-html-documento th:nth-child(7),
+    #reporte-html-documento td:nth-child(7) { width: 18%; }
+
+    /* Durante la captura se elimina todo el chrome que puede pintarse encima
+       del documento (header/footer fijos, handle, sombra del diálogo y velo
+       del backdrop). Sin esto, html2canvas oscurece las filas inferiores. */
+    body.glauk-capturando-reporte .glauk-modal__header,
+    body.glauk-capturando-reporte .glauk-modal__footer,
+    body.glauk-capturando-reporte .glauk-modal__handle {
+      visibility: hidden !important;
+    }
+
+    body.glauk-capturando-reporte .glauk-modal__dialog {
+      box-shadow: none !important;
+      background: #ffffff !important;
+    }
+
+    body.glauk-capturando-reporte .glauk-modal {
+      background: transparent !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    body.glauk-capturando-reporte .glauk-modal__content,
+    body.glauk-capturando-reporte .glauk-modal__body {
+      overflow: visible !important;
+    }
+
+    /* Sin transformaciones ni animaciones en la cadena del documento durante
+       la captura: un scale/translate heredado vuelve borroso el texto aunque
+       el canvas se genere a 2x. */
+    body.glauk-capturando-reporte .glauk-modal__dialog,
+    body.glauk-capturando-reporte .glauk-modal__content,
+    body.glauk-capturando-reporte .glauk-modal__body,
+    body.glauk-capturando-reporte #reporte-html-documento,
+    body.glauk-capturando-reporte #reporte-html-documento * {
+      transform: none !important;
+      animation: none !important;
+      transition: none !important;
+      will-change: auto !important;
+    }
+
+    @media print {
+      body * { visibility: hidden; }
+      #reporte-html-documento, #reporte-html-documento * { visibility: visible; }
+      #reporte-html-documento { position: absolute; left: 0; top: 0; width: 100%; background: #ffffff !important; color: #0f172a !important; }
+      .no-imprimir { display: none !important; }
+    }
+  </style>
+</head>
+
+<body class="bg-[#030611] text-slate-100 font-sans antialiased min-h-screen selection:bg-cyan-500 selection:text-black"
+      x-data="app"
+      @keydown.escape.window="cerrarFiltros(); cerrarDetalle(); cerrarMenuMovil()"
+      x-cloak>
+
+  <!-- CONTENEDOR FIJO DE PANTALLA COMPLETA -->
+  <div class="flex flex-col md:flex-row h-screen overflow-hidden">
+
+    <!-- FONDO DEL MENÚ MÓVIL -->
+    <div x-show="menuMovilAbierto"
+         x-cloak
+         class="glauk-sidebar-backdrop"
+         @click="cerrarMenuMovil()"></div>
+
+    <!-- NAVEGACIÓN LATERAL PRINCIPAL -->
+    <!-- ================================================================= -->
+<!-- COMPONENTE: sidebar.ejs                                           -->
+<!-- UBICACIÓN: views/layout/                                          -->
+<!-- RESPONSABILIDAD: Menú lateral de navegación global y Modales      -->
+<!-- ================================================================= -->
+
+<aside id="glauk-sidebar"
+       class="glauk-sidebar w-full md:w-64 bg-[#070e23] border-r border-slate-800 flex flex-col justify-between shrink-0"
+       :class="{ 'is-open': menuMovilAbierto }">
+  <div class="p-4 space-y-6">
+    <button type="button"
+            class="glauk-sidebar-close"
+            @click="cerrarMenuMovil()"
+            aria-label="Cerrar menú">✕</button>
+    <!-- LOGO -->
+    <div class="flex items-center gap-3">
+      <img src="./logo-fundablock.png" alt="Logo" class="h-9 w-auto" loading="lazy" decoding="async">
+      <div>
+        <h1 class="font-bold text-white text-sm tracking-wide">FUNDABLOCK</h1>
+        <p class="text-[10px] text-cyan-400 font-mono">GLAUK2 ENGINE</p>
+      </div>
+    </div>
+
+    <!-- MENÚ DE NAVEGACIÓN -->
+    <nav class="space-y-1">
+
+      <!-- 1. COMPROBANTES -->
+      <button @click="vistaActiva = 'comprobantes'; cerrarMenuMovil()" :class="vistaActiva === 'comprobantes' ? 'bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-400' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-r text-sm font-medium transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Comprobantes
+      </button>
+
+      <!-- 2. CARTELERA TASAS (módulo TasasHub real) -->
+      <a href="/tasas/" @click="cerrarMenuMovil()" class="w-full flex items-center justify-between px-3 py-2.5 rounded-r text-sm font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition no-underline" aria-label="Abrir el módulo TasasHub">
+        <span class="flex items-center gap-3">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+          Cartelera Tasas
+        </span>
+        <span class="text-xs text-sky-400 opacity-80 font-normal" aria-hidden="true">&#8599;</span>
+      </a>
+
+      <!-- 3. DIRECTORIO SOCIOS (módulo PerfilHub real) -->
+      <a href="/perfiles/" @click="cerrarMenuMovil()" class="w-full flex items-center justify-between px-3 py-2.5 rounded-r text-sm font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition" aria-label="Abrir el módulo PerfilHub">
+        <span class="flex items-center gap-3">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          Directorio Socios
+        </span>
+        <span class="text-xs text-cyan-400 opacity-80 font-normal" aria-hidden="true">↗</span>
+      </a>
+
+      <!-- 4. DASHBOARD -->
+      <button @click="vistaActiva = 'dashboard'; cerrarMenuMovil()" :class="vistaActiva === 'dashboard' ? 'bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-400' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-r text-sm font-medium transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Dashboard
+      </button>
+
+    </nav>
+  </div>
+
+  <div class="p-4 border-t border-slate-800/80">
+    <div class="text-xs text-slate-500 font-mono text-center">
+      Glauk2 Engine &bull; Online
+    </div>
+  </div>
+
+</aside>
+
+
+    <!-- ÁREA DE CONTENIDO DINÁMICO -->
+    <main class="glauk-main flex-1 p-3 md:p-6 overflow-y-auto overflow-x-hidden space-y-4 md:space-y-5">
+
+      <!-- BARRA MÓVIL: ABRE EL MENÚ LATERAL COMO DRAWER -->
+      <div class="glauk-mobile-topbar md:hidden">
+        <button type="button"
+                class="glauk-mobile-menu-btn"
+                @click="abrirMenuMovil()"
+                :aria-expanded="menuMovilAbierto ? 'true' : 'false'"
+                aria-controls="glauk-sidebar"
+                aria-label="Abrir menú de navegación">☰</button>
+        <div class="glauk-mobile-brand">
+          <strong>FUNDABLOCK</strong>
+          <span>GLAUK2 ENGINE</span>
+        </div>
+      </div>
+
+      <!-- VISTA 1: AUDITORÍA DE COMPROBANTES -->
+      <div x-show="vistaActiva === 'comprobantes'" class="space-y-3 md:space-y-4">
+        <!-- ================================================================= -->
+<!-- COMPONENTE: headerKPIs.ejs                                        -->
+<!-- UBICACIÓN: views/comprobantes/components/                         -->
+<!-- RESPONSABILIDAD: Título principal, botones globales y KPIs top   -->
+<!-- ================================================================= -->
+
+<div class="flex items-center justify-between gap-2">
+  <div>
+    <h2 class="text-lg md:text-2xl font-black text-white tracking-tight leading-tight">Auditoría en Vivo</h2>
+    <p class="text-[10px] md:text-xs text-slate-400">Comprobantes procesados con IA y tasas dinámicas.</p>
+  </div>
+  <div class="flex items-center gap-1.5 shrink-0">
+    <!-- Botón Refrescar Lista -->
+    <button @click="cargarComprobantes(false)" class="p-2 bg-[#060c24] border border-blue-900/60 rounded-xl hover:bg-blue-900/40 text-slate-300 transition-colors active:scale-95" title="Refrescar">
+      🔄
+    </button>
+
+    <!-- Contador de ítems en pantalla -->
+    <span class="px-2.5 py-1.5 bg-purple-950/80 border border-purple-500/40 text-purple-300 rounded-xl text-[11px] md:text-xs font-bold font-mono" x-text="(items || []).length + ' / ' + (totalRegistros || (items || []).length) + ' ítems'"></span>
+  </div>
+</div>
+
+<!-- GRILLA DE KPIS SUPERIORES (4 Tarjetas de Resumen Contable) -->
+<div class="glauk-kpis-grid">
+
+ <!-- 1. Sujeto Auditado (Llamada explícita al servicio pasando la variable) -->
+<div class="col-span-2 sm:col-span-1 bg-[#060c24] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl border border-blue-900/50 shadow-xl">
+  <p class="text-[8px] md:text-[9px] font-extrabold text-blue-400/80 uppercase">SUJETO / ENTIDAD AUDITADA</p>
+ <h3 class="text-xs md:text-base font-black text-white mt-0.5 truncate" x-text="obtenerSujetoAuditado(filtroSocio)"></h3>
+</div>
+
+  <!-- 2. Ítems Operados -->
+  <div class="bg-[#060c24] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl border border-blue-900/50 shadow-xl">
+    <p class="text-[8px] md:text-[9px] font-extrabold text-blue-400/80 uppercase">OPERADOS</p>
+    <h3 class="text-xs md:text-base font-black text-pink-400 mt-0.5" x-text="(totalRegistros || (todosLosItems || []).length) + ' ítems'"></h3>
+  </div>
+
+  <!-- 3. Total Movimiento del Período -->
+  <div class="bg-[#060c24] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl border border-blue-900/50 shadow-xl col-span-1">
+    <p class="text-[8px] md:text-[9px] font-extrabold text-emerald-400 uppercase" x-text="'MOVIMIENTO' + (hayDatosParciales ? ' (PARCIAL)' : '')">MOVIMIENTO</p>
+    <h3 class="text-xs md:text-base font-black text-emerald-400 mt-0.5 truncate" x-text="formatMonto(movimientoFiltradoTotal) + ' ' + (items[0]?.moneda_socio_1 || items[0]?.moneda || 'USDT').toUpperCase()"></h3>
+  </div>
+
+  <!-- 4. Saldo Actual Calculado -->
+  <div class="bg-[#010a14] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl border border-emerald-500/40 shadow-xl col-span-2 sm:col-span-1">
+    <p class="text-[8px] md:text-[9px] font-extrabold text-emerald-400 uppercase" x-text="'SALDO ACTUAL TOTAL' + (hayDatosParciales ? ' (PARCIAL)' : '')">SALDO ACTUAL TOTAL</p>
+    <h3 class="text-xs md:text-base font-black text-emerald-300 mt-0.5 truncate" x-text="formatMonto(saldoActualTotal) + ' ' + (items[0]?.moneda_socio_1 || items[0]?.moneda || 'USDT').toUpperCase()"></h3>
+  </div>
+
+</div>
+
+        <!-- ================================================================= -->
+<!-- COMPONENTE: barraFiltrosAuditoria.ejs                             -->
+<!-- UBICACIÓN: views/comprobantes/components/                         -->
+<!-- RESPONSABILIDAD: Panel de 8 filtros reactivos para la auditoría   -->
+<!-- ================================================================= -->
+
+<div class="glauk-filter-bar">
+  <div class="glauk-filter-chips" role="group" aria-label="Filtros rápidos de comprobantes">
+    <button type="button" class="glauk-chip" :class="{ 'is-active': filtroChip === 'todos' }" @click="aplicarChip('todos')">Todos</button>
+    <button type="button" class="glauk-chip" :class="{ 'is-active': filtroChip === 'hoy' }" @click="aplicarChip('hoy')">Hoy</button>
+  </div>
+  <button type="button" class="glauk-filter-trigger" @click="abrirFiltros()" aria-haspopup="dialog" aria-controls="glauk-filtros-sheet">
+    <span aria-hidden="true">⚙️</span>
+    <span>Filtros</span>
+    <span class="glauk-filter-count" x-show="filtrosActivosCount > 0" x-text="filtrosActivosCount"></span>
+  </button>
+</div>
+
+<!-- HOJA INFERIOR DE FILTROS (8 CONTROLES INTACTOS) -->
+<div x-show="filtrosSheetAbierto"
+     x-cloak
+     class="glauk-sheet-backdrop"
+     @click.self="cerrarFiltros()">
+  <section id="glauk-filtros-sheet"
+           class="glauk-bottom-sheet"
+           role="dialog"
+           aria-modal="true"
+           aria-labelledby="glauk-filtros-title">
+    <div class="glauk-sheet-handle" aria-hidden="true"></div>
+    <header class="glauk-sheet-head">
+      <div>
+        <h3 id="glauk-filtros-title">Filtros de auditoría</h3>
+        <p>Los 8 filtros se aplican al confirmar.</p>
+      </div>
+      <button type="button" class="glauk-sheet-close" @click="cerrarFiltros()" aria-label="Cerrar filtros">✕</button>
+    </header>
+    <div class="glauk-sheet-body">
+      <div class="glauk-filter-grid">
+        <label class="glauk-field">
+          <span class="glauk-label">1. Rol</span>
+          <select x-model="filtrosBorrador.rol" class="glauk-input">
+            <option value="">Todos</option>
+            <option value="SOCIO">SOCIOS</option>
+            <option value="MATRIZ_GENERAL">MATRIZ_GENERAL</option>
+            <option value="MATRIZ_1">MATRIZ_1</option>
+          </select>
+        </label>
+
+        <label class="glauk-field">
+          <span class="glauk-label">2. Socio</span>
+          <select x-model="filtrosBorrador.socio" class="glauk-input">
+            <option value="">Todos los Socios</option>
+            <template x-for="s in directorio" :key="'fs-' + (s.nombre || s)">
+              <option :value="s.nombre || s" x-text="s.nombre || s"></option>
+            </template>
+          </select>
+        </label>
+
+        <label class="glauk-field">
+          <span class="glauk-label">3. Fecha inicio</span>
+          <input type="date" x-model="filtrosBorrador.fechaInicio" class="glauk-input">
+        </label>
+
+        <label class="glauk-field">
+          <span class="glauk-label">4. Fecha fin</span>
+          <input type="date" x-model="filtrosBorrador.fechaFin" class="glauk-input">
+        </label>
+
+        <label class="glauk-field">
+          <span class="glauk-label">5. Desde hash</span>
+          <select x-model="filtrosBorrador.desdeHash" class="glauk-input">
+            <option value="">TODOS</option>
+            <template x-for="item in comprobantes" :key="'dh-' + (item.hash_largo || item.hash_corto)">
+              <option :value="item.hash_largo" x-text="item.hash_corto || (item.hash_largo ? item.hash_largo.substring(0, 8) : 'HASH')"></option>
+            </template>
+          </select>
+        </label>
+
+        <label class="glauk-field">
+          <span class="glauk-label">6. Hasta hash</span>
+          <select x-model="filtrosBorrador.hastaHash" class="glauk-input">
+            <option value="">TODOS</option>
+            <template x-for="item in comprobantes" :key="'hh-' + (item.hash_largo || item.hash_corto)">
+              <option :value="item.hash_largo" x-text="item.hash_corto || (item.hash_largo ? item.hash_largo.substring(0, 8) : 'HASH')"></option>
+            </template>
+          </select>
+        </label>
+
+        <label class="glauk-field">
+          <span class="glauk-label">7. Ordenar</span>
+          <select x-model="filtrosBorrador.orden" class="glauk-input">
+            <option value="fecha_desc">Recientes primero</option>
+            <option value="fecha_asc">Antiguos primero</option>
+          </select>
+        </label>
+
+        <label class="glauk-field">
+          <span class="glauk-label">8. Buscar hash</span>
+          <input type="text"
+                 x-model="filtrosBorrador.hash"
+                 @keyup.enter="aplicarFiltros()"
+                 placeholder="Buscar..."
+                 class="glauk-input">
+        </label>
+      </div>
+    </div>
+    <footer class="glauk-sheet-foot">
+      <button type="button" class="glauk-btn-secondary" @click="limpiarFiltros()">Limpiar Filtros</button>
+      <button type="button" class="glauk-btn-primary" @click="aplicarFiltros()">Aplicar Filtros</button>
+    </footer>
+  </section>
+</div>
+
+        <!-- ================================================================= -->
+<!-- COMPONENTE: listaComprobantesCards.ejs                            -->
+<!-- UBICACIÓN: views/comprobantes/components/                         -->
+<!-- ================================================================= -->
+
+<div class="glauk-comprobantes-grid">
+
+  <!-- BUCLE VINCULADO STRICTAMENTE A ITEMS (2X VALIDADOS) -->
+  <template x-for="(item, index) in items" :key="(item.hash_largo || item.id || item.referencia || 'item-') + index">
+
+    <article class="glauk-card glauk-card-horizontal glauk-card--strip flex flex-col w-full max-w-[650px] rounded-[14px] bg-[#0b1120] border border-slate-800 overflow-hidden"
+             x-data="{
+               get s2Visible() {
+                 const s = item.socio_2 || item.nombre_socio_2 || '';
+                 return !!s && s !== 'GENERAL' && s !== 'NO DEFINIDO';
+               },
+               get s1Nombre() {
+                 return item.socio_1 || item.nombre_socio_1 || item.socio || item.titular || 'GENERAL';
+               },
+               get s1Badge() {
+                 if (item.badge_1) return item.badge_1;
+                 const rol = (item.rol_1 || (directorio || []).find(d => String(d.nombre || '').trim().toUpperCase() === String(this.s1Nombre).trim().toUpperCase())?.rol || '').toUpperCase();
+                 if (rol === 'ADMIN') return '💎';
+                 if (rol === 'ASESOR') return '👔';
+                 if (rol === 'PROVEEDOR') return '🏦';
+                 return '🤝';
+               },
+               get s1Moneda() {
+                 if (item.moneda_base_socio1) return item.moneda_base_socio1;
+                 const sObj = (directorio || []).find(d => String(d.nombre || '').trim().toUpperCase() === String(this.s1Nombre).trim().toUpperCase());
+                 return sObj?.moneda_base || sObj?.moneda_socio || sObj?.moneda || 'USDT';
+               },
+               get s2Nombre() {
+                 return item.socio_2 || item.nombre_socio_2 || 'GENERAL';
+               },
+               get s2Badge() {
+                 if (item.badge_2) return item.badge_2;
+                 const rol = (item.rol_2 || (directorio || []).find(d => String(d.nombre || '').trim().toUpperCase() === String(this.s2Nombre).trim().toUpperCase())?.rol || '').toUpperCase();
+                 if (rol === 'ADMIN') return '💎';
+                 if (rol === 'ASESOR') return '👔';
+                 if (rol === 'PROVEEDOR') return '🏦';
+                 return '🤝';
+               },
+               get s2Moneda() {
+                 if (item.moneda_base_socio2) return item.moneda_base_socio2;
+                 const sObj = (directorio || []).find(d => String(d.nombre || '').trim().toUpperCase() === String(this.s2Nombre).trim().toUpperCase());
+                 return sObj?.moneda_base || sObj?.moneda_socio || sObj?.moneda || 'USDT';
+               }
+             }"
+             @click="abrirDetalle(item)"
+             @keydown.enter.self.prevent="abrirDetalle(item)"
+             tabindex="0"
+             role="button"
+             :aria-label="'Abrir detalle del comprobante ' + (item.hash_corto || item.hash_largo || '')">
+
+      <!-- CINTILLO SUPERIOR: KPIs del comprobante a todo el ancho -->
+      <header class="glauk-card-strip">
+        <div class="glauk-card-strip__meta">
+          <span x-text="item.fecha_fmt || 'S/F'"></span>
+          <span class="glauk-card-strip__sep" aria-hidden="true">•</span>
+          <span x-text="item.hash_corto || 'HASH'"></span>
+          <span class="glauk-card-strip__sep" aria-hidden="true">•</span>
+          <span x-text="item.lote_tasa_asignado || item.lote || 'T-ND'"></span>
+          <span class="glauk-card-strip__sep" aria-hidden="true">•</span>
+          <span class="glauk-card-strip__tipo"
+                :class="'is-tipo-' + resolverTipoComprobante(item).toLowerCase()"
+                x-text="resolverTipoComprobante(item)"></span>
+        </div>
+        <div class="glauk-card-strip__flags">
+          <span x-show="item.es_x2" class="glauk-mini-badge is-x2">⚡ x2</span>
+          <span class="glauk-mini-badge"
+                :class="item.procesado_ia ? 'is-ia-ok' : 'is-ia-bad'"
+                x-text="item.procesado_ia ? 'IA ✓' : 'IA ✕'"></span>
+        </div>
+      </header>
+
+      <div class="glauk-card-body">
+        <div class="glauk-card-media">
+        <span class="glauk-card-media-label">RECIBO</span>
+        <template x-if="urlRecibo(item)">
+          <img :src="urlRecibo(item)"
+               alt="Recibo del comprobante"
+               loading="lazy"
+               decoding="async"
+               @click.stop.prevent="abrirLightbox(item, $event)"
+               @error="$el.style.display='none'; $el.nextElementSibling?.classList.remove('hidden')">
+        </template>
+        <div class="glauk-card-media-empty" :class="{ 'hidden': urlRecibo(item) }" aria-hidden="true">📷</div>
+      </div>
+
+      <div class="glauk-card-content">
+        <div class="glauk-card-topline">
+          <div class="glauk-card-amount-main">
+            <strong x-text="formatMonto(item.monto)"></strong>
+            <small x-text="item.moneda || '---'"></small>
+          </div>
+          <div class="glauk-card-actions-row">
+            <button type="button"
+                    class="glauk-card-action-btn"
+                    @click.stop="abrirDetalle(item)"
+                    title="Ver detalle"
+                    aria-label="Ver detalle">👁</button>
+            <button type="button"
+                    class="glauk-card-action-btn"
+                    @click.stop="$dispatch('abrir-modal-edicion', item)"
+                    title="Editar comprobante"
+                    aria-label="Editar comprobante">✏️</button>
+            <button type="button"
+                    class="glauk-card-action-btn"
+                    @click.stop="eliminarComprobante(item.id || item.hash_largo)"
+                    title="Eliminar comprobante"
+                    aria-label="Eliminar comprobante">🗑️</button>
+          </div>
+        </div>
+
+        <div class="glauk-card-bank-line" :title="(item.titular || '-') + ' • ' + (item.banco || '-')">
+          <strong x-text="item.titular || '-'"></strong>
+          <span class="glauk-card-bullet">•</span>
+          <span class="glauk-card-bank" x-text="item.banco || '-'"></span>
+        </div>
+        <div class="glauk-card-ref" x-text="'REF: ' + (item.referencia || '-')"></div>
+
+        <div class="glauk-socios-stack">
+          <div class="glauk-socio-row is-socio1">
+            <div class="glauk-socio-main">
+              <div class="glauk-socio-title">
+                <span class="glauk-socio-emoji" aria-hidden="true" x-text="s1Badge || '🛡️'"></span>
+                <span class="glauk-socio-name" x-text="s1Nombre"></span>
+              </div>
+              <span class="glauk-socio-rate" x-text="'T1 ' + formatTasa(resolverTasaComprobante(item, 1), item.moneda, resolverTipoComprobante(item))"></span>
+            </div>
+            <strong class="glauk-socio-subtotal"
+                    :class="signoSocio(item, 1) < 0 ? 'is-negative' : 'is-positive'"
+                    x-text="(signoSocio(item, 1) < 0 ? '-' : '+') + formatMonto(Math.abs(parseFloat(obtenerME1(item) || 0))) + ' ' + s1Moneda"></strong>
+          </div>
+
+          <div class="glauk-socio-row is-socio2" x-show="s2Visible">
+            <div class="glauk-socio-main">
+              <div class="glauk-socio-title">
+                <span class="glauk-socio-emoji" aria-hidden="true" x-text="s2Badge || '🛡️'"></span>
+                <span class="glauk-socio-name" x-text="s2Nombre"></span>
+              </div>
+              <span class="glauk-socio-rate" x-text="'T2 ' + formatTasa(resolverTasaComprobante(item, 2), item.moneda, resolverTipoComprobante(item))"></span>
+            </div>
+            <strong class="glauk-socio-subtotal"
+                    :class="signoSocio(item, 2) < 0 ? 'is-negative' : 'is-positive'"
+                    x-text="(signoSocio(item, 2) < 0 ? '-' : '+') + formatMonto(Math.abs(parseFloat(obtenerME2(item) || 0))) + ' ' + s2Moneda"></strong>
+          </div>
+        </div>
+      </div>
+      </div>
+
+    </article>
+
+  </template>
+
+</div>
+
+<!-- CENTINELA DE SCROLL INFINITO DE ALTA PROXIMIDAD -->
+<!-- CENTINELA DE SCROLL INFINITO (CON DISPARADOR MANUAL Y AUTOMÁTICO) -->
+<div id="sentinel-scroll"
+     class="w-full py-8 my-4 flex flex-col justify-center items-center gap-2 cursor-pointer relative z-50 min-h-[100px]"
+     @click="cargarSiguientePagina()">
+
+  <!-- CARGANDO Primera Página o Siguiente Lote -->
+  <div x-show="cargando || cargandoMas" class="flex items-center gap-2 text-cyan-400 text-xs font-mono animate-pulse bg-slate-900/90 px-5 py-2.5 rounded-full border border-cyan-500/40 shadow-xl">
+    <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+    <span x-text="cargando ? 'Cargando comprobantes...' : 'Cargando más comprobantes...'"></span>
+  </div>
+
+  <!-- INDICADOR DE MÁS DATOS (Permite clic directo como respaldo) -->
+  <div x-show="!cargando && !cargandoMas && hayMasDatos" class="text-center py-2 px-4 rounded-xl bg-slate-900/80 border border-cyan-500/30 text-cyan-400 text-xs font-mono shadow-lg hover:bg-cyan-950/40 transition-all">
+    <span>⬇️ Mostrando <span x-text="items.length"></span> de <span x-text="totalRegistros || items.length"></span> comprobantes — Desliza o haz clic aquí</span>
+  </div>
+
+  <!-- FIN DE REGISTROS O CAP DE 500 ALCANZADO -->
+  <div x-show="!cargando && !cargandoMas && !hayMasDatos && items.length > 0" class="text-center py-2.5 px-5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 text-xs font-mono shadow-lg">
+    <span x-text="items.length >= capMaximoDOM ? ('⚡ Límite máximo de ' + capMaximoDOM + ' tarjetas alcanzado en pantalla') : (totalRegistros > items.length ? '✅ Fin de los registros disponibles' : '✅ Todos los comprobantes del mes están cargados')"></span>
+    <span class="block text-[10px] text-slate-500 mt-0.5" x-text="'Total en pantalla: ' + items.length + ' de ' + (totalRegistros || items.length)"></span>
+  </div>
+
+</div>
+
+
+      </div>
+
+      <!-- VISTA 3: DIRECTORIO DE SOCIOS -->
+      <div x-show="vistaActiva === 'directorio'" class="space-y-4">
+        <!-- ================================================================= -->
+<!-- COMPONENTE: directorioLista.ejs                                   -->
+<!-- UBICACIÓN: views/directorio/components/                           -->
+<!-- RESPONSABILIDAD: Grilla y gestión del directorio de socios         -->
+<!-- ================================================================= -->
+
+<div class="space-y-4">
+  <!-- CABECERA Y ACCIONES GLOBALES -->
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-blue-900/50 pb-3">
+    <h2 class="text-xl md:text-2xl font-black text-white tracking-tight">Directorio de Socios</h2>
+    <div class="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+      <button @click="abrirConfigSocio({ nombre: 'GENERAL', rol: 'MATRIZ_GENERAL' })" class="px-2.5 py-1.5 bg-amber-950/80 border border-amber-500/50 text-amber-300 rounded-lg text-[10px] md:text-xs font-bold">🌐 General</button>
+      <button @click="apagarTodosSocios()" class="px-2.5 py-1.5 bg-rose-950/80 border border-rose-500/50 text-rose-300 rounded-lg text-[10px] md:text-xs font-bold">🔴 Apagar Todos</button>
+      <button @click="guardarVigentes()" class="px-2.5 py-1.5 bg-purple-950/80 border border-purple-500/50 text-purple-300 rounded-lg text-[10px] md:text-xs font-bold">📌 Guardar</button>
+      <button @click="restaurarVigentes()" class="px-2.5 py-1.5 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 rounded-lg text-[10px] md:text-xs font-bold">📄 Restaurar</button>
+      <button @click="crearNuevoSocio()" class="px-3 py-1.5 bg-cyan-600 text-white rounded-lg text-xs font-black hover:bg-cyan-500 shadow-lg shadow-cyan-600/20">➕ Nuevo</button>
+    </div>
+  </div>
+
+  <!-- BÚSQUEDA -->
+  <div class="bg-[#060c24] p-2.5 rounded-2xl border border-blue-900/50 shadow-xl">
+    <input type="text" x-model="busquedaDirectorio" placeholder="Buscar socio..." class="w-full bg-[#030611] border border-blue-900/60 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-400">
+  </div>
+
+  <!-- LISTA DE SOCIOS -->
+  <div class="bg-[#060c24] rounded-2xl border border-blue-900/50 shadow-2xl overflow-hidden">
+    <div class="divide-y divide-blue-900/40">
+      <template x-for="socio in directorioFiltrado" :key="socio.nombre">
+        <div class="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-blue-950/20 transition-colors">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <h3 class="font-extrabold text-white text-sm" x-text="socio.nombre"></h3>
+
+              <button @click="toggleEstadoSocio(socio)" :class="socio.activo ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-slate-800 text-slate-500 border-slate-700'" class="px-2 py-0.5 rounded-lg text-[9px] font-black border transition-all flex items-center gap-1" title="Estado WA">
+                <span class="w-1.5 h-1.5 rounded-full" :class="socio.activo ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'"></span>
+                <span x-text="socio.activo ? 'WA: ACTIVO' : 'WA: INACTIVO'"></span>
+              </button>
+
+              <button @click="toggleDashSocio(socio)" :class="socio.mostrar_dashboard !== false ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50' : 'bg-slate-800 text-slate-500 border-slate-700'" class="px-2 py-0.5 rounded-lg text-[9px] font-black border transition-all flex items-center gap-1" title="Presencia Dashboard">
+                📊 <span x-text="socio.mostrar_dashboard !== false ? 'DASH: ON' : 'DASH: OFF'"></span>
+              </button>
+
+              <button @click="toggleHerenciaSocio(socio)" :class="socio.herencia ? 'bg-purple-500/20 text-purple-300 border-purple-500/50' : 'bg-slate-800 text-slate-500 border-slate-700'" class="px-2 py-0.5 rounded-lg text-[9px] font-black border transition-all flex items-center gap-1" title="Herencia Contractual">
+                🧬 <span x-text="socio.herencia ? 'HERENCIA: ON' : 'HERENCIA: OFF'"></span>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="px-1.5 py-0.5 rounded bg-blue-950 text-cyan-300 text-[8px] md:text-[9px] font-bold border border-blue-800/40" x-text="socio.rol || socio.roles || 'SOCIO'"></span>
+              <span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 text-[8px] md:text-[9px] font-bold border border-emerald-800/40" x-text="socio.moneda_base || socio.moneda_socio || 'USDT'"></span>
+              <span class="px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-bold border" :class="getTallaClass(socio).color" x-text="getTallaClass(socio).label"></span>
+              <span class="font-mono text-slate-400 text-[10px] ml-1" x-text="socio.id_grupo || socio.whatsapp || '-'"></span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 shrink-0 border-t sm:border-t-0 border-blue-900/30 pt-2 sm:pt-0">
+            <button @click="enviarTasaIndividual(socio)" class="p-1.5 bg-amber-950/80 border border-amber-600/40 text-amber-300 rounded-xl hover:bg-amber-900 transition-all active:scale-95 shadow-lg shadow-amber-900/20" title="Enviar Tasa por WhatsApp">⚡</button>
+            <button @click="abrirConfigSocio(socio)" class="px-3 py-1.5 bg-purple-950/80 border border-purple-600/40 text-purple-300 rounded-xl font-bold text-xs hover:bg-purple-900 transition-all flex-1 sm:flex-none text-center active:scale-95">⚙ Configurar</button>
+            <button @click="eliminarSocioDirectorio(socio.nombre)" class="p-1.5 bg-rose-950/80 border border-rose-600/40 text-rose-300 rounded-xl hover:bg-rose-900 transition-all active:scale-95" title="Eliminar Socio">🗑</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+      </div>
+
+      <!-- VISTA 4: DASHBOARD -->
+      <div x-show="vistaActiva === 'dashboard'" class="space-y-4">
+        <!-- ================================================================= -->
+<!-- COMPONENTE: balancePendientes.ejs                                 -->
+<!-- UBICACIÓN: views/dashboard/components/                           -->
+<!-- RESPONSABILIDAD: Tarjeta de resumen de balance y KPIs globales    -->
+<!-- ================================================================= -->
+
+<div class="bg-[#0b132b] border border-slate-800 rounded-lg p-4 space-y-4">
+  <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-3">
+    <h2 class="text-base font-semibold text-white flex items-center gap-2">
+      <span>📊 Balance y Pendientes</span>
+    </h2>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-cyan-400 font-mono" x-text="`Lote Activo: ${loteActivo || 'N/A'}`"></span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
+      <span class="text-xs text-slate-400">Total Movimiento Filtrado</span>
+      <div class="text-xl font-bold text-cyan-400 font-mono mt-1" x-text="formatMonto(movimientoFiltradoTotal)"></div>
+    </div>
+    <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
+      <span class="text-xs text-slate-400">Socios Registrados</span>
+      <div class="text-xl font-bold text-white font-mono mt-1" x-text="directorio.length"></div>
+    </div>
+    <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
+      <span class="text-xs text-slate-400">Comprobantes Registrados</span>
+      <div class="text-xl font-bold text-emerald-400 font-mono mt-1" x-text="comprobantes.length"></div>
+    </div>
+  </div>
+</div>
+
+        <!-- ================================================================= -->
+<!-- COMPONENTE: inspeccionLotes.ejs                                   -->
+<!-- UBICACIÓN: views/dashboard/components/                           -->
+<!-- RESPONSABILIDAD: Tabla de inspección de saldos pendientes         -->
+<!-- ================================================================= -->
+
+<div class="bg-[#0b132b] border border-slate-800 rounded-lg p-4 space-y-4">
+  <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+    <h2 class="text-base font-semibold text-white">🔍 Inspección de Lotes</h2>
+  </div>
+  <p class="text-xs text-slate-400">Inspecciona y monitorea los saldos pendientes por socio y lote.</p>
+
+  <!-- TABLA: solo escritorio (>= 768px) -->
+  <div class="glauk-lotes-tabla overflow-x-auto">
+    <table class="w-full text-left text-xs">
+      <thead class="bg-slate-900/80 text-slate-400 font-mono">
+        <tr>
+          <th class="p-2">Socio</th>
+          <th class="p-2">Pendiente</th>
+          <th class="p-2">Acción</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/50">
+        <template x-for="item in sociosPendientesConsolidado" :key="item.nombre">
+          <tr class="hover:bg-slate-800/30">
+            <td class="p-2 text-white font-medium" x-text="item.nombre"></td>
+            <td class="p-2 text-cyan-400 font-mono font-bold" x-text="formatMonto(item.saldoFinal) + ' ' + item.moneda"></td>
+            <td class="p-2">
+              <div class="flex items-center gap-1.5">
+                <button @click="verComprobantesDeSocio(item.nombre)" class="px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded hover:bg-cyan-500/30 active:scale-95 transition-all">
+                  Ver Comprobantes
+                </button>
+                <button @click="abrirReporteSocio(item.nombre)" class="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded hover:bg-emerald-500 hover:text-white active:scale-95 transition-all font-bold">
+                  Reporte
+                </button>
+              </div>
+            </td>
+          </tr>
+        </template>
+
+        <template x-if="!sociosPendientesConsolidado || sociosPendientesConsolidado.length === 0">
+          <tr>
+            <td colspan="3" class="p-4 text-center text-slate-500">No hay pendientes registrados en este período.</td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TARJETAS TÁCTILES: solo móvil (< 768px) -->
+  <div class="glauk-lotes-cards">
+    <template x-for="item in sociosPendientesConsolidado" :key="'lote-movil-' + item.nombre">
+      <article class="glauk-lote-card">
+        <div class="glauk-lote-card__info">
+          <p class="glauk-lote-card__name" x-text="item.nombre"></p>
+          <p class="glauk-lote-card__amount"
+             :class="(Number(item.saldoFinal) || 0) >= 0 ? 'is-positive' : 'is-negative'"
+             x-text="formatMonto(item.saldoFinal) + ' ' + item.moneda"></p>
+        </div>
+        <div class="glauk-lote-card__actions">
+          <button type="button"
+                  class="glauk-lote-action is-ver"
+                  @click="verComprobantesDeSocio(item.nombre)"
+                  title="Ver comprobantes del socio"
+                  aria-label="Ver comprobantes del socio">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+          <button type="button"
+                  class="glauk-lote-action is-reporte"
+                  @click="abrirReporteSocio(item.nombre)"
+                  title="Generar estado de cuenta"
+                  aria-label="Generar estado de cuenta">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M8 13h8"/>
+              <path d="M8 17h5"/>
+            </svg>
+          </button>
+        </div>
+      </article>
+    </template>
+
+    <div class="glauk-lote-empty"
+         x-show="!sociosPendientesConsolidado || sociosPendientesConsolidado.length === 0">
+      No hay pendientes registrados en este período.
+    </div>
+  </div>
+</div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- COMPONENTES MODALES FLOTANTES -->
+  <!-- ================================================================= -->
+<!-- COMPONENTE: modalConfigSocio.ejs                                  -->
+<!-- UBICACIÓN: views/directorio/components/                           -->
+<!-- RESPONSABILIDAD: Modal de configuración integral del socio        -->
+<!-- ================================================================= -->
+
+<div x-show="modalConfigSocioAbierto"
+     x-cloak
+     class="glauk-modal"
+     @click.self="modalConfigSocioAbierto = false">
+  <div class="glauk-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="glauk-config-socio-title">
+    <div class="glauk-modal__handle" aria-hidden="true"></div>
+    <header class="glauk-modal__header">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 shrink-0 rounded-xl bg-purple-950 border border-purple-500/40 flex items-center justify-center text-purple-300 text-base">⚙</div>
+        <div class="min-w-0">
+          <h3 id="glauk-config-socio-title">Configuración Integral</h3>
+          <p>Valores con lote <strong class="text-cyan-400" x-text="loteActivo || 'ACTIVO'"></strong>.</p>
+        </div>
+      </div>
+      <button type="button" class="glauk-modal__close" @click="modalConfigSocioAbierto = false" aria-label="Cerrar configuración">✕</button>
+    </header>
+
+    <!-- FORMULARIO REACTIVO DE EDICIÓN -->
+    <template x-if="socioConfigEdit">
+      <div class="glauk-modal__content">
+        <div class="glauk-modal__body">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-[#030611] p-3 rounded-2xl border border-blue-900/60">
+          <div>
+            <label class="block text-[9px] font-bold text-purple-400 uppercase mb-1">Nombre Socio</label>
+            <input type="text" x-model="socioConfigEdit.nombre" class="w-full bg-[#080e26] border border-blue-900/80 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold outline-none uppercase">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-pink-400 uppercase mb-1">Moneda Nativa</label>
+            <select x-model="socioConfigEdit.moneda_socio" class="w-full bg-[#080e26] border border-pink-500/40 rounded-xl px-2.5 py-1.5 text-xs text-pink-300 font-bold outline-none uppercase">
+              <template x-for="m in listaMonedasActivas" :key="'nativa-' + m.code">
+                <option :value="m.code" x-text="m.code" :selected="m.code === socioConfigEdit.moneda_socio"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-amber-400 uppercase mb-1">Saldo Anterior</label>
+            <input type="number" step="0.01" x-model="socioConfigEdit.saldo_anterior" class="w-full bg-[#080e26] border border-amber-500/40 rounded-xl px-2.5 py-1.5 text-xs font-black text-amber-300 outline-none">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-cyan-400 uppercase mb-1">ID Grupo / WhatsApp</label>
+            <input type="text" x-model="socioConfigEdit.whatsapp" placeholder="120363...@g.us" class="w-full bg-[#080e26] border border-blue-900/80 rounded-xl px-2.5 py-1.5 text-xs text-cyan-300 font-mono outline-none">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-emerald-400 uppercase mb-1">Ver Dashboard</label>
+            <select x-model.boolean="socioConfigEdit.mostrar_dashboard" class="w-full bg-[#080e26] border border-emerald-500/40 rounded-xl px-2.5 py-1.5 text-xs text-emerald-300 font-bold outline-none">
+              <option :value="true">SÍ</option>
+              <option :value="false">NO</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-purple-400 uppercase mb-1">Hereda?</label>
+            <select x-model.boolean="socioConfigEdit.herencia" class="w-full bg-[#080e26] border border-purple-500/40 rounded-xl px-2.5 py-1.5 text-xs text-purple-300 font-bold outline-none">
+              <option :value="true">SÍ</option>
+              <option :value="false">NO</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ACCIONES SECUNDARIAS DE ENVÍO -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-3 border-t border-blue-900/60">
+          <button type="button" @click="enviarTasaIndividual(socioConfigEdit, true)" class="min-h-11 px-3 py-2 bg-purple-950/80 border border-purple-500/50 text-purple-300 rounded-xl text-xs font-black active:scale-95 transition-all">🧪 Enviar a Prueba</button>
+          <button type="button" @click="enviarTasaIndividual(socioConfigEdit, false)" class="min-h-11 px-3 py-2 bg-amber-950/80 border border-amber-500/50 text-amber-300 rounded-xl text-xs font-black active:scale-95 transition-all">⚡ Enviar Prod</button>
+        </div>
+        </div>
+
+        <footer class="glauk-modal__footer">
+          <button type="button" @click="modalConfigSocioAbierto = false" class="px-4 py-2.5 bg-[#030611] text-slate-300 rounded-xl text-xs font-bold border border-blue-900 hover:text-white transition-all">Cancelar</button>
+          <button type="button" @click="guardarConfigSocioModal()" class="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-xs font-black shadow-lg shadow-purple-600/30 active:scale-95 transition-all">💾 Guardar Cambios</button>
+        </footer>
+      </div>
+    </template>
+
+  </div>
+</div>
+
+  <!-- ================================================================= -->
+<!-- COMPONENTE: modalEditarComprobante.ejs                            -->
+<!-- UBICACIÓN: views/comprobantes/components/                         -->
+<!-- RESPONSABILIDAD: Modal con Recalculo Dinámico de Montos / Socios  -->
+<!-- ================================================================= -->
+
+<div x-data="{
+  modalAbierto: false,
+  cargando: false,
+  itemEdicion: null,
+
+  numeroPuro(valor) {
+    if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
+    if (valor === null || valor === undefined) return 0;
+    const texto = String(valor).trim().replace(/[^\d.,+-]/g, '');
+    if (!texto) return 0;
+    const limpio = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(texto)
+      ? texto.replace(/,/g, '')
+      : texto.replace(/\.(?=\d{3}\b)/g, '').replace(',', '.');
+    const num = Number(limpio);
+    return Number.isFinite(num) ? num : 0;
+  },
+
+  async guardarModal() {
+    if (!this.itemEdicion || this.cargando) return;
+    this.cargando = true;
+
+    const hashTarget = String(this.itemEdicion.hash_largo || this.itemEdicion.id || '').trim();
+    if (!hashTarget) {
+      alert('⚠️ El comprobante no tiene hash largo; no se puede guardar.');
+      this.cargando = false;
+      return;
+    }
+
+    // El backend recalcula el snapshot completo. Solo se envían los campos que
+    // el usuario editó; no se envían subtotales ni tasas calculadas en el cliente.
+    const montoPuro = Math.abs(this.numeroPuro(this.itemEdicion.monto));
+    const lote = String(this.itemEdicion.lote_tasa_asignado || 'T070').trim().toUpperCase();
+    const moneda = String(this.itemEdicion.moneda || 'USDT').trim().toUpperCase();
+    const naturaleza = String(this.itemEdicion.tipo_manual || 'D').trim().toUpperCase();
+
+    const payload = {
+      hash_largo: hashTarget,
+      banco: String(this.itemEdicion.banco || '').trim(),
+      referencia: String(this.itemEdicion.referencia || '').trim(),
+      titular: String(this.itemEdicion.titular || '').trim(),
+      socio_1: String(this.itemEdicion.nombre_socio_1 || 'GENERAL').trim(),
+      socio_2: String(this.itemEdicion.nombre_socio_2 || 'GENERAL').trim(),
+      nombre_socio_1: String(this.itemEdicion.nombre_socio_1 || 'GENERAL').trim(),
+      nombre_socio_2: String(this.itemEdicion.nombre_socio_2 || 'GENERAL').trim(),
+      tipo_manual: naturaleza,
+      moneda,
+      monto: montoPuro,
+      lote_tasa_asignado: lote,
+      lote_tasa: lote
+    };
+
+    console.log('PAYLOAD ENVIADO:', payload);
+
+    try {
+      const resolverApi = window.GlaukAPI?.url || ((ruta) => ruta);
+      const res = await fetch(resolverApi('/api/v1/comprobantes/' + encodeURIComponent(hashTarget)), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        console.error('ERROR BACKEND DETALLADO:', res.status, errorData);
+        const detalle = errorData?.error || errorData?.message || ('HTTP ' + res.status);
+        throw new Error('Error del servidor (' + res.status + '): ' + detalle);
+      }
+
+      const okData = await res.json().catch(() => null);
+      console.log('RESPUESTA BACKEND:', res.status, okData);
+
+      // La fila se refresca desde la API canónica; no se mezcla el payload local.
+      window.dispatchEvent(new CustomEvent('comprobante-actualizado', {
+        detail: { hash_largo: hashTarget }
+      }));
+      this.modalAbierto = false;
+    } catch (err) {
+      alert('⚠️ Error al congelar el comprobante: ' + err.message);
+    } finally {
+      this.cargando = false;
+    }
+  }
+}"
+@abrir-modal-edicion.window="
+  if ($event && $event.detail) {
+    const raw = $event.detail.comprobante || $event.detail;
+    const idHash = String(raw.hash_largo || raw.id || raw.referencia || '').trim();
+    const s1 = raw.nombre_socio_1 || raw.socio_1 || (raw.grupo_1 ? raw.grupo_1.grupo : 'GENERAL');
+    const s2 = raw.nombre_socio_2 || raw.socio_2 || (raw.grupo_2 ? raw.grupo_2.grupo : 'GENERAL');
+
+    itemEdicion = JSON.parse(JSON.stringify({
+      ...raw,
+      id: idHash,
+      hash_largo: idHash,
+      nombre_socio_1: s1,
+      socio_1: s1,
+      nombre_socio_2: s2,
+      socio_2: s2,
+      monto: Number(raw.monto ?? raw.monto_local ?? 0),
+      tipo_manual: String(raw.tipo_manual || raw.tipo_op1 || raw.tipo_op || raw.tipo || 'D').split('-')[0].toUpperCase(),
+      moneda: String(raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
+      lote_tasa_asignado: raw.lote_tasa_asignado || raw.lote_tasa || raw.lote || 'T070'
+    }));
+
+    modalAbierto = true;
+  }
+">
+  <template x-teleport="body">
+    <div x-show="modalAbierto"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="glauk-modal"
+         @click.self="modalAbierto = false"
+         x-cloak>
+
+      <div class="glauk-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="glauk-editar-title">
+        <div class="glauk-modal__handle" aria-hidden="true"></div>
+
+        <!-- CABECERA FIJA DEL MODAL -->
+        <header class="glauk-modal__header">
+          <h3 id="glauk-editar-title">✏️ Editar Comprobante</h3>
+          <button type="button"
+                  class="glauk-modal__close"
+                  @click="modalAbierto = false"
+                  aria-label="Cerrar edición">✕</button>
+        </header>
+
+        <!-- CUERPO SCROLLEABLE DEL MODAL -->
+        <template x-if="itemEdicion">
+          <div class="glauk-modal__content">
+            <div class="glauk-modal__body text-xs">
+
+            <!-- ENCABEZADO: HASH LARGO Y FECHA INPUT -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-[#030611] p-2.5 rounded-xl border border-blue-900/60">
+              <div class="sm:col-span-2">
+                <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Hash Largo Referencia</label>
+                <input type="text"
+                       x-model="itemEdicion.hash_largo"
+                       readonly
+                       class="w-full bg-[#080e26] border border-cyan-500/30 rounded-lg px-2 py-1.5 text-xs text-cyan-400 font-mono font-bold outline-none truncate">
+              </div>
+              <div class="sm:col-span-1">
+                <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Fecha Input</label>
+                <input type="datetime-local"
+                       x-model="itemEdicion.fecha_hora_input"
+                       class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-white font-mono font-bold outline-none focus:border-cyan-400">
+              </div>
+            </div>
+
+            <!-- BLOQUE 1: DATOS EXTRAÍDOS / BANCO -->
+            <div class="space-y-1">
+              <span class="text-[10px] font-black text-cyan-400 uppercase tracking-wider">1. DATOS EXTRAÍDOS / BANCO</span>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-[#030611] p-2.5 rounded-xl border border-blue-900/60">
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Banco</label>
+                  <input type="text"
+                         x-model="itemEdicion.banco"
+                         placeholder="BINANCE"
+                         class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none uppercase focus:border-cyan-400">
+                </div>
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Nº Referencia</label>
+                  <input type="text"
+                         x-model="itemEdicion.referencia"
+                         placeholder="418926466452"
+                         class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-cyan-300 font-mono font-bold outline-none focus:border-cyan-400">
+                </div>
+                <div>
+                  <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Titular Cuenta</label>
+                  <input type="text"
+                         x-model="itemEdicion.titular"
+                         placeholder="JAIRO FUNDABLOCK"
+                         class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none uppercase focus:border-cyan-400">
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOQUE 2: ASIGNACIÓN DE SOCIOS -->
+            <div class="space-y-1">
+              <span class="text-[10px] font-black text-purple-400 uppercase tracking-wider">2. ASIGNACIÓN DE SOCIOS</span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-[#030611] p-2.5 rounded-xl border border-blue-900/60">
+                <div>
+                  <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5">Socio 1 (Impacto)</label>
+                  <select x-model="itemEdicion.nombre_socio_1"
+                          class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none">
+                    <option value="GENERAL">GENERAL</option>
+                    <template x-for="(s, idx) in (typeof directorio !== 'undefined' ? directorio : (typeof todosLosSocios !== 'undefined' ? todosLosSocios : []))" :key="'ed-s1-' + idx">
+                      <option :value="typeof s === 'object' ? (s.nombre || '') : s"
+                              :selected="(typeof s === 'object' ? s.nombre : s) === itemEdicion.nombre_socio_1"
+                              x-text="typeof s === 'object' ? (s.nombre || '') : s"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5">Socio 2 (Contraparte)</label>
+                  <select x-model="itemEdicion.nombre_socio_2"
+                          class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none">
+                    <option value="GENERAL">GENERAL</option>
+                    <template x-for="(s, idx) in (typeof directorio !== 'undefined' ? directorio : (typeof todosLosSocios !== 'undefined' ? todosLosSocios : []))" :key="'ed-s2-' + idx">
+                      <option :value="typeof s === 'object' ? (s.nombre || '') : s"
+                              :selected="(typeof s === 'object' ? s.nombre : s) === itemEdicion.nombre_socio_2"
+                              x-text="typeof s === 'object' ? (s.nombre || '') : s"></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOQUE 3: REGLAS DE OPERACIÓN -->
+            <div class="space-y-1">
+              <span class="text-[10px] font-black text-amber-400 uppercase tracking-wider">3. REGLAS DE OPERACIÓN</span>
+              <div class="bg-[#030611] p-2.5 rounded-xl border border-blue-900/60 space-y-2">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[8px] font-bold text-amber-400 uppercase mb-0.5">Naturaleza</label>
+                    <select x-model="itemEdicion.tipo_manual"
+                            class="w-full bg-[#080e26] border border-amber-500/40 rounded-lg px-2 py-1.5 text-xs text-amber-300 font-bold outline-none">
+                      <option value="A">A (Abono)</option>
+                      <option value="D">D (Depósito)</option>
+                      <option value="P">P (Pago)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-[8px] font-bold text-emerald-400 uppercase mb-0.5">Moneda Recibo</label>
+                    <select x-model="itemEdicion.moneda"
+                            class="w-full bg-[#080e26] border border-emerald-500/40 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none">
+                      <template x-for="m in ['USD','USDT','ECU','VES','COP','PEN','ARS','BRL','CLP','MXN','PYG','BOB','EUR','CAD','GBP']" :key="m">
+                        <option :value="m" x-text="m" :selected="m === itemEdicion.moneda"></option>
+                      </template>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-[8px] font-bold text-emerald-400 uppercase mb-0.5">Monto Local</label>
+                    <input type="number"
+                           step="any"
+                           x-model="itemEdicion.monto"
+                           class="w-full bg-[#080e26] border border-emerald-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
+                  </div>
+
+                  <div>
+                    <label class="block text-[8px] font-bold text-purple-400 uppercase mb-0.5">Lote Tasa</label>
+                    <input type="text"
+                           x-model="itemEdicion.lote_tasa_asignado"
+                           placeholder="T070"
+                           class="w-full bg-[#080e26] border border-purple-500/40 rounded-lg px-2 py-1.5 text-xs text-purple-300 font-mono font-bold outline-none uppercase">
+                  </div>
+                </div>
+
+                <div class="text-[10px] text-slate-400 bg-[#020617] border border-blue-900/60 rounded-xl p-2.5">
+                  Los subtotales y las tasas se recalculan en el backend al guardar. Esta pantalla solo edita los datos del comprobante.
+                </div>
+
+              </div>
+            </div>
+
+            <!-- BOTONERA DE ACCIONES (FOOTER FIJO) -->
+            </div>
+
+            <footer class="glauk-modal__footer">
+              <button type="button"
+                      @click="modalAbierto = false"
+                      class="px-3.5 py-2.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-600/50 text-rose-300 rounded-xl font-bold transition-all active:scale-95 text-xs cursor-pointer">
+                Cancelar
+              </button>
+              <button type="button"
+                      @click="guardarModal()"
+                      :disabled="cargando"
+                      class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black shadow-lg shadow-cyan-950/50 transition-all active:scale-95 text-xs cursor-pointer disabled:opacity-50">
+                <span x-show="!cargando">💾 Guardar Cambios</span>
+                <span x-show="cargando">⏳ Guardando...</span>
+              </button>
+            </footer>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </template>
+</div>
+
+  <!-- ================================================================= -->
+<!-- COMPONENTE: modalReporteEstadoCuenta.ejs                          -->
+<!-- UBICACIÓN: views/reportes/components/                            -->
+<!-- RESPONSABILIDAD: Modal visor y despacho de estados de cuenta      -->
+<!-- ================================================================= -->
+
+<div x-show="modalReporteAbierto"
+     class="glauk-modal"
+     @click.self="modalReporteAbierto = false"
+     x-cloak>
+  <div class="glauk-modal__dialog glauk-modal__dialog--wide" role="dialog" aria-modal="true" aria-labelledby="glauk-reporte-title">
+    <div class="glauk-modal__handle" aria-hidden="true"></div>
+
+    <!-- CABECERA FIJA -->
+    <header class="glauk-modal__header">
+      <div class="flex items-center gap-2 min-w-0">
+        <h3 id="glauk-reporte-title" class="shrink-0 font-black tracking-tight">Reporte de Estado de Cuenta</h3>
+        <span class="px-2 py-0.5 bg-purple-950/80 border border-purple-500/40 text-purple-300 rounded-lg text-[10px] font-bold font-mono truncate"
+              x-text="(reporteSocio || 'Sin socio') + ' · ' + reporteItems.length + ' ítems'"></span>
+      </div>
+      <button type="button" class="glauk-modal__close" @click="modalReporteAbierto = false" aria-label="Cerrar estado de cuenta">✕</button>
+    </header>
+
+    <!-- CUERPO SCROLLEABLE -->
+    <div class="glauk-modal__content">
+      <div class="glauk-modal__body">
+
+    <!-- BARRA DE MÉTRICAS: mismo componente visual que el dashboard -->
+    <div class="glauk-reporte-metricas">
+      <div class="bg-[#060c24] p-2.5 rounded-xl border border-amber-500/30 shadow-xl min-w-0">
+        <p class="text-[8px] font-extrabold text-amber-400 uppercase truncate">Saldo anterior</p>
+        <h3 class="text-xs md:text-base font-black text-amber-300 mt-0.5 truncate"
+            x-text="reporteFormatearMonto(reporteSaldoInicialRango) + ' ' + reporteMoneda"></h3>
+      </div>
+      <div class="bg-[#060c24] p-2.5 rounded-xl border border-blue-900/50 shadow-xl min-w-0">
+        <p class="text-[8px] font-extrabold text-emerald-400 uppercase truncate">Movimiento parcial</p>
+        <h3 class="text-xs md:text-base font-black text-emerald-400 mt-0.5 truncate"
+            x-text="(reporteMovimientoTotal < 0 ? '-' : '+') + reporteFormatearMonto(Math.abs(reporteMovimientoTotal)) + ' ' + reporteMoneda"></h3>
+      </div>
+      <div class="bg-[#010a14] p-2.5 rounded-xl border border-emerald-500/40 shadow-xl min-w-0">
+        <p class="text-[8px] font-extrabold text-emerald-400 uppercase truncate">Saldo final</p>
+        <h3 class="text-xs md:text-base font-black text-emerald-300 mt-0.5 truncate"
+            x-text="reporteFormatearMonto(reporteSaldoFinalRango) + ' ' + reporteMoneda"></h3>
+      </div>
+    </div>
+
+    <!-- BARRA DE FILTROS DEL REPORTE -->
+    <div class="flex flex-wrap items-center gap-1.5">
+        <div class="flex items-center gap-1 bg-[#030611] border border-blue-900/60 rounded-lg px-1.5 py-1">
+          <label class="text-[9px] font-bold text-slate-400 uppercase" for="reporte-desde">Desde</label>
+          <input id="reporte-desde" type="date" x-model="reporteFechaInicio" @change="recargarReporte()" class="bg-[#030611] text-[10px] text-slate-200 outline-none">
+          <label class="text-[9px] font-bold text-slate-400 uppercase" for="reporte-hasta">Hasta</label>
+          <input id="reporte-hasta" type="date" x-model="reporteFechaFin" @change="recargarReporte()" class="bg-[#030611] text-[10px] text-slate-200 outline-none">
+        </div>
+        <div class="flex items-center gap-1 bg-[#030611] border border-blue-900/60 rounded-lg px-1.5 py-1">
+          <button type="button" @click="reportePaginaAnterior()" :disabled="reportePaginaSegura <= 1" class="min-w-8 min-h-8 text-[11px] text-cyan-300 disabled:opacity-50">◀</button>
+          <span class="text-[10px] text-slate-300 font-mono" x-text="reportePaginaSegura + '/' + reporteTotalPaginas"></span>
+          <button type="button" @click="reportePaginaSiguiente()" :disabled="reportePaginaSegura >= reporteTotalPaginas" class="min-w-8 min-h-8 text-[11px] text-cyan-300 disabled:opacity-50">▶</button>
+        </div>
+        <div class="flex items-center gap-1 bg-[#030611] border border-amber-500/40 rounded-lg px-1.5 py-1">
+          <label class="text-[9px] font-bold text-amber-400 uppercase" for="reporte-desde-hash">Desde hash</label>
+          <select id="reporte-desde-hash" x-model="reporteDesdeHash" @change="reiniciarPaginaReporte()" class="bg-[#030611] text-[10px] text-amber-200 outline-none max-w-[120px]">
+            <option value="">TODOS</option>
+            <template x-for="item in reporteOpcionesHash" :key="'rdh-' + (item.hash_largo || item.id)">
+              <option :value="item.hash_largo || item.id" x-text="reporteHashItem(item)"></option>
+            </template>
+          </select>
+          <label class="text-[9px] font-bold text-amber-400 uppercase" for="reporte-hasta-hash">Hasta hash</label>
+          <select id="reporte-hasta-hash" x-model="reporteHastaHash" @change="reiniciarPaginaReporte()" class="bg-[#030611] text-[10px] text-amber-200 outline-none max-w-[120px]">
+            <option value="">TODOS</option>
+            <template x-for="item in reporteOpcionesHash" :key="'rhh-' + (item.hash_largo || item.id)">
+              <option :value="item.hash_largo || item.id" x-text="reporteHashItem(item)"></option>
+            </template>
+          </select>
+        </div>
+        <div class="flex items-center gap-1 bg-[#030611] border border-blue-900/60 rounded-lg px-1.5 py-1">
+          <label class="text-[9px] font-bold text-slate-400 uppercase" for="reporte-orden">Orden</label>
+          <select id="reporte-orden" x-model="reporteOrden" @change="recargarReporte()" class="bg-[#030611] text-[10px] text-slate-200 outline-none">
+            <option value="fecha_asc">Ascendente</option>
+            <option value="fecha_desc">Descendente</option>
+          </select>
+        </div>
+    </div>
+
+    <div x-show="reporteCargando" class="px-3 py-1.5 text-[10px] text-amber-300 bg-amber-950/40 border border-amber-900/60 rounded-lg">
+      ⏳ Cargando comprobantes y saldos del socio...
+    </div>
+
+    <!-- DOCUMENTO RENDERIZADO PARA CAPTURA DE IMAGEN -->
+    <div class="glauk-reporte-scroll">
+      <div id="reporte-html-documento" class="bg-white text-slate-900 p-6 flex flex-col shrink-0 mx-auto" style="width:800px; max-width:800px">
+        <div>
+          <div class="border-b-2 border-slate-900 pb-3 mb-4 flex justify-between items-start gap-4">
+            <div>
+              <h1 class="text-lg font-black uppercase text-slate-900">REPORTE DE ESTADO DE CUENTA</h1>
+              <p class="text-[10px] text-slate-500 font-bold mt-1" x-text="'Rango auditado: ' + reporteRangoTexto"></p>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-xs font-black text-emerald-600 font-mono">FUNDABLOCK GLAUK2 ENGINE</span>
+              <span class="block text-[9px] font-mono text-slate-400" x-text="'Página ' + reportePaginaSegura + ' de ' + reporteTotalPaginas"></span>
+            </div>
+          </div>
+
+          <div class="flex items-end justify-between gap-4 mb-4">
+            <div>
+              <span class="block text-[9px] font-black text-slate-400 uppercase">Socio auditado</span>
+              <span class="block text-xl font-black uppercase text-slate-900" x-text="reporteSocio || 'TODOS'"></span>
+              <span class="block text-[10px] text-slate-500 font-mono" x-text="reporteItems.length + ' comprobante(s) cargado(s)'"></span>
+              <span class="block text-[10px] text-slate-500 font-mono" x-text="'Movimiento total del rango: ' + (reporteMovimientoTotal < 0 ? '-' : '+') + reporteFormatearMonto(Math.abs(reporteMovimientoTotal)) + ' ' + reporteMoneda"></span>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-lg px-5 py-3 text-right" style="min-width:190px">
+              <span class="block text-[9px] font-black text-slate-500 uppercase" x-text="reporteEsDescendente ? 'Saldo final de página' : 'Saldo anterior de página'"></span>
+              <span class="block text-xl font-mono font-black text-amber-700" x-text="reporteFormatearMonto(reporteSaldoAnteriorPagina) + ' ' + reporteMoneda"></span>
+            </div>
+          </div>
+
+          <table class="w-full text-left text-[10px]">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 font-mono uppercase">
+                <th class="px-2 py-1.5">Fecha</th>
+                <th class="px-2 py-1.5">Tipo</th>
+                <th class="px-2 py-1.5">Hash</th>
+                <th class="px-2 py-1.5 text-right">Monto recibo</th>
+                <th class="px-2 py-1.5 text-center">Tasa</th>
+                <th class="px-2 py-1.5">Titular / Banco</th>
+                <th class="px-2 py-1.5 text-right">Subtotal socio</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="item in reporteItemsPagina" :key="item.hash_largo || item.id">
+                <tr class="border-b">
+                  <td class="px-2 py-1.5 font-mono text-slate-500" x-text="reporteFechaItem(item)"></td>
+                  <td class="px-2 py-1.5"><span class="font-black text-slate-900" x-text="reporteTipoItem(item)"></span></td>
+                  <td class="px-2 py-1.5 font-mono text-slate-500" x-text="reporteHashItem(item)"></td>
+                  <td class="px-2 py-1.5 text-right font-mono text-slate-900" x-text="reporteFormatearMonto(reporteMontoOriginalItem(item)) + ' ' + reporteMonedaOriginalItem(item)"></td>
+                  <td class="px-2 py-1.5 text-center font-mono">
+                    <span class="block font-bold text-slate-900" x-text="reporteFormatearTasa(reporteTasaItem(item))"></span>
+                    <span class="block text-[9px] text-slate-400" x-show="reporteLoteItem(item)" x-text="reporteLoteItem(item)"></span>
+                  </td>
+                  <td class="px-2 py-1.5 text-slate-500">
+                    <span class="block font-bold text-slate-900" x-text="reporteTitularItem(item)"></span>
+                    <span class="block text-[9px] text-slate-400" x-text="reporteBancoItem(item)"></span>
+                  </td>
+                  <td class="px-2 py-1.5 text-right font-mono font-black" :style="reporteSignoItem(item) === '-' ? 'color:#e11d48' : 'color:#047857'" x-text="reporteSignoItem(item) + reporteFormatearMonto(reporteMontoItem(item)) + ' ' + reporteMonedaItem(item)"></td>
+                </tr>
+              </template>
+              <template x-if="reporteItemsPagina.length === 0">
+                <tr>
+                  <td colspan="7" class="px-2 py-3 text-center text-slate-500 font-bold">
+                    Sin comprobantes para el socio y rango seleccionados.
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-3">
+          <div class="flex items-center justify-end gap-3 mb-4">
+            <div class="text-right">
+              <span class="block text-[9px] font-black text-slate-400 uppercase">Movimiento de página</span>
+              <span class="block text-sm font-mono font-black" :style="reporteMovimientoPagina < 0 ? 'color:#e11d48' : 'color:#0f172a'" x-text="(reporteMovimientoPagina < 0 ? '-' : '+') + reporteFormatearMonto(Math.abs(reporteMovimientoPagina)) + ' ' + reporteMoneda"></span>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-5 py-3 text-right" style="min-width:190px">
+              <span class="block text-[9px] font-black text-emerald-700 uppercase" x-text="reporteEsDescendente ? 'Saldo inicial de página' : 'Nuevo saldo de página'"></span>
+              <span class="block text-xl font-mono font-black text-emerald-800" x-text="reporteFormatearMonto(reporteSaldoFinalPagina) + ' ' + reporteMoneda"></span>
+            </div>
+          </div>
+          <div class="border-t-2 border-slate-900 pt-2 text-[9px] text-slate-500 flex justify-between font-mono gap-4">
+            <span>GLAUK2 ENGINE • AUDITORÍA EN TIEMPO REAL • DOCUMENTO OFICIAL</span>
+            <span class="shrink-0" x-text="'Página ' + reportePaginaSegura + ' de ' + reporteTotalPaginas"></span>
+          </div>
+        </div>
+      </div>
+      </div>
+      </div>
+
+      <footer class="glauk-modal__footer">
+        <button type="button"
+                @click="modalReporteAbierto = false"
+                class="px-4 py-2.5 bg-blue-950 text-slate-300 rounded-xl text-xs font-bold border border-blue-900 hover:text-white transition-all">
+          Cerrar
+        </button>
+        <button type="button"
+                @click="generandoImagen = true; enviarReporteViaEvolution(reporteSocio).finally(() => generandoImagen = false)"
+                :disabled="generandoImagen || reporteCargando || reporteItems.length === 0"
+                class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-lg active:scale-95 transition-all">
+          <span x-show="!generandoImagen" x-text="'🤖 Enviar Pág ' + reportePaginaSegura"></span>
+          <span x-show="generandoImagen">⏳ Enviando...</span>
+        </button>
+      </footer>
+    </div>
+
+  </div>
+</div>
+
+<!-- DETALLE TÁCTIL DEL COMPROBANTE -->
+<div x-show="detalleAbierto"
+     x-cloak
+     class="glauk-sheet-backdrop glauk-detail-backdrop"
+     @click.self="cerrarDetalle()">
+  <section class="glauk-bottom-sheet glauk-detail-sheet"
+           role="dialog"
+           aria-modal="true"
+           aria-labelledby="glauk-detalle-title">
+    <div class="glauk-sheet-handle" aria-hidden="true"></div>
+    <header class="glauk-sheet-head">
+      <div>
+        <h3 id="glauk-detalle-title">Detalle del comprobante</h3>
+        <p x-text="itemDetalle ? (itemDetalle.hash_corto || itemDetalle.hash_largo || '') : ''"></p>
+      </div>
+      <button type="button" class="glauk-sheet-close" @click="cerrarDetalle()" aria-label="Cerrar detalle">✕</button>
+    </header>
+
+    <div class="glauk-sheet-body" x-show="itemDetalle">
+      <div class="glauk-detail-image">
+        <template x-if="itemDetalle && urlRecibo(itemDetalle)">
+          <img :src="urlRecibo(itemDetalle)"
+               alt="Recibo del comprobante"
+               loading="lazy"
+               decoding="async"
+               @click="abrirLightbox(itemDetalle)">
+        </template>
+        <div x-show="!itemDetalle || !urlRecibo(itemDetalle)" class="glauk-thumb-empty">📷 Sin imagen</div>
+      </div>
+      <p class="glauk-detail-hint" x-show="itemDetalle && urlRecibo(itemDetalle)">Toca la imagen para ampliarla</p>
+
+      <div class="glauk-detail-grid">
+        <div><span>Monto recibo</span><strong x-text="formatMonto(itemDetalle?.monto || 0) + ' ' + (itemDetalle?.moneda || '')"></strong></div>
+        <div><span>Banco</span><strong x-text="itemDetalle?.banco || '-'"></strong></div>
+        <div><span>Titular</span><strong x-text="itemDetalle?.titular || '-'"></strong></div>
+        <div><span>Referencia</span><strong x-text="itemDetalle?.referencia || '-'"></strong></div>
+        <div><span>Lote tasa</span><strong x-text="itemDetalle?.lote_tasa_asignado || itemDetalle?.lote || itemDetalle?.lote_tasa || 'T-ND'"></strong></div>
+        <div><span>Fecha</span><strong x-text="itemDetalle?.fecha_fmt || 'S/F'"></strong></div>
+        <div><span>Hash</span><strong x-text="itemDetalle?.hash_largo || itemDetalle?.hash_corto || '-'"></strong></div>
+      </div>
+
+      <div class="glauk-detail-socios">
+        <div class="glauk-detail-socio">
+          <h4>Socio 1</h4>
+          <p><span>Nombre</span><strong x-text="itemDetalle?.socio_1 || itemDetalle?.nombre_socio_1 || 'GENERAL'"></strong></p>
+          <p><span>Tasa</span><strong x-text="formatTasa(resolverTasaComprobante(itemDetalle || {}, 1), (itemDetalle || {}).moneda, resolverTipoComprobante(itemDetalle || {}))"></strong></p>
+          <p><span>ME1</span><strong x-text="formatMonto(obtenerME1(itemDetalle || {}))"></strong></p>
+        </div>
+        <div class="glauk-detail-socio"
+             x-show="itemDetalle && (itemDetalle.socio_2 || itemDetalle.nombre_socio_2) && (itemDetalle.socio_2 || itemDetalle.nombre_socio_2) !== 'GENERAL' && (itemDetalle.socio_2 || itemDetalle.nombre_socio_2) !== 'NO DEFINIDO'">
+          <h4>Socio 2</h4>
+          <p><span>Nombre</span><strong x-text="itemDetalle?.socio_2 || itemDetalle?.nombre_socio_2"></strong></p>
+          <p><span>Tasa</span><strong x-text="formatTasa(resolverTasaComprobante(itemDetalle || {}, 2), (itemDetalle || {}).moneda, resolverTipoComprobante(itemDetalle || {}))"></strong></p>
+          <p><span>ME2</span><strong x-text="formatMonto(obtenerME2(itemDetalle || {}))"></strong></p>
+        </div>
+      </div>
+    </div>
+
+    <footer class="glauk-sheet-foot">
+      <button type="button" class="glauk-btn-secondary" @click="cerrarDetalle()">Cerrar</button>
+      <button type="button" class="glauk-btn-primary" @click="editarDesdeDetalle()">✏️ Editar</button>
+    </footer>
+  </section>
+</div>
+
+<!-- LIGHTBOX / VISOR DE IMAGEN A PANTALLA COMPLETA -->
+<div x-show="lightboxAbierto"
+     x-cloak
+     class="glauk-lightbox"
+     @click.self="cerrarLightbox()"
+     role="dialog"
+     aria-modal="true"
+     aria-label="Visor de imagen del comprobante">
+  <button type="button"
+          class="glauk-lightbox__close"
+          @click="cerrarLightbox()"
+          aria-label="Cerrar visor">✕</button>
+  <img x-show="lightboxImagen"
+       :src="lightboxImagen"
+       class="glauk-lightbox__image"
+       alt="Comprobante ampliado"
+       decoding="async"
+       @click.stop>
+</div>
+
+<script type="module" src="/shared/js/mobile-nav.js?v=20261025_02"></script>
+</body>
+</html>

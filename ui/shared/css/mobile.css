@@ -1,0 +1,1837 @@
+/* ==========================================================================
+   Glauk · capa mobile-first compartida
+   Bottom navigation, hojas deslizantes, filtros táctiles y tarjetas.
+   Se carga después de las hojas de estilo propias de cada módulo.
+   ========================================================================== */
+
+:root {
+  --glauk-nav-height: 64px;
+  --glauk-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+body.glauk-sheet-open {
+  overflow: hidden;
+}
+
+body.glauk-sheet-open .glauk-main {
+  overflow: hidden;
+}
+
+/* Notificaciones compartidas (Comprobantes no carga components.css). */
+.toast-host {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100% - 28px));
+}
+
+.toast-host .toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 11px;
+  border: 1px solid #16224f;
+  border-left: 4px solid #06b6d4;
+  border-radius: 10px;
+  background: #0b1326;
+  color: #e8eefc;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .35);
+  animation: glauk-toast-in .18s ease-out;
+}
+
+.toast-host .toast-success { border-left-color: #10b981; }
+.toast-host .toast-error { border-left-color: #fb7185; }
+.toast-host .toast-warning { border-left-color: #f59e0b; }
+.toast-host .toast-icon { color: #06b6d4; font-weight: 900; }
+.toast-host .toast-success .toast-icon { color: #10b981; }
+.toast-host .toast-error .toast-icon { color: #fb7185; }
+.toast-host .toast-warning .toast-icon { color: #f59e0b; }
+.toast-host .toast-text { flex: 1; font-size: .78rem; }
+.toast-host .toast-close { border: 0; background: transparent; color: #94a3b8; font-size: 1.1rem; line-height: 1; }
+
+@media (max-width: 1023px) {
+  .toast-host {
+    bottom: calc(14px + var(--glauk-nav-height) + var(--glauk-safe-bottom));
+  }
+}
+
+@keyframes glauk-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Bottom navigation (solo móvil/tablet; en desktop manda el sidebar)
+   -------------------------------------------------------------------------- */
+.glauk-bottom-nav {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  height: calc(var(--glauk-nav-height) + var(--glauk-safe-bottom));
+  padding: 0 6px var(--glauk-safe-bottom);
+  background: linear-gradient(180deg, rgba(7, 14, 35, .94), rgba(3, 6, 17, .99));
+  border-top: 1px solid rgba(34, 211, 238, .18);
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.glauk-bottom-nav a {
+  position: relative;
+  min-height: var(--glauk-nav-height);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  transition: color .15s ease, transform .12s ease;
+}
+
+.glauk-bottom-nav a:active {
+  transform: scale(.96);
+}
+
+.glauk-bottom-nav a.is-active {
+  color: #22d3ee;
+}
+
+.glauk-bottom-nav a.is-active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 999px 999px;
+  background: #22d3ee;
+  box-shadow: 0 0 12px rgba(34, 211, 238, .8);
+}
+
+.glauk-nav-icon {
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glauk-nav-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.glauk-nav-label {
+  line-height: 1;
+}
+
+@media (min-width: 1024px) {
+  .glauk-bottom-nav {
+    display: none;
+  }
+
+  body.glauk-has-bottom-nav {
+    padding-bottom: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .glauk-main {
+    padding-bottom: calc(var(--glauk-nav-height) + var(--glauk-safe-bottom)) !important;
+  }
+
+  body.glauk-has-bottom-nav .footer {
+    padding-bottom: calc(var(--glauk-nav-height) + var(--glauk-safe-bottom));
+  }
+
+  /* En Tasas el footer de acciones es fijo: debe subir por encima de la
+     BottomNav para que "Ver Previa" y "Guardar Cambios" sigan siendo
+     alcanzables con el pulgar. */
+  body.glauk-has-bottom-nav .sticky-footer {
+    bottom: calc(var(--glauk-nav-height) + var(--glauk-safe-bottom));
+    z-index: 45;
+  }
+
+  /* Reserva espacio para el footer de acciones cuando está visible. */
+  body.glauk-has-bottom-nav:has(#stickyFooter:not(.hidden)) .glauk-main {
+    padding-bottom: calc(var(--glauk-nav-height) + 76px + var(--glauk-safe-bottom)) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Drawer del sidebar en móvil
+   -------------------------------------------------------------------------- */
+.glauk-sidebar-backdrop {
+  display: none;
+}
+
+.glauk-sidebar-close {
+  display: none;
+}
+
+.glauk-mobile-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 2px;
+}
+
+.glauk-mobile-menu-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(34, 211, 238, .35);
+  border-radius: 12px;
+  background: #060c24;
+  color: #67e8f9;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.glauk-mobile-brand {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.glauk-mobile-brand strong {
+  color: #f8fafc;
+  font-size: 13px;
+  letter-spacing: .04em;
+}
+
+.glauk-mobile-brand span {
+  color: #22d3ee;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+}
+
+@media (max-width: 1023px) {
+  .glauk-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 80;
+    width: min(84vw, 300px);
+    max-width: 300px;
+    overflow-y: auto;
+    transform: translateX(-105%);
+    transition: transform .22s ease;
+    box-shadow: 24px 0 60px rgba(0, 0, 0, .55);
+  }
+
+  .glauk-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .glauk-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    background: rgba(0, 0, 0, .66);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .glauk-sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    border: 1px solid rgba(30, 58, 138, .8);
+    border-radius: 12px;
+    background: #030611;
+    color: #94a3b8;
+    font-size: 16px;
+    font-weight: 900;
+  }
+}
+
+@media (min-width: 1024px) {
+  .glauk-sidebar {
+    position: static;
+    transform: none;
+  }
+
+  .glauk-sidebar-backdrop {
+    display: none !important;
+  }
+
+  .glauk-sidebar-close {
+    display: none !important;
+  }
+
+  .glauk-mobile-topbar {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Barra compacta de filtros
+   -------------------------------------------------------------------------- */
+.glauk-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(6, 12, 36, .96);
+  border: 1px solid rgba(30, 58, 138, .55);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
+}
+
+@media (max-width: 1023px) {
+  .glauk-filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+}
+
+.glauk-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 1px;
+  scrollbar-width: none;
+}
+
+.glauk-filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.glauk-chip {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(30, 58, 138, .8);
+  background: #030611;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+
+.glauk-chip.is-active {
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, .55);
+  background: rgba(6, 182, 212, .12);
+}
+
+.glauk-filter-trigger {
+  flex: 0 0 auto;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 211, 238, .45);
+  background: rgba(6, 182, 212, .12);
+  color: #67e8f9;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.glauk-filter-count {
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #22d3ee;
+  color: #001018;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 0 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Bottom sheet / modal compartido (mobile-first)
+   --------------------------------------------------------------------------
+   Anatomía obligatoria: handle + header fijo + body scrolleable + footer fijo.
+   El diálogo nunca scrollea completo: solo su body. Así los botones de acción
+   quedan siempre accesibles con el pulgar, incluso con el teclado virtual. */
+.glauk-sheet-backdrop,
+.glauk-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, .75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  overscroll-behavior: contain;
+}
+
+.glauk-bottom-sheet,
+.glauk-modal__dialog {
+  width: 100%;
+  max-width: 600px;
+  max-height: 92vh;
+  max-height: 92dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0b132b;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, .55);
+  animation: glauk-sheet-up .22s ease-out;
+}
+
+.glauk-modal__dialog--wide {
+  max-width: min(1400px, 100%);
+}
+
+.glauk-sheet-handle,
+.glauk-modal__handle {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 5px;
+  margin: 8px auto 0;
+  border-radius: 999px;
+  background: #334155;
+}
+
+.glauk-sheet-head,
+.glauk-modal__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: #0f172a;
+}
+
+.glauk-sheet-head h3,
+.glauk-modal__header h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.glauk-sheet-head p,
+.glauk-modal__header p {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.glauk-sheet-close,
+.glauk-modal__close {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, .28);
+  background: #030611;
+  color: #cbd5e1;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  touch-action: manipulation;
+}
+
+.glauk-sheet-close:active,
+.glauk-modal__close:active {
+  transform: scale(.96);
+}
+
+.glauk-sheet-body,
+.glauk-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Permite que el body y el footer convivan dentro de un x-if de Alpine y que
+   el body siga siendo el único elemento con scroll. */
+.glauk-modal__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.glauk-sheet-foot,
+.glauk-modal__footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px calc(12px + var(--glauk-safe-bottom));
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  background: #0f172a;
+}
+
+.glauk-sheet-foot > button,
+.glauk-modal__footer > button {
+  min-height: 44px;
+}
+
+@media (max-width: 767px) {
+  /* Dos acciones principales a ancho completo: objetivo táctil cómodo. */
+  .glauk-sheet-foot > button,
+  .glauk-modal__footer > button {
+    flex: 1 1 0;
+  }
+
+  /* Los campos de formulario nunca bajan de 44px: se usan con el pulgar y son
+     el principal motivo de recortes cuando el teclado virtual abre. */
+  .glauk-modal__body input:not([type="checkbox"]):not([type="radio"]),
+  .glauk-modal__body select,
+  .glauk-modal__body textarea,
+  .glauk-sheet-body input:not([type="checkbox"]):not([type="radio"]),
+  .glauk-sheet-body select,
+  .glauk-sheet-body textarea {
+    min-height: 44px;
+  }
+
+  /* Cualquier acción dentro del cuerpo conserva el objetivo táctil mínimo,
+     incluidas las tarjetas de monedas ([+ Suma] / [- Resta]). */
+  .glauk-modal__body button,
+  .glauk-sheet-body button {
+    min-height: 44px;
+  }
+
+  /* Los botones solo-icono (quitar moneda) también deben ser cuadrados de 44px. */
+  .glauk-modal__body [data-accion="eliminar-moneda"] {
+    min-width: 44px;
+  }
+}
+
+/* Ningún bloque de contenido puede crear un scroll anidado vertical: el único
+   scroll del modal es el del body. */
+.glauk-modal__body > *,
+.glauk-sheet-body > * {
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .glauk-sheet-backdrop,
+  .glauk-modal {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .glauk-bottom-sheet,
+  .glauk-modal__dialog {
+    width: 90%;
+    max-width: 600px;
+    max-height: 85vh;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 12px;
+  }
+
+  .glauk-modal__dialog--wide {
+    max-width: min(1400px, 100%);
+  }
+
+  .glauk-sheet-handle,
+  .glauk-modal__handle {
+    display: none;
+  }
+
+  .glauk-sheet-foot,
+  .glauk-modal__footer {
+    padding-bottom: 12px;
+  }
+}
+
+@keyframes glauk-sheet-up {
+  from {
+    opacity: .4;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Lightbox de comprobantes
+   -------------------------------------------------------------------------- */
+.glauk-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, .94);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.glauk-lightbox__image {
+  max-width: 100%;
+  max-height: 75dvh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.glauk-lightbox__close {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top, 0px));
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  background: rgba(3, 6, 17, .9);
+  color: #f8fafc;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+/* --------------------------------------------------------------------------
+   Controles táctiles de filtros
+   -------------------------------------------------------------------------- */
+.glauk-filter-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .glauk-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.glauk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.glauk-label {
+  color: #67e8f9;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.glauk-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(30, 58, 138, .85);
+  border-radius: 12px;
+  background: #030611;
+  color: #e2e8f0;
+  font-size: 14px;
+  outline: none;
+}
+
+.glauk-input:focus {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, .16);
+}
+
+.glauk-btn-primary,
+.glauk-btn-secondary {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 900;
+  transition: transform .12s ease, filter .12s ease;
+}
+
+.glauk-btn-primary:active,
+.glauk-btn-secondary:active {
+  transform: scale(.98);
+}
+
+.glauk-btn-primary {
+  border: 1px solid #22d3ee;
+  background: #0891b2;
+  color: #fff;
+}
+
+.glauk-btn-secondary {
+  border: 1px solid #1e3a8a;
+  background: #0b1326;
+  color: #cbd5e1;
+}
+
+/* --------------------------------------------------------------------------
+   Tarjetas de comprobantes
+   -------------------------------------------------------------------------- */
+.glauk-comprobantes-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  min-height: 300px;
+}
+
+@media (min-width: 640px) {
+  .glauk-comprobantes-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1280px) {
+  .glauk-comprobantes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1536px) {
+  .glauk-comprobantes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.glauk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #16224f;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #060c24, #050a1c);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
+  cursor: pointer;
+  transition: border-color .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+
+.glauk-card:hover {
+  border-color: rgba(34, 211, 238, .45);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, .35);
+}
+
+.glauk-card:active {
+  transform: scale(.992);
+}
+
+.glauk-card:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+.glauk-card-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.glauk-card-thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(30, 58, 138, .8);
+  border-radius: 12px;
+  background: #010309;
+}
+
+.glauk-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.glauk-thumb-empty {
+  color: #64748b;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.glauk-card-head {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.glauk-card-amount {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.glauk-card-amount > span {
+  color: #34d399;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.glauk-card-amount small {
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.glauk-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.glauk-card-meta span:first-child {
+  color: #e2e8f0;
+}
+
+.glauk-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.glauk-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid rgba(30, 58, 138, .8);
+  border-radius: 999px;
+  background: #0b1326;
+  color: #cbd5e1;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.glauk-mini-badge.is-x2 {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, .4);
+  background: rgba(69, 26, 3, .8);
+}
+
+.glauk-finance-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+@media (min-width: 420px) {
+  .glauk-finance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.glauk-finance-cell {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(30, 58, 138, .5);
+  border-radius: 12px;
+  background: #030611;
+}
+
+.glauk-finance-cell.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.glauk-finance-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: #67e8f9;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.glauk-finance-title span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glauk-finance-values {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 5px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+}
+
+.glauk-finance-values strong {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.glauk-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(30, 58, 138, .4);
+}
+
+.glauk-card-hint {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.glauk-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.glauk-icon-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(30, 58, 138, .7);
+  border-radius: 11px;
+  background: #0b1326;
+  color: #94a3b8;
+  font-size: 15px;
+  transition: color .15s ease, border-color .15s ease;
+}
+
+.glauk-icon-btn:hover {
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, .5);
+}
+
+/* Grilla de KPIs superiores: 2 columnas en móvil y 4 parejas en escritorio,
+   sin la tarjeta editable de Saldo Anterior. */
+.glauk-kpis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 768px) {
+  .glauk-kpis-grid {
+    gap: 12px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .glauk-kpis-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tarjeta de comprobantes: cintillo superior + cuerpo horizontal
+   -------------------------------------------------------------------------- */
+.glauk-card.glauk-card-horizontal {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  max-width: 650px;
+  margin-inline: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #1e293b;
+  border-radius: 14px;
+  background: #0b1120;
+}
+
+/* Cintillo de KPIs a todo el ancho: fecha, hash, lote, tipo, x2 e IA. */
+.glauk-card-strip {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(30, 41, 59, .8);
+  background: #060b14;
+  font-size: 10px;
+}
+
+.glauk-card-strip__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.glauk-card-strip__meta > span {
+  flex: 0 0 auto;
+}
+
+.glauk-card-strip__sep {
+  color: #475569;
+}
+
+.glauk-card-strip__tipo {
+  color: #e2e8f0;
+  font-weight: 900;
+}
+
+.glauk-card-strip__tipo.is-tipo-d {
+  color: #34d399;
+}
+
+.glauk-card-strip__tipo.is-tipo-p {
+  color: #fda4af;
+}
+
+.glauk-card-strip__tipo.is-tipo-a {
+  color: #67e8f9;
+}
+
+.glauk-card-strip__flags {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.glauk-card-strip .glauk-mini-badge {
+  padding: 1px 5px;
+  font-size: 9px;
+}
+
+.glauk-card-body {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+
+.glauk-card-media {
+  position: relative;
+  flex: 0 0 23%;
+  min-width: 85px;
+  align-self: stretch;
+  overflow: hidden;
+  background: #020617;
+}
+
+.glauk-card-media img {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .9;
+  transition: opacity .2s ease, transform .25s ease;
+}
+
+.glauk-card-horizontal:hover .glauk-card-media img {
+  opacity: 1;
+  transform: scale(1.02);
+}
+
+.glauk-card-media-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #020617;
+  color: #64748b;
+  font-size: 22px;
+}
+
+.glauk-card-media-empty.hidden {
+  display: none !important;
+}
+
+.glauk-card-media-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 2px 6px;
+  border: 1px solid rgba(148, 163, 184, .25);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, .78);
+  color: #cbd5e1;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1.4;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+.glauk-card-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.glauk-card-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.glauk-card-amount-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.glauk-card-amount-main > strong {
+  color: #34d399;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 640px) {
+  .glauk-card-amount-main > strong {
+    font-size: 24px;
+  }
+}
+
+.glauk-card-amount-main > small {
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.glauk-card-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.glauk-card-action-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 7px;
+  background: rgba(148, 163, 184, .08);
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+@media (min-width: 640px) {
+  .glauk-card-action-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+}
+
+.glauk-card-action-btn:hover {
+  border-color: rgba(34, 211, 238, .4);
+  background: rgba(34, 211, 238, .14);
+  color: #67e8f9;
+}
+
+.glauk-card-action-btn:active {
+  transform: scale(.95);
+}
+
+.glauk-card-bank-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.glauk-card-bank-line strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #e2e8f0;
+  text-overflow: ellipsis;
+}
+
+.glauk-card-bank-line .glauk-card-bank {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.glauk-card-bullet {
+  flex: 0 0 auto;
+  color: #475569;
+}
+
+.glauk-card-ref {
+  overflow: hidden;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glauk-card-badges-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 1px 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.glauk-card-badges-line::-webkit-scrollbar {
+  display: none;
+}
+
+.glauk-card-badges-line .glauk-mini-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
+.glauk-mini-badge.is-tipo-d {
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, .45);
+  background: rgba(2, 44, 34, .75);
+}
+
+.glauk-mini-badge.is-tipo-p {
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, .4);
+  background: rgba(76, 5, 25, .65);
+}
+
+.glauk-mini-badge.is-tipo-a {
+  color: #67e8f9;
+  border-color: rgba(6, 182, 212, .4);
+  background: rgba(8, 51, 68, .7);
+}
+
+.glauk-mini-badge.is-ia-ok {
+  color: #c4b5fd;
+  border-color: rgba(168, 85, 247, .4);
+  background: rgba(59, 7, 100, .55);
+}
+
+.glauk-mini-badge.is-ia-bad {
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, .4);
+  background: rgba(76, 5, 25, .6);
+}
+
+.glauk-socios-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 1px;
+}
+
+.glauk-socio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 6px;
+  border-left: 3px solid transparent;
+  border-radius: 0 7px 7px 0;
+  background: rgba(15, 23, 42, .55);
+}
+
+.glauk-socio-row.is-socio1 {
+  border-left-color: #f59e0b;
+}
+
+.glauk-socio-row.is-socio2 {
+  border-left-color: #22d3ee;
+}
+
+/* Columna izquierda en dos líneas: nombre con emoji de rol y, debajo, la tasa. */
+.glauk-socio-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding-left: 1px;
+  padding-right: 8px;
+}
+
+.glauk-socio-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.glauk-socio-emoji {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.glauk-socio-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.glauk-socio-row.is-socio1 .glauk-socio-name {
+  color: #fbbf24;
+}
+
+.glauk-socio-row.is-socio2 .glauk-socio-name {
+  color: #22d3ee;
+}
+
+.glauk-socio-rate {
+  flex: 0 0 auto;
+  padding-left: 18px;
+  overflow: hidden;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glauk-socio-subtotal {
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.glauk-socio-subtotal.is-positive {
+  color: #34d399;
+}
+
+.glauk-socio-subtotal.is-negative {
+  color: #f43f5e;
+}
+
+@media (max-width: 600px) {
+  .glauk-card.glauk-card-horizontal {
+    border-radius: 12px;
+  }
+
+  .glauk-card-strip {
+    gap: 6px;
+    padding: 5px 9px;
+  }
+
+  .glauk-card-strip__meta {
+    gap: 4px;
+    font-size: 9.5px;
+  }
+
+  .glauk-card-media {
+    flex-basis: 24%;
+    min-width: 85px;
+  }
+
+  .glauk-card-content {
+    gap: 4px;
+    padding: 7px 8px;
+  }
+
+  .glauk-card-amount-main > strong {
+    font-size: 18px;
+  }
+
+  .glauk-card-amount-main > small {
+    font-size: 9px;
+  }
+
+  .glauk-card-action-btn {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+
+  .glauk-card-bank-line {
+    font-size: 9px;
+  }
+
+  .glauk-card-ref {
+    font-size: 8px;
+  }
+
+  .glauk-socio-row {
+    gap: 6px;
+    padding: 4px 5px;
+  }
+
+  .glauk-socio-main {
+    padding-right: 6px;
+  }
+
+  .glauk-socio-emoji {
+    font-size: 11px;
+  }
+
+  .glauk-socio-name {
+    font-size: 11px;
+  }
+
+  .glauk-socio-rate {
+    padding-left: 17px;
+    font-size: 8.5px;
+  }
+
+  .glauk-socio-subtotal {
+    font-size: 11px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Detalle del comprobante
+   -------------------------------------------------------------------------- */
+.glauk-detail-backdrop {
+  z-index: 1060;
+}
+
+.glauk-detail-sheet {
+  max-width: 900px;
+}
+
+.glauk-detail-sheet .glauk-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.glauk-detail-image {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(30, 58, 138, .6);
+  border-radius: 14px;
+  background: #010309;
+}
+
+.glauk-detail-image img {
+  max-width: 100%;
+  max-height: 45dvh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+.glauk-detail-hint {
+  margin: -6px 0 0;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.glauk-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.glauk-detail-grid > div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(30, 58, 138, .55);
+  border-radius: 10px;
+  background: #030611;
+}
+
+.glauk-detail-grid span {
+  display: block;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.glauk-detail-grid strong {
+  display: block;
+  color: #e2e8f0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.glauk-detail-socios {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .glauk-detail-socios {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.glauk-detail-socio {
+  padding: 10px;
+  border: 1px solid rgba(30, 58, 138, .55);
+  border-radius: 12px;
+  background: #030611;
+}
+
+.glauk-detail-socio h4 {
+  margin: 0 0 6px;
+  color: #67e8f9;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.glauk-detail-socio p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 3px 0;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.glauk-detail-socio strong {
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+@media (max-width: 420px) {
+  .glauk-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glauk-bottom-sheet,
+  .glauk-card,
+  .glauk-bottom-nav a {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Inspección de lotes: tabla financiera en escritorio, tarjetas en móvil
+   -------------------------------------------------------------------------- */
+.glauk-lotes-tabla {
+  display: none;
+}
+
+.glauk-lotes-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 768px) {
+  .glauk-lotes-tabla {
+    display: block;
+  }
+
+  .glauk-lotes-cards {
+    display: none;
+  }
+}
+
+.glauk-lote-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  background: #0b1120;
+}
+
+.glauk-lote-card__info {
+  min-width: 0;
+}
+
+.glauk-lote-card__name {
+  margin: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.glauk-lote-card__amount {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.glauk-lote-card__amount.is-positive {
+  color: #34d399;
+}
+
+.glauk-lote-card__amount.is-negative {
+  color: #f43f5e;
+}
+
+.glauk-lote-card__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.glauk-lote-action {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #1e293b;
+  transition: background .15s ease, border-color .15s ease, transform .12s ease;
+}
+
+.glauk-lote-action.is-ver {
+  color: #38bdf8;
+}
+
+.glauk-lote-action.is-reporte {
+  color: #34d399;
+}
+
+.glauk-lote-action:hover {
+  border-color: #475569;
+  background: #334155;
+}
+
+.glauk-lote-action:active {
+  transform: scale(.95);
+}
+
+.glauk-lote-empty {
+  padding: 16px 0;
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Reporte de estado de cuenta: paridad total web / móvil
+   --------------------------------------------------------------------------
+   El lienzo conserva los 800 px lógicos y la tabla financiera completa en
+   cualquier viewport. En móvil no se ocultan columnas, no se apilan filas ni
+   se cambia la paleta: el contenedor exterior desplaza horizontalmente con
+   inercia táctil y deja intactas todas las celdas. */
+.glauk-reporte-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  padding: 16px;
+  background: #020617;
+  border: 1px solid rgba(30, 58, 138, .55);
+  border-radius: 14px;
+}
+
+/* Barra de métricas del reporte: misma densidad que los KPIs del dashboard. */
+.glauk-reporte-metricas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 360px) {
+  .glauk-reporte-metricas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glauk-reporte-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.glauk-reporte-scroll::-webkit-scrollbar-thumb {
+  background: #1e3a8a;
+  border-radius: 999px;
+}
+
+/* Blindaje estructural: ninguna regla responsive puede convertir la tabla en
+   bloques, ocultar columnas ni alterar su modelo de visualización. */
+#reporte-html-documento {
+  margin-inline: auto;
+  flex: 0 0 auto;
+}
+
+#reporte-html-documento table {
+  display: table !important;
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+#reporte-html-documento thead {
+  display: table-header-group !important;
+}
+
+#reporte-html-documento tbody {
+  display: table-row-group !important;
+}
+
+#reporte-html-documento tr {
+  display: table-row !important;
+}
+
+#reporte-html-documento th,
+#reporte-html-documento td {
+  display: table-cell !important;
+  visibility: visible !important;
+}
+
+@media (max-width: 799px) {
+  .glauk-reporte-scroll {
+    padding: 12px;
+  }
+
+  .glauk-modal__dialog--wide {
+    max-width: 100%;
+  }
+}
+
+@media print {
+  .glauk-bottom-nav,
+  .glauk-sheet-backdrop,
+  .glauk-filter-bar {
+    display: none !important;
+  }
+
+  body.glauk-has-bottom-nav,
+  .glauk-main {
+    padding-bottom: 0 !important;
+  }
+}

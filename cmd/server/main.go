@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"hooty/internal/api"
 	"hooty/internal/clock"
 	"hooty/internal/config"
 	"hooty/internal/ingest"
@@ -51,6 +52,9 @@ func run() error {
 
 	verifyCtx, cancelVerify := context.WithTimeout(ctx, 10*time.Second)
 	err = postgres.VerifySchema(verifyCtx, pool)
+	if err == nil {
+		err = api.VerifyViews(verifyCtx, pool)
+	}
 	cancelVerify()
 	if err != nil {
 		return err
@@ -101,6 +105,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	readRepository, err := api.NewRepository(ctx, pool)
+	if err != nil {
+		return err
+	}
+	readAPI := api.NewHandler(readRepository, logger)
 
 	mux := http.NewServeMux()
 	webhook := ingest.NewHTTPHandler(service, ingest.HTTPOptions{
@@ -111,7 +120,8 @@ func run() error {
 	})
 	mux.Handle("/webhooks/evolution", webhook)
 	mux.Handle("/api/v1/webhooks/hooty", webhook)
-	mux.HandleFunc("/healthz", healthz(pool))
+	readAPI.Register(mux)
+	mux.HandleFunc("GET /healthz", healthz(pool))
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

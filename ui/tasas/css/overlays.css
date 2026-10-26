@@ -1,0 +1,184 @@
+.modal-card {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.modal-sm {
+  max-width: 20rem;
+}
+
+@media (max-width: 767px) {
+  /* En mobile el bottom sheet ocupa todo el ancho: sin bordes flotantes. */
+  .modal-sm {
+    max-width: 100%;
+  }
+}
+
+.modal-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: #0f172a;
+}
+
+.modal-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2rem;
+}
+
+.modal-copy {
+  color: var(--slate-400);
+  font-size: 12px;
+  line-height: 1.35rem;
+}
+
+.modal-input {
+  color: var(--accent-red);
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.modal-input:focus {
+  border-color: var(--accent-red);
+}
+
+.modal-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  background: #0f172a;
+}
+
+.modal-actions .btn,
+.modal-actions .soft-btn {
+  min-height: 44px;
+}
+
+@media (max-width: 767px) {
+  .modal-actions .btn,
+  .modal-actions .soft-btn {
+    flex: 1 1 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .modal-actions {
+    padding-bottom: 12px;
+  }
+}
+
+.close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  color: var(--slate-400);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25rem;
+  touch-action: manipulation;
+}
+
+.close-btn:hover {
+  color: var(--white);
+}
+
+.close-btn-plain {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+.sheet-card .close-btn-plain {
+  font-size: 18px;
+}
+
+.sheet-card .modal-head h3 {
+  font-size: 14px;
+}
+
+.sheet-card .text-input {
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.25rem;
+}
+
+#modalPreview {
+  backdrop-filter: blur(12px);
+}
+
+.preview-card {
+  max-width: 32rem;
+}
+
+.preview-head .close-btn {
+  background: var(--slate-800);
+}
+
+.preview-head {
+  padding: 12px 14px;
+  background: #0f172a;
+}
+
+.preview-head h3 {
+  min-width: 0;
+  font-size: 12px;
+}
+
+.preview-body {
+  display: flex;
+  min-height: 180px;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  background: var(--brand-dark);
+}
+
+.preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  background: #0f172a;
+}
+
+.preview-footer .btn-secondary {
+  padding: 6px 14px;
+}
+
+.preview-footer .switch-label {
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.preview-footer .switch-label > span:first-child {
+  color: inherit;
+}
