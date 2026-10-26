@@ -107,8 +107,8 @@ func TestMuxSirveUIYNoRompeAPI(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /comprobantes/ status = %d", resp.StatusCode)
 	}
-	if !strings.Contains(string(body), "Fundablock") {
-		t.Fatal("el HTML embebido no contiene Fundablock")
+	if !strings.Contains(string(body), "Hooty") {
+		t.Fatal("el HTML embebido no contiene Hooty")
 	}
 
 	resp, err = http.Get(server.URL + "/api/v1/comprobantes")

@@ -30,8 +30,8 @@ async function esperarFuentes() {
   if (document.fonts?.ready) await document.fonts.ready;
 }
 
-// Las imágenes locales se marcan como CORS antes del render. El logo vive en
-// /shared/brand, por lo que no depende de recursos remotos.
+// Las imágenes locales se marcan como CORS antes del render. Los recursos de
+// marca viven en /shared/assets, por lo que no dependen de recursos remotos.
 function prepararImagenes(elemento) {
   for (const image of elemento.querySelectorAll('img')) {
     if (!image.src.startsWith('data:')) image.crossOrigin = 'anonymous';

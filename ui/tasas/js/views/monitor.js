@@ -90,7 +90,7 @@ export function initMonitor() {
       aplicarMapa(datos.borrador);
       showToast('✅ Lote vigente cargado desde Hooty');
     } catch (error) {
-      showToast(`❌ Error de conexión al leer HOO: ${error.message}`);
+      showToast(`❌ Error de conexión al leer Hooty: ${error.message}`);
     }
   }
 

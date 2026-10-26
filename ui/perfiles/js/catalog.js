@@ -1,4 +1,4 @@
-// Catálogo estático heredado de PerfilHub. El orden importa: alimenta el
+// Catálogo estático heredado del directorio de socios. El orden importa: alimenta el
 // selector "Agregar Moneda" y se conserva igual al de perfilesgo.
 export const CATALOGO_MONEDAS = Object.freeze({
   ARS: { nombre: 'Argentina', iso: 'AR', base: 1602 },

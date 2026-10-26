@@ -1,6 +1,7 @@
 {
-  "short_name": "TasasHub",
-  "name": "TasasHub Engine - Gestión de Tasas",
+  "short_name": "Hooty",
+  "name": "Hooty · Mercado & Tasas",
+  "description": "Monitor de lotes y cotizaciones.",
   "icons": [
     {
       "src": "./icon-192.png",

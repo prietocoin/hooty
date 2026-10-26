@@ -3,32 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>TasasHub Engine - Control Global</title>
-  <link rel="icon" type="image/png" href="./icon-512.png"><link rel="shortcut icon" type="image/png" href="./icon-512.png"><link rel="apple-touch-icon" href="./icon-512.png">
+  <title>Hooty · Mercado &amp; Tasas</title>
+  <link rel="icon" type="image/svg+xml" href="../shared/assets/favicon.svg"><link rel="shortcut icon" type="image/svg+xml" href="../shared/assets/favicon.svg"><link rel="apple-touch-icon" href="../shared/assets/icon-192.png">
   <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#0b1326">
+  <meta name="theme-color" content="#090d16">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="TasasHub">
-  <link rel="stylesheet" href="../shared/css/fintech.css?v=20261026_05">
-  <link rel="stylesheet" href="./css/theme.css?v=20261026_05">
-  <link rel="stylesheet" href="./css/layout.css?v=20261026_05">
-  <link rel="stylesheet" href="./css/dashboard.css?v=20261026_05">
-  <link rel="stylesheet" href="./css/controls.css?v=20261026_05">
-  <link rel="stylesheet" href="./css/cards.css?v=20261026_05">
-  <link rel="stylesheet" href="./css/feedback.css?v=20261026_05">
-  <link rel="stylesheet" href="./css/overlays.css?v=20261026_05">
-  <link rel="stylesheet" href="../shared/css/mobile.css?v=20261026_05">
+  <meta name="apple-mobile-web-app-title" content="Hooty">
+  <link rel="stylesheet" href="../shared/css/fintech.css?v=20261027_01">
+  <link rel="stylesheet" href="./css/theme.css?v=20261027_01">
+  <link rel="stylesheet" href="./css/layout.css?v=20261027_01">
+  <link rel="stylesheet" href="./css/dashboard.css?v=20261027_01">
+  <link rel="stylesheet" href="./css/controls.css?v=20261027_01">
+  <link rel="stylesheet" href="./css/cards.css?v=20261027_01">
+  <link rel="stylesheet" href="./css/feedback.css?v=20261027_01">
+  <link rel="stylesheet" href="./css/overlays.css?v=20261027_01">
+  <link rel="stylesheet" href="../shared/css/mobile.css?v=20261027_01">
 </head>
 <body class="tasas-app">
   <header class="app-header">
     <div class="header-inner">
       <div class="ft-brand">
-        <div class="brand-mark" aria-hidden="true">⚡</div>
+        <img class="brand-mark ft-brand-mark" src="../shared/assets/logo.svg" alt="" width="34" height="34">
         <div class="ft-brand-copy">
-          <h1 class="ft-brand-title">FUNDABLOCK</h1>
-          <p class="ft-brand-sub">TasasHub Engine</p>
+          <h1 class="ft-brand-title">Hooty</h1>
+          <p class="ft-brand-sub">Mercado &amp; Tasas</p>
         </div>
       </div>
       <div class="header-actions">
@@ -45,10 +45,10 @@
       <div class="hero-copy">
         <span class="hero-eyebrow">
           <span class="live-dot" aria-hidden="true"></span>
-          TasasHub · Operación en vivo
+          Hooty · Mercado &amp; Tasas
         </span>
-        <h2>Monitor Global</h2>
-        <p>El pulso del mercado, el lote vigente y la publicación a socios en una sola mesa de control.</p>
+        <h2>Mercado &amp; Tasas</h2>
+        <p>Monitor de lotes y cotizaciones.</p>
       </div>
       <div class="hero-actions">
         <span id="lblLoteActual" class="lote-badge">Lote en Prod: --</span>
@@ -84,7 +84,7 @@
               ⚡ <span>Publicar Lote a Socios ON</span>
             </button>
             <button id="btnHoo" class="btn btn-purple" type="button">
-              📑 <span>Traer Borrador Hoo</span>
+              📑 <span>Cargar lote vigente</span>
             </button>
           </div>
         </div>
@@ -113,8 +113,8 @@
     </div>
   </div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite">Mensaje</div>
-  <script src="../config.js?v=20261026_05"></script>
-  <script type="module" src="./js/main.js?v=20261026_05"></script>
-  <script type="module" src="/shared/js/mobile-nav.js?v=20261026_05"></script>
+  <script src="../config.js?v=20261027_01"></script>
+  <script type="module" src="./js/main.js?v=20261027_01"></script>
+  <script type="module" src="/shared/js/mobile-nav.js?v=20261027_01"></script>
 </body>
 </html>

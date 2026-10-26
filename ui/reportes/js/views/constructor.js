@@ -106,9 +106,9 @@ export function crearConstructor(ctx) {
     const { rows, total } = normalizarResultado(resultado);
     const incluidas = rows.slice(0, LIMITE_REPORTE);
 
-    const logo = el('img', { src: '../shared/brand/logo-fundablock.png', alt: 'FUNDABLOCK', style: 'width:88px;height:auto' });
+    const logo = el('img', { src: '../shared/assets/logo.svg', alt: 'Hooty', style: 'width:48px;height:48px;border-radius:12px' });
     host.append(el('header', {},
-      el('div', { class: 'row' }, logo, el('div', {}, el('h2', {}, 'FUNDABLOCK'), el('p', {}, 'Glaukov Engine · Reportes'))),
+      el('div', { class: 'row' }, logo, el('div', {}, el('h2', {}, 'HOOTY'), el('p', {}, 'Hooty · Operaciones'))),
       el('div', { style: 'text-align:right' }, el('h1', {}, 'REPORTE'), el('small', {}, formatDate(new Date(), true)))
     ));
     host.append(el('div', { class: 'reporte-meta' },
@@ -147,7 +147,7 @@ export function crearConstructor(ctx) {
       `ME1 total (${incluidas.length} filas): ${formatNumber(totalME1, 2)}`));
     host.append(el('div', { class: 'reporte-foot' },
       el('span', {}, `${incluidas.length} de ${total} operaciones · lote ${filtros.lote || 'vigente'}`),
-      el('span', {}, 'Reporte generado en el navegador · Glauk')
+      el('span', {}, 'Reporte generado en el navegador · Hooty')
     ));
   }
 

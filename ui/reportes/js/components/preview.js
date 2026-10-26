@@ -45,7 +45,7 @@ export function crearPreview(ctx) {
   function descargar() {
     const reporte = ctx.state.reporte;
     if (!reporte.blob) return;
-    descargarBlob(reporte.blob, `reporte-${reporte.meta?.socio || 'glauk'}.jpg`);
+    descargarBlob(reporte.blob, `reporte-${reporte.meta?.socio || 'hooty'}.jpg`);
   }
 
   async function enviar() {

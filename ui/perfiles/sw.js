@@ -5,7 +5,7 @@
  * la caché solo se usa como respaldo offline.
  */
 
-const CACHE = 'glauk-perfiles-v5-tasas-20261024-99';
+const CACHE = 'hooty-perfiles-20261027_01';
 const ASSETS = [
   './', './index.html', './manifest.json',
   './css/tailwind.css', './css/perfiles.css',
@@ -17,8 +17,8 @@ const ASSETS = [
   './js/controllers/acciones.js',
   './js/utils/tasas.js',
   '../shared/js/dom.js', '../shared/js/http.js', '../shared/js/api-base.js',
-  '../shared/brand/favicon.svg',
-  '../shared/brand/icon-192.png', '../shared/brand/icon-512.png'
+  '../shared/assets/favicon.svg',
+  '../shared/assets/icon-192.png', '../shared/assets/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {

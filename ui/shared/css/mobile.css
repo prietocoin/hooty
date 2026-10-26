@@ -202,6 +202,15 @@ body.glauk-sheet-open .glauk-main {
 
 .glauk-mobile-brand {
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.glauk-mobile-brand > div {
+  display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.1;

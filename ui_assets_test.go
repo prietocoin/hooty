@@ -38,7 +38,7 @@ func TestUIHandlerSirveLaRaizYLosAssets(t *testing.T) {
 			t.Fatalf("status = %d", rec.Code)
 		}
 		body, _ := io.ReadAll(rec.Body)
-		if !strings.Contains(string(body), "Fundablock") {
+		if !strings.Contains(string(body), "Hooty") {
 			t.Fatal("no se sirvió el index de comprobantes")
 		}
 		if rec.Header().Get("Cache-Control") != "no-cache" {
@@ -151,7 +151,7 @@ func TestMuxEstaticoNoColisionaConAPIYWebhooks(t *testing.T) {
 		{http.MethodGet, "/healthz", http.StatusOK, "health"},
 		{http.MethodPost, "/webhooks/evolution", http.StatusOK, "webhook"},
 		{http.MethodGet, "/api/v1/comprobantes", http.StatusOK, "api"},
-		{http.MethodGet, "/comprobantes/", http.StatusOK, "Fundablock"},
+		{http.MethodGet, "/comprobantes/", http.StatusOK, "Hooty"},
 	}
 	for _, tc := range cases {
 		req, _ := http.NewRequest(tc.method, server.URL+tc.path, nil)

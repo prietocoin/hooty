@@ -1,6 +1,6 @@
 /**
  * @file sync.js
- * @description Señal de sincronización entre pestañas de Glauk.
+ * @description Señal de sincronización entre pestañas de Hooty.
  *
  * Perfiles y Comprobantes viven en documentos distintos. Cuando un socio cambia
  * su configuración de monedas, Comprobantes debe volver a proyectar importes con

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Hooty">
+  <defs>
+    <linearGradient id="hooty-bg" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111c33"/>
+      <stop offset="1" stop-color="#070b14"/>
+    </linearGradient>
+    <linearGradient id="hooty-visor" x1="18" y1="30" x2="46" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#hooty-bg)"/>
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="none" stroke="#22d3ee" stroke-opacity=".35" stroke-width="2"/>
+  <path d="M14 23 9 11l14 6" fill="#22d3ee" fill-opacity=".9"/>
+  <path d="M50 23 55 11 41 17" fill="#10b981" fill-opacity=".9"/>
+  <path d="M32 14c-9.4 0-17 7.2-17 16.5V40c0 7.5 7.6 12 17 12s17-4.5 17-12V30.5C49 21.2 41.4 14 32 14Z"
+        fill="#0b1326" stroke="#22d3ee" stroke-width="2.4"/>
+  <rect x="18.5" y="28" width="27" height="11.5" rx="5.75" fill="#030611" stroke="url(#hooty-visor)" stroke-width="2.2"/>
+  <circle cx="26" cy="33.6" r="4.6" fill="#34d399" fill-opacity=".16"/>
+  <circle cx="38" cy="33.6" r="4.6" fill="#34d399" fill-opacity=".16"/>
+  <circle cx="26" cy="33.6" r="2.6" fill="#34d399"/>
+  <circle cx="38" cy="33.6" r="2.6" fill="#34d399"/>
+  <path d="M32 40.5 29.2 46h5.6L32 40.5Z" fill="#fb923c"/>
+  <path d="M19 44c3.5 4.2 8 6.3 13 6.3S41.5 48.2 45 44" fill="none" stroke="#22d3ee" stroke-opacity=".5" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M32 47.5v4" stroke="#fb923c" stroke-opacity=".65" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
