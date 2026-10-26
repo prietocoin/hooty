@@ -91,6 +91,10 @@ export function comprobantesState() {
     filtroHash: '',
     saldoAnterior: 0,
 
+    // Inspección de Lotes: búsqueda en vivo y chips de saldo.
+    busquedaPendientes: '',
+    filtroPendientes: 'todos',
+
     obtenerSujetoAuditado,
     obtenerInsigniaRol,
 
@@ -110,6 +114,44 @@ export function comprobantesState() {
       return calcularSociosPendientesConsolidado(this.directorio, this.items, {
         fechaInicio: this.filtroFechaInicio, fechaFin: this.filtroFechaFin
       });
+    },
+
+    get sociosPendientesFiltrados() {
+      const consulta = String(this.busquedaPendientes || '').trim().toLowerCase();
+      return this.sociosPendientesConsolidado.filter((item) => {
+        const saldo = Number(item.saldoFinal) || 0;
+        if (this.filtroPendientes === 'negativo' && saldo >= 0) return false;
+        if (this.filtroPendientes === 'positivo' && saldo <= 0) return false;
+        if (!consulta) return true;
+        return String(item.nombre || '').toLowerCase().includes(consulta)
+          || String(item.moneda || '').toLowerCase().includes(consulta);
+      });
+    },
+
+    get monedaPendientes() {
+      const primero = (this.items || [])[0];
+      return String(primero?.moneda_socio_1 || primero?.moneda || 'USDT').toUpperCase();
+    },
+
+    inicialesSocio(nombre) {
+      const partes = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+      if (!partes.length) return '—';
+      if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+      return (partes[0][0] + partes[1][0]).toUpperCase();
+    },
+
+    claseSaldoPendiente(saldo) {
+      const valor = Number(saldo) || 0;
+      if (valor < 0) return 'is-negative';
+      if (valor > 0) return 'is-positive';
+      return 'is-zero';
+    },
+
+    signoSaldoPendiente(saldo) {
+      const valor = Number(saldo) || 0;
+      if (valor < 0) return '-';
+      if (valor > 0) return '+';
+      return '';
     },
 
     get hayDatosParciales() {

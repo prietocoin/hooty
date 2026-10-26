@@ -18,12 +18,12 @@
   <link rel="icon" type="image/png" href="./logo-fundablock.png">
   <link rel="stylesheet" href="/shared/vendor/glauk2/tailwind.css?v=20261026_03">
   <link rel="stylesheet" href="/shared/css/mobile.css?v=20261026_03">
-  <link rel="stylesheet" href="/shared/css/fintech.css?v=20261026_03">
+  <link rel="stylesheet" href="/shared/css/fintech.css?v=20261026_04">
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261026_03"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261026_03"></script>
-  <script type="module" src="./js/pwa.js?v=20261026_03"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261026_04"></script>
+  <script type="module" src="./js/pwa.js?v=20261026_04"></script>
   <script src="/shared/vendor/glauk2/alpine.min.js?v=20261026_03" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261026_03"></script>
 
@@ -708,31 +708,67 @@
 <!-- RESPONSABILIDAD: Tarjeta de resumen de balance y KPIs globales    -->
 <!-- ================================================================= -->
 
-<div class="bg-[#0b132b] border border-slate-800 rounded-lg p-4 space-y-4">
-  <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-3">
-    <h2 class="text-base font-semibold text-white flex items-center gap-2">
-      <span>📊 Balance y Pendientes</span>
-    </h2>
-    <div class="flex items-center gap-2">
-      <span class="text-xs text-cyan-400 font-mono" x-text="`Lote Activo: ${loteActivo || 'N/A'}`"></span>
+<section class="lot-panel" aria-labelledby="lot-balance-title">
+  <header class="lot-panel__head">
+    <div>
+      <h2 id="lot-balance-title" class="lot-panel__title">Balance y Pendientes</h2>
+      <p class="lot-panel__sub">Resumen del período y saldos consolidados por socio.</p>
     </div>
-  </div>
+    <span class="ft-badge ft-badge--accent" x-text="`Lote ${loteActivo || 'N/A'}`"></span>
+  </header>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
-      <span class="text-xs text-slate-400">Total Movimiento Filtrado</span>
-      <div class="text-xl font-bold text-cyan-400 font-mono mt-1" x-text="formatMonto(movimientoFiltradoTotal)"></div>
-    </div>
-    <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
-      <span class="text-xs text-slate-400">Socios Registrados</span>
-      <div class="text-xl font-bold text-white font-mono mt-1" x-text="directorio.length"></div>
-    </div>
-    <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
-      <span class="text-xs text-slate-400">Comprobantes Registrados</span>
-      <div class="text-xl font-bold text-emerald-400 font-mono mt-1" x-text="comprobantes.length"></div>
-    </div>
+  <div class="lot-kpis">
+    <article class="lot-kpi">
+      <span class="lot-kpi__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"/>
+          <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/>
+          <path d="M16 13h2"/>
+        </svg>
+      </span>
+      <div class="lot-kpi__body">
+        <p class="lot-kpi__label">Total Movimiento</p>
+        <p class="lot-kpi__value">
+          <span x-text="formatMonto(movimientoFiltradoTotal)"></span>
+          <span class="lot-kpi__unit" x-text="monedaPendientes"></span>
+        </p>
+        <p class="lot-kpi__hint">Filtrado por el período activo</p>
+      </div>
+    </article>
+
+    <article class="lot-kpi">
+      <span class="lot-kpi__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </span>
+      <div class="lot-kpi__body">
+        <p class="lot-kpi__label">Socios Registrados</p>
+        <p class="lot-kpi__value" x-text="directorio.length"></p>
+        <p class="lot-kpi__hint">Visibles en el directorio</p>
+      </div>
+    </article>
+
+    <article class="lot-kpi">
+      <span class="lot-kpi__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-3 2-3-2-3 2V3a1 1 0 0 1 1-1Z"/>
+          <path d="M9 7h6"/>
+          <path d="M9 11h6"/>
+          <path d="M9 15h4"/>
+        </svg>
+      </span>
+      <div class="lot-kpi__body">
+        <p class="lot-kpi__label">Comprobantes Registrados</p>
+        <p class="lot-kpi__value" x-text="comprobantes.length"></p>
+        <p class="lot-kpi__hint">Procesados en el período</p>
+      </div>
+    </article>
   </div>
-</div>
+</section>
 
         <!-- ================================================================= -->
 <!-- COMPONENTE: inspeccionLotes.ejs                                   -->
@@ -740,92 +776,118 @@
 <!-- RESPONSABILIDAD: Tabla de inspección de saldos pendientes         -->
 <!-- ================================================================= -->
 
-<div class="bg-[#0b132b] border border-slate-800 rounded-lg p-4 space-y-4">
-  <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-    <h2 class="text-base font-semibold text-white">🔍 Inspección de Lotes</h2>
+<section class="lot-panel lot-inspector" aria-labelledby="lot-inspeccion-title">
+  <header class="lot-panel__head">
+    <div>
+      <h2 id="lot-inspeccion-title" class="lot-panel__title">Inspección de Lotes</h2>
+      <p class="lot-panel__sub">Saldos pendientes por socio y lote. Toca una tarjeta para auditar sus comprobantes.</p>
+    </div>
+    <span class="ft-badge" x-text="`${sociosPendientesFiltrados.length} socios`"></span>
+  </header>
+
+  <div class="lot-controls">
+    <label class="lot-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/>
+        <path d="m20 20-3.2-3.2"/>
+      </svg>
+      <input type="search"
+             class="lot-search__input"
+             x-model="busquedaPendientes"
+             placeholder="Buscar socio por nombre o moneda..."
+             aria-label="Buscar socio por nombre o moneda"
+             autocomplete="off">
+      <button type="button"
+              class="lot-search__clear"
+              x-show="busquedaPendientes"
+              @click="busquedaPendientes = ''"
+              aria-label="Limpiar búsqueda">✕</button>
+    </label>
+
+    <div class="lot-chips" role="group" aria-label="Filtros rápidos de saldo">
+      <button type="button"
+              class="lot-chip"
+              :class="{ 'is-active': filtroPendientes === 'todos' }"
+              @click="filtroPendientes = 'todos'">Todos</button>
+      <button type="button"
+              class="lot-chip is-danger"
+              :class="{ 'is-active': filtroPendientes === 'negativo' }"
+              @click="filtroPendientes = 'negativo'">Con Saldo Negativo</button>
+      <button type="button"
+              class="lot-chip is-success"
+              :class="{ 'is-active': filtroPendientes === 'positivo' }"
+              @click="filtroPendientes = 'positivo'">Con Saldo a Favor</button>
+    </div>
   </div>
-  <p class="text-xs text-slate-400">Inspecciona y monitorea los saldos pendientes por socio y lote.</p>
 
-  <!-- TABLA: solo escritorio (>= 768px) -->
-  <div class="glauk-lotes-tabla overflow-x-auto">
-    <table class="w-full text-left text-xs">
-      <thead class="bg-slate-900/80 text-slate-400 font-mono">
-        <tr>
-          <th class="p-2">Socio</th>
-          <th class="p-2">Pendiente</th>
-          <th class="p-2">Acción</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-800/50">
-        <template x-for="item in sociosPendientesConsolidado" :key="item.nombre">
-          <tr class="hover:bg-slate-800/30">
-            <td class="p-2 text-white font-medium" x-text="item.nombre"></td>
-            <td class="p-2 text-cyan-400 font-mono font-bold" x-text="formatMonto(item.saldoFinal) + ' ' + item.moneda"></td>
-            <td class="p-2">
-              <div class="flex items-center gap-1.5">
-                <button @click="verComprobantesDeSocio(item.nombre)" class="px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded hover:bg-cyan-500/30 active:scale-95 transition-all">
-                  Ver Comprobantes
-                </button>
-                <button @click="abrirReporteSocio(item.nombre)" class="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded hover:bg-emerald-500 hover:text-white active:scale-95 transition-all font-bold">
-                  Reporte
-                </button>
-              </div>
-            </td>
-          </tr>
-        </template>
-
-        <template x-if="!sociosPendientesConsolidado || sociosPendientesConsolidado.length === 0">
-          <tr>
-            <td colspan="3" class="p-4 text-center text-slate-500">No hay pendientes registrados en este período.</td>
-          </tr>
-        </template>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TARJETAS TÁCTILES: solo móvil (< 768px) -->
-  <div class="glauk-lotes-cards">
-    <template x-for="item in sociosPendientesConsolidado" :key="'lote-movil-' + item.nombre">
-      <article class="glauk-lote-card">
-        <div class="glauk-lote-card__info">
-          <p class="glauk-lote-card__name" x-text="item.nombre"></p>
-          <p class="glauk-lote-card__amount"
-             :class="(Number(item.saldoFinal) || 0) >= 0 ? 'is-positive' : 'is-negative'"
-             x-text="formatMonto(item.saldoFinal) + ' ' + item.moneda"></p>
+  <div class="lot-grid" x-show="sociosPendientesFiltrados.length > 0">
+    <template x-for="item in sociosPendientesFiltrados" :key="'lote-' + item.nombre">
+      <article class="lot-card">
+        <div class="lot-card__top">
+          <span class="lot-avatar" aria-hidden="true" x-text="inicialesSocio(item.nombre)"></span>
+          <div class="lot-card__identity">
+            <h3 class="lot-card__name" x-text="item.nombre"></h3>
+            <span class="lot-currency" x-text="item.moneda"></span>
+          </div>
+          <span class="lot-balance"
+                :class="claseSaldoPendiente(item.saldoFinal)"
+                :aria-label="`Saldo pendiente ${formatMonto(item.saldoFinal)} ${item.moneda}`">
+            <span x-text="signoSaldoPendiente(item.saldoFinal)"></span>
+            <span x-text="formatMonto(Math.abs(Number(item.saldoFinal) || 0))"></span>
+          </span>
         </div>
-        <div class="glauk-lote-card__actions">
+
+        <dl class="lot-card__meta">
+          <div>
+            <dt>Saldo base</dt>
+            <dd x-text="formatMonto(item.saldoBase) + ' ' + item.moneda"></dd>
+          </div>
+          <div>
+            <dt>Movimiento del período</dt>
+            <dd x-text="formatMonto(item.movimientoHistorico) + ' ' + item.moneda"></dd>
+          </div>
+        </dl>
+
+        <footer class="lot-card__actions">
           <button type="button"
-                  class="glauk-lote-action is-ver"
-                  @click="verComprobantesDeSocio(item.nombre)"
-                  title="Ver comprobantes del socio"
-                  aria-label="Ver comprobantes del socio">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  class="lot-action lot-action--primary"
+                  @click="verComprobantesDeSocio(item.nombre)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
+            Comprobantes
           </button>
           <button type="button"
-                  class="glauk-lote-action is-reporte"
-                  @click="abrirReporteSocio(item.nombre)"
-                  title="Generar estado de cuenta"
-                  aria-label="Generar estado de cuenta">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  class="lot-action"
+                  @click="abrirReporteSocio(item.nombre)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <path d="M14 2v6h6"/>
               <path d="M8 13h8"/>
               <path d="M8 17h5"/>
             </svg>
+            Reporte
           </button>
-        </div>
+        </footer>
       </article>
     </template>
-
-    <div class="glauk-lote-empty"
-         x-show="!sociosPendientesConsolidado || sociosPendientesConsolidado.length === 0">
-      No hay pendientes registrados en este período.
-    </div>
   </div>
-</div>
+
+  <div class="lot-empty" x-show="sociosPendientesFiltrados.length === 0">
+    <span class="lot-empty__icon" aria-hidden="true">🔍</span>
+    <p class="lot-empty__title"
+       x-text="sociosPendientesConsolidado.length === 0
+         ? 'No hay pendientes registrados en este período.'
+         : 'Ningún socio coincide con la búsqueda o el filtro.'"></p>
+    <button type="button"
+            class="lot-action"
+            x-show="sociosPendientesConsolidado.length > 0"
+            @click="busquedaPendientes = ''; filtroPendientes = 'todos'">
+      Limpiar filtros
+    </button>
+  </div>
+</section>
 
       </div>
 
