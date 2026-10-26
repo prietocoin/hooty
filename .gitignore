@@ -1,0 +1,19 @@
+# Binarios y artefactos locales
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Herramientas
+.idea/
+.vscode/
+.DS_Store
