@@ -43,7 +43,7 @@ func (h *staticUI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.URL.Path == "/" {
-		http.Redirect(w, r, "/comprobantes/", http.StatusFound)
+		http.Redirect(w, r, "/comprobantes/", http.StatusPermanentRedirect)
 		return
 	}
 

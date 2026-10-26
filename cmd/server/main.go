@@ -112,23 +112,17 @@ func run() error {
 	}
 	readAPI := api.NewHandler(readRepository, logger)
 
-	mux := http.NewServeMux()
 	webhook := ingest.NewHTTPHandler(service, ingest.HTTPOptions{
 		Token:           cfg.WebhookToken,
 		DefaultInstance: cfg.DefaultInstance,
 		MaxBodyBytes:    cfg.MaxBodyBytes,
 		Logger:          logger,
 	})
-	mux.Handle("/webhooks/evolution", webhook)
-	mux.Handle("/api/v1/webhooks/hooty", webhook)
-	readAPI.Register(mux)
-	mux.HandleFunc("GET /healthz", healthz(pool))
-
 	uiHandler, err := hootyui.UIHandler()
 	if err != nil {
 		return err
 	}
-	mux.Handle("/", uiHandler)
+	mux := newMux(webhook, readAPI, healthz(pool), uiHandler)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -198,6 +192,21 @@ func run() error {
 	}
 	logger.Info("hooty.shutdown.done")
 	return nil
+}
+
+// newMux ensambla las rutas del servidor. Se aísla para que los tests puedan
+// verificar precedencia y barra final sin abrir PostgreSQL.
+func newMux(webhook http.Handler, readAPI *api.Handler, health http.Handler, ui http.Handler) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle("POST /webhooks/evolution", webhook)
+	mux.Handle("POST /api/v1/webhooks/hooty", webhook)
+	readAPI.Register(mux)
+	mux.Handle("GET /healthz", health)
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/comprobantes/", http.StatusPermanentRedirect)
+	})
+	mux.Handle("GET /", ui)
+	return mux
 }
 
 func openPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {

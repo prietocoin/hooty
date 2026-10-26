@@ -20,7 +20,7 @@ func TestUIHandlerSirveLaRaizYLosAssets(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusFound {
+		if rec.Code != http.StatusPermanentRedirect {
 			t.Fatalf("status = %d", rec.Code)
 		}
 		if location := rec.Header().Get("Location"); location != "/comprobantes/" {

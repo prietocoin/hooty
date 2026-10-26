@@ -602,10 +602,12 @@ La UI se sirve desde el propio binario Go:
 - `ui_assets.go` declara `//go:embed all:ui`.
 - `UIHandler()` usa `fs.Sub` para quitar el prefijo `ui/` y `http.FileServer`
   para servir los assets.
-- `GET /` redirige a `/comprobantes/`.
-- El handler estático se monta al final en `mux.Handle("/", uiHandler)`, por lo
-  que las rutas más específicas (`/healthz`, webhooks y `/api/v1/*`) conservan
-  prioridad.
+- `GET /` se registra como `GET /{$}` y redirige con 308 a `/comprobantes/`.
+- El handler estático se monta al final en `mux.Handle("GET /", uiHandler)`, por
+  lo que las rutas más específicas (`/healthz`, webhooks y `/api/v1/*`)
+  conservan prioridad.
+- `fs.Sub(embeddedUI, "ui")` quita el prefijo `ui/`: el FileServer ve
+  `/comprobantes/`, no `/ui/comprobantes/`.
 - `Dockerfile` usa un build multi-stage, copia todo el contexto (incluido
   `ui/`) y compila `./cmd/server`; el runtime es distroless con CA roots.
 
@@ -614,6 +616,8 @@ Tests:
 ```text
 TestUIHandlerSirveLaRaizYLosAssets              OK
 TestMuxEstaticoNoColisionaConAPIYWebhooks       OK
+TestMuxSirveUIYNoRompeAPI                       OK
+TestMuxConservaWebhookYHealth                   OK
 go test ./...                                   OK
 go test -race ./...                             OK
 go vet ./...                                    OK
