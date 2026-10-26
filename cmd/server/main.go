@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	hootyui "hooty"
 	"hooty/internal/api"
 	"hooty/internal/clock"
 	"hooty/internal/config"
@@ -122,6 +123,12 @@ func run() error {
 	mux.Handle("/api/v1/webhooks/hooty", webhook)
 	readAPI.Register(mux)
 	mux.HandleFunc("GET /healthz", healthz(pool))
+
+	uiHandler, err := hootyui.UIHandler()
+	if err != nil {
+		return err
+	}
+	mux.Handle("/", uiHandler)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

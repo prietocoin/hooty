@@ -1,0 +1,12 @@
+.git
+.gitignore
+.gitattributes
+.env
+.env.*
+!.env.example
+docs
+bin
+dist
+*.exe
+*.test
+*.out
