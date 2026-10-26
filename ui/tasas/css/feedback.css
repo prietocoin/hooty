@@ -14,26 +14,4 @@
   animation: toast-in .15s ease-out;
 }
 
-.preview-spinner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--accent-cyan);
-  font-size: 12px;
-  font-weight: 700;
-  animation: pulse 2s cubic-bezier(.4, 0, .6, 1) infinite;
-}
 
-.preview-bolt {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.preview-image {
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--border-dark);
-  border-radius: 8px;
-  object-fit: contain;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .4);
-}

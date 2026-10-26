@@ -14,10 +14,7 @@
 
 .btn:active,
 .soft-btn:active,
-.install-btn:active,
-.profile-toggle:active,
-.check-card:active,
-.partner-option:active {
+.install-btn:active {
   transform: scale(.97);
 }
 
@@ -66,17 +63,6 @@
   font-weight: 800;
 }
 
-.btn-purple-solid {
-  flex: 1;
-  max-width: 200px;
-  padding: 10px 12px;
-  border: 0;
-  background: #9333ea;
-  color: var(--white);
-  font-weight: 800;
-  box-shadow: 0 10px 15px -3px rgba(88, 28, 135, .4);
-}
-
 .btn-secondary {
   border-color: var(--border-dark);
   background: var(--slate-800);
@@ -102,23 +88,6 @@
   border-color: rgba(244, 63, 94, .4);
   background: rgba(244, 63, 94, .1);
   color: var(--accent-red);
-}
-
-.amber-soft,
-.cyan-soft {
-  padding: 6px 12px;
-}
-
-.amber-soft {
-  border-color: rgba(245, 158, 11, .4);
-  background: rgba(245, 158, 11, .2);
-  color: #fbbf24;
-}
-
-.cyan-soft {
-  border-color: rgba(6, 182, 212, .4);
-  background: rgba(6, 182, 212, .2);
-  color: var(--accent-cyan);
 }
 
 .install-btn {
@@ -191,17 +160,4 @@
   transform: translateX(16px);
 }
 
-.switch-small {
-  width: 28px;
-  height: 16px;
-  flex-basis: 28px;
-}
 
-.switch-small::after {
-  width: 12px;
-  height: 12px;
-}
-
-.switch-label input:checked + .switch-small::after {
-  transform: translateX(12px);
-}

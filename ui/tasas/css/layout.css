@@ -10,8 +10,7 @@
 }
 
 .header-inner,
-.app-main,
-.sticky-footer-inner {
+.app-main {
   width: 100%;
   max-width: 80rem;
   margin: 0 auto;
@@ -101,7 +100,7 @@
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   padding: 4px;
   border: 1px solid var(--border-dark);
@@ -180,9 +179,7 @@
 }
 
 .monitor-actions,
-.monitor-footer-actions,
-.preview-footer-group,
-.checklist-actions {
+.monitor-footer-actions {
   display: flex;
   align-items: center;
   gap: 8px;

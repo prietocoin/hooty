@@ -17,8 +17,6 @@ export const MONEDAS_DEFAULT = {
   VES: 0, USD: 1.00, USDT: 1.00, PYUSD: 1.20, ECU: 1.00, PAN: 1.00
 };
 
-export const MONEDAS_CHECKLIST = Object.keys(MAPA_BANDERAS_ISO);
-
 const FLAGS_BASE = new URL('../flags/', import.meta.url);
 
 export function obtenerUrlBandera(code) {

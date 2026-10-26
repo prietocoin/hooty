@@ -20,10 +20,6 @@ export const api = {
     return solicitarJson('/monitor');
   },
 
-  socios() {
-    return solicitarJson('/socios');
-  },
-
   borradorHoo() {
     return solicitarJson('/hoo-borrador');
   },
@@ -48,25 +44,5 @@ export const api = {
 
   eliminarLote(idTasa) {
     return solicitarJson(`/lote/${encodeURIComponent(idTasa)}`, { method: 'DELETE' });
-  },
-
-  guardarSocio(nombre, cambios) {
-    return solicitarJson(`/socios/${encodeURIComponent(nombre)}`, {
-      method: 'PUT',
-      body: JSON.stringify(cambios)
-    });
-  },
-
-  disparar(socio, modoPrueba) {
-    return solicitarJson('/disparar', {
-      method: 'POST',
-      body: JSON.stringify({ socio, modo_prueba: modoPrueba })
-    });
-  },
-
-  async renderBlob(nombre) {
-    const respuesta = await fetch(apiUrl(`${BASE}/render/${encodeURIComponent(nombre)}`));
-    if (!respuesta.ok) throw new Error('Error al renderizar');
-    return respuesta.blob();
   }
 };

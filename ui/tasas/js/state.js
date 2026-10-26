@@ -1,12 +1,5 @@
 export const state = {
-  socios: [],
-  socioActivo: null,
   modoPruebaGlobal: true,
   borradorTasas: {},
-  loteActualCodigo: 'T000',
-  previewUrl: ''
+  loteActualCodigo: 'T000'
 };
-
-export function socioSeleccionado() {
-  return state.socioActivo;
-}
