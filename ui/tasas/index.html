@@ -37,25 +37,33 @@
     </div>
   </header>
   <main class="app-main glauk-main">
-    <div class="tabs tabs-single" aria-label="Monitor Global">
-      <span class="tab active">📊 Monitor Global</span>
-    </div>
-    <section class="tab-panel">
+    <header class="monitor-hero">
+      <div class="hero-copy">
+        <span class="hero-eyebrow">
+          <span class="live-dot" aria-hidden="true"></span>
+          TasasHub · Operación en vivo
+        </span>
+        <h2>Monitor Global</h2>
+        <p>El pulso del mercado, el lote vigente y la publicación a socios en una sola mesa de control.</p>
+      </div>
+      <div class="hero-actions">
+        <span id="lblLoteActual" class="lote-badge">Lote en Prod: --</span>
+        <button id="btnBorrarLote" class="soft-btn danger-soft" type="button">
+          🗑️ <span class="hide-sm">Borrar Lote</span>
+        </button>
+        <button id="btnRemesas" class="btn btn-green" type="button">
+          🚀 Enviar Tasa Remesas
+        </button>
+      </div>
+    </header>
+    <section class="monitor-panel">
       <div class="panel">
         <div class="monitor-top">
           <span class="monitor-title">
             <span class="live-dot" aria-hidden="true"></span>
-            MONITOR DE VARIACIÓN &amp; PUBLICACIÓN
+            Variación por moneda
           </span>
-          <div class="monitor-actions">
-            <span id="lblLoteActual" class="lote-badge">Lote en Prod: --</span>
-            <button id="btnBorrarLote" class="soft-btn danger-soft" type="button">
-              🗑️ <span class="hide-sm">Borrar Lote</span>
-            </button>
-            <button id="btnRemesas" class="btn btn-green" type="button">
-              🚀 Enviar Tasa Remesas
-            </button>
-          </div>
+          <span class="monitor-hint">Edita el nuevo lote y guárdalo</span>
         </div>
         <div id="gridMonitor" class="monitor-grid"></div>
         <div class="monitor-footer">
