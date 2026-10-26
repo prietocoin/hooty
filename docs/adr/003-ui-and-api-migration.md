@@ -546,3 +546,46 @@ node --check ...     OK
 Limitación vigente: las escrituras (edición/borrado de comprobantes, guardado de
 perfiles y tasas) siguen sin endpoint en Hooty. La UI debe operar en modo
 lectura hasta implementar esa fase.
+
+## 11. Diagnóstico del 404 en `hooty.jairokov.com`
+
+El cuerpo observado era `404 page not found` con
+`Content-Type: text/plain`. Ese texto lo genera el `http.ServeMux` cuando no
+encuentra un patrón, no el handler de la API. El handler devuelve
+`{"error":"not_found"}` con `Content-Type: application/json`.
+
+Causas posibles, en orden:
+
+1. La instancia desplegada servía un commit anterior a la incorporación de
+   `internal/api` (el commit `a4b6ee8` no tenía rutas de lectura).
+2. El mux registraba solo el subtree `"/api/v1/"`; se reemplazó por patrones
+   exactos con método de Go 1.22+.
+3. Un proxy que elimina `/api/v1` antes de llegar al contenedor. En ese caso
+   el backend recibe `/comprobantes` y devuelve 404.
+
+Se corrigió el registro a patrones completos:
+
+```text
+GET /api/v1/comprobantes
+GET /api/v1/comprobantes/
+GET /api/v1/comprobantes/{hash}
+GET /api/v1/comprobantes/{hash}/
+GET /api/v1/perfiles
+GET /api/v1/tasas/monitor
+GET /api/v1/reportes/filtros
+OPTIONS /api/v1/
+```
+
+Validación local:
+
+```text
+TestRegisterRutasExactasYBarraFinal  OK
+TestRegisterRechazaMetodoNoPermitido OK
+```
+
+Si tras el redespliegue el 404 continúa, revisar:
+
+- que el contenedor ejecute el commit `58bec6e` o posterior;
+- los logs de arranque (`VerifyViews`, `VerifySchema`);
+- la configuración de strip-prefix/rewrite del proxy;
+- que `/healthz` y `/api/v1/comprobantes` lleguen al mismo upstream.

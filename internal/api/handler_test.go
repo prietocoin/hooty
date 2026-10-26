@@ -239,6 +239,27 @@ func TestRegisterRutasExactasYBarraFinal(t *testing.T) {
 	}
 }
 
+func TestServidorHTTPResponde200EnComprobantes(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).Register(mux)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/v1/comprobantes")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("X-Total-Count"); got != "1" {
+		t.Fatalf("X-Total-Count = %q", got)
+	}
+}
+
 func TestRegisterRechazaMetodoNoPermitido(t *testing.T) {
 	t.Parallel()
 
