@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hooty/internal/clock"
+	"hooty/internal/dbschema"
 	"hooty/internal/domain"
 )
 
@@ -205,31 +206,22 @@ func VerifySchema(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	defer rows.Close()
 
-	found := map[string]map[string]bool{}
+	found := map[string]map[string]string{}
 	for rows.Next() {
-		var table, column string
-		if err := rows.Scan(&table, &column); err != nil {
+		var table, column, dataType string
+		if err := rows.Scan(&table, &column, &dataType); err != nil {
 			return fmt.Errorf("leer columna del esquema: %w", err)
 		}
 		if found[table] == nil {
-			found[table] = map[string]bool{}
+			found[table] = map[string]string{}
 		}
-		found[table][column] = true
+		found[table][column] = dataType
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("recorrer information_schema: %w", err)
 	}
-
-	var missing []string
-	for table, columns := range requiredSchema {
-		for _, column := range columns {
-			if !found[table][column] {
-				missing = append(missing, table+"."+column)
-			}
-		}
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("postgres: faltan columnas del contrato: %v", missing)
+	if err := dbschema.Validate(found, requiredSchema); err != nil {
+		return fmt.Errorf("postgres: %w", err)
 	}
 	return nil
 }

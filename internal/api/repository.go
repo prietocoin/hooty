@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hooty/internal/clock"
+	"hooty/internal/dbschema"
 )
 
 // ErrNotFound indica que la fila solicitada no existe.
@@ -48,21 +49,35 @@ func NewRepository(ctx context.Context, pool *pgxpool.Pool) (*Repository, error)
 	return &Repository{pool: pool, tasaOrder: order}, nil
 }
 
-// VerifyViews falla rápido si las vistas no tienen las columnas del contrato.
+var requiredViewSchema = dbschema.Schema{
+	"perfil": {
+		"nombre":        {Kind: dbschema.Text},
+		"id_grupo":      {Kind: dbschema.Text},
+		"rol":           {Kind: dbschema.Text},
+		"moneda_base":   {Kind: dbschema.Text},
+		"saldo_inicial": {Kind: dbschema.Numeric},
+		"mostrar":       {Kind: dbschema.JSON},
+		"monedas":       {Kind: dbschema.JSON},
+		"herencia":      {Kind: dbschema.Boolean},
+	},
+	"tasa": {
+		"id_tasa": {Kind: dbschema.Text},
+		"tasas":   {Kind: dbschema.JSON},
+	},
+}
+
+// VerifyViews falla rápido si las vistas no tienen las columnas y tipos del
+// contrato.
 func VerifyViews(ctx context.Context, pool *pgxpool.Pool) error {
 	if pool == nil {
 		return errors.New("api: pool es obligatorio")
 	}
-	required := map[string][]string{
-		"perfil": {"nombre", "id_grupo", "rol", "moneda_base", "saldo_inicial", "mostrar", "monedas", "herencia"},
-		"tasa":   {"id_tasa", "tasas"},
-	}
-	tables := make([]string, 0, len(required))
-	for table := range required {
+	tables := make([]string, 0, len(requiredViewSchema))
+	for table := range requiredViewSchema {
 		tables = append(tables, table)
 	}
 	rows, err := pool.Query(ctx, `
-SELECT table_name, column_name
+SELECT table_name, column_name, data_type
 FROM information_schema.columns
 WHERE table_schema = 'public'
   AND table_name = ANY($1::text[])`, tables)
@@ -71,30 +86,22 @@ WHERE table_schema = 'public'
 	}
 	defer rows.Close()
 
-	found := map[string]map[string]bool{}
+	found := map[string]map[string]string{}
 	for rows.Next() {
-		var table, column string
-		if err := rows.Scan(&table, &column); err != nil {
+		var table, column, dataType string
+		if err := rows.Scan(&table, &column, &dataType); err != nil {
 			return fmt.Errorf("api: escanear columna de vista: %w", err)
 		}
 		if found[table] == nil {
-			found[table] = map[string]bool{}
+			found[table] = map[string]string{}
 		}
-		found[table][column] = true
+		found[table][column] = dataType
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("api: recorrer columnas de vistas: %w", err)
 	}
-	var missing []string
-	for table, columns := range required {
-		for _, column := range columns {
-			if !found[table][column] {
-				missing = append(missing, table+"."+column)
-			}
-		}
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("api: faltan columnas en vistas: %v", missing)
+	if err := dbschema.Validate(found, requiredViewSchema); err != nil {
+		return fmt.Errorf("api: %w", err)
 	}
 	return nil
 }

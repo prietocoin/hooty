@@ -1,5 +1,7 @@
 package postgres
 
+import "hooty/internal/dbschema"
+
 // El SQL vive en un solo archivo para que el contrato con las tablas
 // definitivas sea auditable. Ninguna consulta del store toca comprobantes
 // fuera de GuardarComprobanteYMarcar, y el sweeper tiene su propio archivo.
@@ -112,23 +114,58 @@ ORDER BY
 LIMIT 1`
 
 	sqlSchemaColumns = `
-SELECT table_name, column_name
+SELECT table_name, column_name, data_type
 FROM information_schema.columns
 WHERE table_schema = 'public'
   AND table_name = ANY($1)
 ORDER BY table_name, ordinal_position`
 )
 
-var requiredSchema = map[string][]string{
+var (
+	columnText      = dbschema.Column{Kind: dbschema.Text}
+	columnInteger   = dbschema.Column{Kind: dbschema.Integer}
+	columnBoolean   = dbschema.Column{Kind: dbschema.Boolean}
+	columnNumeric   = dbschema.Column{Kind: dbschema.Numeric}
+	columnTimestamp = dbschema.Column{Kind: dbschema.TimestampWall}
+)
+
+var requiredSchema = dbschema.Schema{
 	"impactos": {
-		"id", "hash_largo", "hash_corto", "id_grupo", "caption", "instancia",
-		"procesado", "recibido_en", "pareja_id",
+		"id":          columnInteger,
+		"hash_largo":  columnText,
+		"hash_corto":  columnText,
+		"id_grupo":    columnText,
+		"caption":     columnText,
+		"instancia":   columnText,
+		"procesado":   columnBoolean,
+		"recibido_en": columnTimestamp,
+		"pareja_id":   columnInteger,
 	},
 	"comprobantes": {
-		"hash_largo", "hash_corto", "instancia",
-		"monto_recibo", "moneda_recibo", "banco", "titular", "referencia", "url_imagen",
-		"grupo_1", "grupo_2", "caption_1", "caption_2",
-		"socio_1", "socio_2", "tasa_1", "tasa_2", "monto_1", "monto_2", "me1", "me2",
-		"lote_tasa", "fecha_operacion", "creado_en", "actualizado_en",
+		"hash_largo":      columnText,
+		"hash_corto":      columnText,
+		"instancia":       columnText,
+		"monto_recibo":    columnNumeric,
+		"moneda_recibo":   columnText,
+		"banco":           columnText,
+		"titular":         columnText,
+		"referencia":      columnText,
+		"url_imagen":      columnText,
+		"grupo_1":         columnText,
+		"grupo_2":         columnText,
+		"caption_1":       columnText,
+		"caption_2":       columnText,
+		"socio_1":         columnText,
+		"socio_2":         columnText,
+		"tasa_1":          columnNumeric,
+		"tasa_2":          columnNumeric,
+		"monto_1":         columnNumeric,
+		"monto_2":         columnNumeric,
+		"me1":             columnNumeric,
+		"me2":             columnNumeric,
+		"lote_tasa":       columnText,
+		"fecha_operacion": columnTimestamp,
+		"creado_en":       columnTimestamp,
+		"actualizado_en":  columnTimestamp,
 	},
 }
