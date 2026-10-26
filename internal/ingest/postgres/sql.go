@@ -94,15 +94,16 @@ WHERE id = ANY($1)
   AND pareja_id IS NOT NULL
   AND procesado = FALSE`
 
+	// Lectura de catálogos a través de las vistas canónicas de ADR-003. Las
+	// tablas físicas perfiles_glaukov y tasas_glaukov quedan reservadas para
+	// escritura.
 	sqlLatestRateLot = `
 SELECT COALESCE(id_tasa, ''), COALESCE(tasas, '{}'::jsonb)
-FROM tasas_glaukov
-ORDER BY id DESC
-LIMIT 1`
+FROM tasa`
 
 	sqlProfileByGroup = `
 SELECT COALESCE(nombre, ''), COALESCE(moneda_base, 'USDT')
-FROM perfiles_glaukov
+FROM perfil
 WHERE LOWER(BTRIM(COALESCE(id_grupo, ''))) = LOWER(BTRIM($1))
    OR LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))
 ORDER BY

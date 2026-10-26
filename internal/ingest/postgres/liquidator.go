@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,16 +17,19 @@ import (
 	"hooty/internal/ingest"
 )
 
-// Liquidator resuelve los dos perfiles y el lote vigente de tasas_glaukov.
+// Liquidator resuelve los dos perfiles y el lote vigente a través de las
+// vistas canónicas perfil y tasa (ADR-003).
 //
 // No duplica fórmulas: delega el cálculo puro en ingest.CalcularLiquidacion y
 // solo se ocupa de leer PostgreSQL.
 type Liquidator struct {
-	pool *pgxpool.Pool
-	now  clock.Clock
+	pool      *pgxpool.Pool
+	now       clock.Clock
+	tasaOrder string
 }
 
-// NewLiquidator construye el adaptador financiero.
+// NewLiquidator construye el adaptador financiero y detecta la columna de
+// orden de la vista tasa sin asumir que expone `id`.
 func NewLiquidator(pool *pgxpool.Pool, now clock.Clock) (*Liquidator, error) {
 	if pool == nil {
 		return nil, errors.New("postgres: pool es obligatorio para liquidar")
@@ -33,7 +37,13 @@ func NewLiquidator(pool *pgxpool.Pool, now clock.Clock) (*Liquidator, error) {
 	if now == nil {
 		return nil, errors.New("postgres: reloj es obligatorio para liquidar")
 	}
-	return &Liquidator{pool: pool, now: now}, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	order, err := detectTasaOrder(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+	return &Liquidator{pool: pool, now: now, tasaOrder: order}, nil
 }
 
 // Liquidar implementa ingest.Liquidator.
@@ -61,7 +71,7 @@ func (l *Liquidator) perfil(ctx context.Context, grupo string) (domain.Perfil, e
 	err := l.pool.QueryRow(ctx, sqlProfileByGroup, strings.TrimSpace(grupo)).
 		Scan(&perfil.Nombre, &perfil.MonedaBase)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Perfil{}, domain.Validationf("el grupo %q no está registrado en perfiles_glaukov", grupo)
+		return domain.Perfil{}, domain.Validationf("el grupo %q no está registrado en la vista perfil", grupo)
 	}
 	if err != nil {
 		return domain.Perfil{}, fmt.Errorf("postgres: leer perfil %q: %w", grupo, err)
@@ -74,7 +84,8 @@ func (l *Liquidator) perfil(ctx context.Context, grupo string) (domain.Perfil, e
 func (l *Liquidator) loteVigente(ctx context.Context) (domain.LoteTasas, error) {
 	var id string
 	var raw []byte
-	if err := l.pool.QueryRow(ctx, sqlLatestRateLot).Scan(&id, &raw); err != nil {
+	query := sqlLatestRateLot + " ORDER BY " + l.tasaOrder + " LIMIT 1"
+	if err := l.pool.QueryRow(ctx, query).Scan(&id, &raw); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.LoteTasas{}, domain.Validationf("no hay lote de tasas vigente")
 		}
@@ -88,6 +99,26 @@ func (l *Liquidator) loteVigente(ctx context.Context) (domain.LoteTasas, error) 
 		return domain.LoteTasas{}, domain.Validationf("el lote de tasas %q está vacío", id)
 	}
 	return domain.LoteTasas{ID: strings.TrimSpace(id), Tasas: tasas}, nil
+}
+
+func detectTasaOrder(ctx context.Context, pool *pgxpool.Pool) (string, error) {
+	for _, column := range []string{"id", "creado_en", "created_at", "fecha", "id_tasa"} {
+		var exists bool
+		if err := pool.QueryRow(ctx, `
+SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tasa'
+      AND column_name = $1
+)`, column).Scan(&exists); err != nil {
+			return "", fmt.Errorf("postgres: detectar orden de la vista tasa: %w", err)
+		}
+		if exists {
+			return column + " DESC", nil
+		}
+	}
+	return "id_tasa DESC", nil
 }
 
 func parseRates(raw []byte) (map[string]float64, error) {
