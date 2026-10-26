@@ -14,6 +14,9 @@ import (
 type Store interface {
 	RegistrarImpacto(ctx context.Context, impacto domain.Impacto) (domain.Registro, error)
 	GuardarComprobanteYMarcar(ctx context.Context, comprobante domain.Comprobante, ids []int64) error
+	// ReleasePair libera la reserva mutua si el procesamiento falla antes del
+	// UPSERT contable, permitiendo que un reintento vuelva a emparejar.
+	ReleasePair(ctx context.Context, ids []int64) error
 }
 
 // MediaFetcher descarga el binario desde Evolution. Solo se invoca para el

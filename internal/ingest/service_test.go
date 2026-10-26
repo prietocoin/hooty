@@ -13,17 +13,26 @@ import (
 )
 
 type fakeStore struct {
-	registro    domain.Registro
-	registroErr error
-	registrados []domain.Impacto
-	guardados   []domain.Comprobante
-	ids         [][]int64
+	registro       domain.Registro
+	registroErr    error
+	registrosQueue []domain.Registro
+	registrados    []domain.Impacto
+	guardados      []domain.Comprobante
+	ids            [][]int64
+	releaseCalls   int
+	released       [][]int64
+	releaseErr     error
 }
 
 func (f *fakeStore) RegistrarImpacto(_ context.Context, impacto domain.Impacto) (domain.Registro, error) {
 	f.registrados = append(f.registrados, impacto)
 	if f.registroErr != nil {
 		return domain.Registro{}, f.registroErr
+	}
+	if len(f.registrosQueue) > 0 {
+		registro := f.registrosQueue[0]
+		f.registrosQueue = f.registrosQueue[1:]
+		return registro, nil
 	}
 	return f.registro, nil
 }
@@ -32,6 +41,12 @@ func (f *fakeStore) GuardarComprobanteYMarcar(_ context.Context, c domain.Compro
 	f.guardados = append(f.guardados, c)
 	f.ids = append(f.ids, append([]int64(nil), ids...))
 	return nil
+}
+
+func (f *fakeStore) ReleasePair(_ context.Context, ids []int64) error {
+	f.releaseCalls++
+	f.released = append(f.released, append([]int64(nil), ids...))
+	return f.releaseErr
 }
 
 type fakeMedia struct {
@@ -78,12 +93,20 @@ type fakeExtractor struct {
 	image   []byte
 	result  domain.Extraccion
 	err     error
+	errs    []error
 }
 
 func (f *fakeExtractor) Extraer(_ context.Context, image []byte, _ string, caption string) (domain.Extraccion, error) {
 	f.calls++
 	f.caption = caption
 	f.image = append([]byte(nil), image...)
+	if len(f.errs) > 0 {
+		err := f.errs[0]
+		f.errs = f.errs[1:]
+		if err != nil {
+			return domain.Extraccion{}, err
+		}
+	}
 	if f.err != nil {
 		return domain.Extraccion{}, f.err
 	}
@@ -305,6 +328,57 @@ func TestFalloDeIADejaElParSinGuardar(t *testing.T) {
 	}
 	if liq.calls != 0 {
 		t.Fatal("no se debe liquidar sin extracción")
+	}
+	if store.releaseCalls != 1 || len(store.released) != 1 ||
+		len(store.released[0]) != 2 || store.released[0][0] != 1 || store.released[0][1] != 2 {
+		t.Fatalf("el par debía liberarse al fallar: calls=%d released=%+v", store.releaseCalls, store.released)
+	}
+}
+
+func TestFalloDeIAPermiteReprocesarTrasLiberarPar(t *testing.T) {
+	t.Parallel()
+
+	pair := domain.Registro{
+		Status: domain.StatusPairReady,
+		Conteo: 2,
+		Pair: []domain.Impacto{
+			{ID: 1, HashLargo: "8a3ef79788979e878129e00ded237dcd", IDGrupo: "120363000000000001@g.us", RecibidoEn: testNow.Add(-time.Minute)},
+			{ID: 2, HashLargo: "8a3ef79788979e878129e00ded237dcd", IDGrupo: "120363000000000002@g.us", RecibidoEn: testNow},
+		},
+	}
+	store := &fakeStore{registrosQueue: []domain.Registro{pair, pair}}
+	media := &fakeMedia{image: []byte("img")}
+	images := &fakeImages{}
+	extractor := &fakeExtractor{
+		result: domain.Extraccion{Monto: 100, Moneda: "USD", Banco: "BANCO", Titular: "TITULAR", Referencia: "REF"},
+		errs:   []error{errors.New("gemini caído")},
+	}
+	liq := &fakeLiquidator{comp: validSettlement()}
+	svc := newService(t, store, media, images, extractor, liq)
+
+	if _, err := svc.Recibir(context.Background(), testEvent()); err == nil {
+		t.Fatal("el primer intento debía fallar")
+	}
+	if store.releaseCalls != 1 {
+		t.Fatalf("releaseCalls = %d, se esperaba 1", store.releaseCalls)
+	}
+	if len(store.guardados) != 0 {
+		t.Fatal("el primer intento no debe guardar comprobante")
+	}
+
+	decision, err := svc.Recibir(context.Background(), testEvent())
+	if err != nil {
+		t.Fatalf("el reintento debía procesar el par: %v", err)
+	}
+	if decision.Status != domain.StatusProcessed {
+		t.Fatalf("estado del reintento = %q", decision.Status)
+	}
+	if extractor.calls != 2 || media.calls != 2 || images.calls != 2 {
+		t.Fatalf("llamadas inesperadas en reintento: extractor=%d media=%d images=%d",
+			extractor.calls, media.calls, images.calls)
+	}
+	if len(store.guardados) != 1 {
+		t.Fatalf("comprobantes guardados = %d, se esperaba 1", len(store.guardados))
 	}
 }
 

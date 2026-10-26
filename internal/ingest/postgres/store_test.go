@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v4"
 
@@ -105,6 +106,94 @@ func TestGuardarComprobanteYMarcarCommitConDosFilas(t *testing.T) {
 
 	if err := store.GuardarComprobanteYMarcar(context.Background(), validComp(), []int64{1, 2}); err != nil {
 		t.Fatalf("GuardarComprobanteYMarcar: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReleasePairLimpiaReservaNoProcesada(t *testing.T) {
+	t.Parallel()
+
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer mock.Close()
+	store, err := New(mock)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE impactos").
+		WithArgs(pgxmock.AnyArg()).
+		WillReturnResult(pgconn.NewCommandTag("UPDATE 2"))
+	mock.ExpectCommit()
+
+	if err := store.ReleasePair(context.Background(), []int64{1, 2}); err != nil {
+		t.Fatalf("ReleasePair: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRegistrarImpactoReintentaParLiberado(t *testing.T) {
+	t.Parallel()
+
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer mock.Close()
+	store, err := New(mock)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	received := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+	impacto := domain.Impacto{
+		HashLargo:  "hash",
+		HashCorto:  "HASH",
+		IDGrupo:    "222@g.us",
+		Instancia:  "hooty",
+		RecibidoEn: received,
+	}
+	columns := []string{"id", "hash_largo", "hash_corto", "id_grupo", "caption", "instancia", "procesado", "recibido_en", "pareja_id"}
+
+	mock.ExpectBegin()
+	mock.ExpectExec("pg_advisory_xact_lock").
+		WithArgs("hooty:hash").
+		WillReturnResult(pgconn.NewCommandTag("SELECT 1"))
+	mock.ExpectQuery("INSERT INTO impactos").
+		WithArgs(anyArgs(6)...).
+		WillReturnError(pgx.ErrNoRows)
+	mock.ExpectQuery("SELECT id, hash_largo").
+		WithArgs("hash", "222@g.us").
+		WillReturnRows(pgxmock.NewRows(columns).
+			AddRow(int64(2), "hash", "HASH", "222@g.us", "segundo", "hooty", false, received, nil))
+	mock.ExpectQuery("FOR UPDATE SKIP LOCKED").
+		WithArgs("hash", "222@g.us").
+		WillReturnRows(pgxmock.NewRows(columns).
+			AddRow(int64(1), "hash", "HASH", "111@g.us", "primero", "hooty", false, received.Add(-time.Minute), nil))
+	mock.ExpectExec("UPDATE impactos SET pareja_id").
+		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgconn.NewCommandTag("UPDATE 1"))
+	mock.ExpectExec("UPDATE impactos SET pareja_id").
+		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgconn.NewCommandTag("UPDATE 1"))
+	mock.ExpectCommit()
+
+	registro, err := store.RegistrarImpacto(context.Background(), impacto)
+	if err != nil {
+		t.Fatalf("RegistrarImpacto: %v", err)
+	}
+	if registro.Status != domain.StatusPairReady || len(registro.Pair) != 2 {
+		t.Fatalf("registro inesperado: %+v", registro)
+	}
+	if registro.Pair[0].ID != 1 || registro.Pair[1].ID != 2 {
+		t.Fatalf("orden del par = %d,%d", registro.Pair[0].ID, registro.Pair[1].ID)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

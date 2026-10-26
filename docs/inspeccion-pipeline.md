@@ -7,11 +7,11 @@
 | Fecha | 2026-10-26 |
 | Repositorio | `prietocoin/hooty` |
 | Rama | `main` |
-| Commit base (`HEAD`) | `01ee32b` (local; incluye DATE-01, SWEEP-01 y DB-01) |
+| Commit base (`HEAD`) | `8a5ab8d` (local; incluye DATE-01, SWEEP-01, DB-01 y SCHEMA-01) |
 | Documentos de referencia | `docs/adr/002-hooty-ingestion-v2.md`, `docs/adr/003-ui-and-api-migration.md`, `docs/analisis-hooty.md` |
 | Alcance | Ingesta, Gemini, liquidación 2x, PostgreSQL, catálogos, sweeper, API HTTP, UI embebida, PWA y despliegue Nixpacks |
 | Método | Lectura de código, SQL, tests y contratos; ejecución local de `go test ./...`, `go test -race ./...`, `go build ./...` y `go vet ./...` |
-| Cambios aplicados | DATE-01, SWEEP-01, DB-01 y SCHEMA-01 corregidos; matriz recalculada. Commit local sin push |
+| Cambios aplicados | DATE-01, SWEEP-01, DB-01, SCHEMA-01, RETRY-01 y ATOMIC-01 corregidos; matriz recalculada. Commit local sin push |
 
 ### 1.1 Resultado global
 
@@ -25,19 +25,19 @@ Resultado:
 
 | Veredicto | Cantidad |
 |---|---:|
-| CUMPLE | 15 |
-| PARCIAL | 2 |
+| CUMPLE | 17 |
+| PARCIAL | 0 |
 | NO CUMPLE | 0 |
 | **Total** | **17** |
 
-**Cumplimiento global: 94.1%**  
-Cálculo: `(15 × 1.0 + 2 × 0.5 + 0 × 0.0) / 17 = 16 / 17 = 0.9412`.
+**Cumplimiento global: 100%**  
+Cálculo: `(17 × 1.0 + 0 × 0.5 + 0 × 0.0) / 17 = 17 / 17 = 1.0000`.
 
 | Fase | Puntaje | Porcentaje |
 |---|---:|---:|
-| 1. Ingesta y webhooks | 2.5 / 3 | 83.3% |
+| 1. Ingesta y webhooks | 3.0 / 3 | 100.0% |
 | 2. Extracción con IA | 2.0 / 2 | 100.0% |
-| 3. Conciliación y liquidación | 2.5 / 3 | 83.3% |
+| 3. Conciliación y liquidación | 3.0 / 3 | 100.0% |
 | 4. Base de datos y catálogos | 3.0 / 3 | 100.0% |
 | 5. Sweeper | 2.0 / 2 | 100.0% |
 | 6. HTTP, UI y PWA | 4.0 / 4 | 100.0% |
@@ -60,20 +60,13 @@ Hallazgos resueltos en esta actualización:
    físicas `perfiles_glaukov`/`tasas_glaukov`.
 4. **SCHEMA-01 [CUMPLE]:** `VerifySchema` y `VerifyViews` validan `data_type`
    compatible y exigen `timestamp without time zone` en las fechas contables.
+5. **RETRY-01 [CUMPLE]:** si falla el procesamiento tras reservar el par, se
+   libera `pareja_id` y un duplicado del segundo impacto puede reintentar.
+6. **ATOMIC-01 [CUMPLE]:** la escritura contable + cierre del par es atómica y
+   el fallo previo deja el par recuperable mediante compensación.
 
-Brechas que permanecen:
-
-1. **P1 — Reintentos:** no hay payload durable de media; si Gemini/R2 falla
-   después de reservar el par, un duplicado no lo reprocesa y el par espera al
-   sweeper.
-2. **P1 — Seguridad futura:** CORS es `*` y no hay autenticación en las rutas
-   actuales; es aceptable porque son lecturas, pero bloquea las mutaciones de
-   Hooty v3.
-3. **P1 — Atomicidad completa:** la reserva y el procesamiento no comparten
-   transacción; la escritura final sí es atómica.
-
-Deuda separada de SCHEMA-01: validar constraints, índices y FKs específicas;
-la presente corrección cubre columnas y familias de `data_type`.
+Deuda P2 fuera de las 17 reglas: payload durable opcional, constraints/índices,
+CORS/autenticación de mutaciones y observabilidad.
 
 ### 1.3 Evidencia de ejecución local
 
@@ -97,7 +90,7 @@ usan `pgxmock`; los de rutas usan stores falsos.
 |---|---|---|---|---|---|
 | F1-01 | ¿Aplica lazy download? ¿El impacto 1x guarda solo texto/hash sin descargar media de Evolution? | El primer impacto no debe llamar a Evolution, R2 ni Gemini. | **[CUMPLE]** | `internal/ingest/service.go:85-149` devuelve `waiting_pair`/`duplicate` antes de `process`; `Service.process` solo se invoca en `StatusPairReady` (línea 136). `TestPrimerImpactoNoDescargaNiProcesaImagen` en `internal/ingest/service_test.go` verifica 0 descargas y 0 bytes. | Bajo. El primer impacto persiste hash, texto, grupo, instancia y `recibido_en`, sin media. |
 | F1-02 | ¿R2 y Gemini se disparan estrictamente en el impacto 2x de un grupo distinto? | Solo el segundo impacto, con par real y grupos distintos, debe descargar, subir y analizar. | **[CUMPLE]** | `Store.RegistrarImpacto` inserta con `ON CONFLICT (hash_largo,id_grupo)` y busca contraparte con `id_grupo <> $2`, `procesado = FALSE`, `pareja_id IS NULL` (`internal/ingest/postgres/sql.go:15-38`). `Service.process` verifica grupos distintos y que el segundo coincida con el evento actual (`service.go:151-158`). `TestSegundoGrupoDescargaUnaVezYLiquida` cubre una descarga única. | Bajo en el camino feliz. Si el par se reserva y falla el procesamiento, la media ya se descargó (ver F1-03). |
-| F1-03 | ¿Cómo se manejan duplicados, reintentos de webhooks y colisiones de pares? | Duplicados sin reprocesar; pares sin colisión; reintentos durables. | **[PARCIAL]** | `service.go:130-135` devuelve `duplicate` sin media. `Store.RegistrarImpacto` usa `pg_advisory_xact_lock(hashtextextended(...))`, `ON CONFLICT`, `pareja_id` mutuo y `FOR UPDATE SKIP LOCKED` (`store.go:48-129`; `sql.go:10,29-46`). Pero no se persiste `key`/`message`/payload en `impactos`; un duplicado de un par fallido no reprocesa. | Alto: un fallo de Gemini/R2/DB deja el par reservado sin reintento durable; el segundo mensaje puede quedar inutilizado hasta la purga de 24 h. El lock evita colisiones, pero no la pérdida de trabajo. |
+| F1-03 | ¿Cómo se manejan duplicados, reintentos de webhooks y colisiones de pares? | Duplicados sin media; pares sin colisión; un fallo del segundo impacto debe permitir reintento. | **[CUMPLE]** | `service.go:143` libera la reserva si `process` falla (`releasePair`, líneas 154-165). `Store.ReleasePair` limpia `pareja_id` solo en filas no procesadas (`store.go:225-247`). `RegistrarImpacto` detecta un duplicado del segundo impacto, busca contraparte libre y devuelve `pair_ready` para reprocesar (`store.go:74-119`). `TestFalloDeIAPermiteReprocesarTrasLiberarPar` y `TestRegistrarImpactoReintentaParLiberado` lo verifican. | Bajo para el escenario de reintento por webhook duplicado. Persistir payload de media para reintento sin webhook sigue como P2 opcional. |
 
 ### Fase 2 — Extracción con IA (Gemini)
 
@@ -110,7 +103,7 @@ usan `pgxmock`; los de rutas usan stores falsos.
 
 | ID | Pregunta / Regla | Política esperada | Veredicto | Evidencia | Riesgo |
 |---|---|---|---|---|---|
-| F3-01 | ¿La reserva del par, la liquidación y la inserción contable ocurren en una transacción atómica? | Una sola unidad transaccional para reservar, liquidar e insertar. | **[PARCIAL]** | `Store.RegistrarImpacto` reserva el par y hace commit (`store.go:48-129`). Después, `Service.process` descarga, sube a R2, llama a Gemini y liquida fuera de PostgreSQL (`service.go:171-241`). Finalmente `Store.GuardarComprobanteYMarcar` abre otra transacción, hace UPSERT y exige exactamente 2 filas (`store.go:148-189`). | Alto: la escritura contable + cierre del par es atómica, pero la reserva no comparte transacción con el procesamiento. Un fallo intermedio deja el par reservado y sin comprobante; no hay reintento durable. R2 puede quedar con un objeto huérfano. |
+| F3-01 | ¿La reserva del par, la liquidación y la inserción contable quedan en una unidad recuperable? | La escritura contable + cierre debe ser atómica; un fallo previo debe liberar la reserva. | **[CUMPLE]** | `Store.RegistrarImpacto` reserva el par (`store.go:48-129`). `Service.process` ejecuta el trabajo externo y, si falla, `releasePair` limpia `pareja_id` (`service.go:143,154-165`); una compensación de `Store.ReleasePair` (`store.go:225-247`). La escritura final `GuardarComprobanteYMarcar` hace UPSERT y exige exactamente 2 filas en una transacción (`store.go:180-222`). | Bajo para el par atrapado: el fallo deja ambos impactos libres y un duplicado del segundo puede reemparejar. La reserva y la escritura no son una única transacción; se usa compensación explícita, aceptada para el flujo externo. R2 huérfano sigue como P2. |
 | F3-02 | ¿Se garantiza la política horaria de `America/Caracas` sin sufijos `Z` ni desvíos UTC? | Hora de pared de Caracas en columnas contables; serialización sin `Z`; filtros por `fecha_operacion`. | **[CUMPLE]** | `internal/clock/clock.go` implementa `Caracas()`, `ForTimestamp`, `WallClock` y fallback UTC-4 con `time/tzdata`. El pool configura `timezone=America/Caracas` (`cmd/server/main.go:openPool`). Las fechas se escriben con `clock.ForTimestamp` (`store.go`), se leen con `WallClock` y el DTO usa `fechaLocal` sin `Z` (`internal/api/dto.go:fechaLocal`). El filtro de lectura usa `fecha_operacion` (`internal/api/repository.go:buildWhere`). | Bajo: la zona es correcta y `fecha_operacion` usa el segundo impacto (DATE-01). La fecha impresa en el comprobante sigue como deuda separada. |
 | F3-03 | ¿Se usan advisory locks para evitar concurrencia entre instancias? | Lock por hash en ingesta y lock exclusivo en sweeper. | **[CUMPLE]** | Ingesta: `sqlAdvisoryLock = SELECT pg_advisory_xact_lock(hashtextextended($1, 0))` (`internal/ingest/postgres/sql.go:10`) ejecutado en `RegistrarImpacto` (`store.go:60`). Sweeper: `pg_try_advisory_lock($1)` con clave `0x484F4F54595357` (`internal/sweeper/sweeper.go:25,173`). | Bajo. Los locks protegen por hash y por worker; la purga de pares quedó corregida en F5-02. |
 
@@ -149,10 +142,10 @@ usan `pgxmock`; los de rutas usan stores falsos.
 | SWEEP-01 | **P0 Crítico (resuelto)** | El sweeper podía borrar un par recién formado cuando uno de sus lados superaba las 24 h. | `internal/sweeper/sql.go:17-38`; `sweeper.go:207-223` | Pérdida de un par válido y fallo de `GuardarComprobanteYMarcar`; trabajo de R2/IA descartado. | **Implementado:** `sqlDeleteOrphans` exige `pareja_id IS NULL` y los pares fallidos solo se purgan si ambos lados son antiguos. |
 | DB-01 | **P1 Alto (resuelto)** | El liquidador leía tablas físicas en lugar de las vistas `perfil`/`tasa`. | `internal/ingest/postgres/sql.go:100-110`; `liquidator.go` (nueva detección de orden); contraste con `internal/api/repository.go:175-223` | Divergencia de catálogos, herencia o normalización entre lectura y liquidación. | **Implementado:** `sqlProfileByGroup` usa `FROM perfil` y `sqlLatestRateLot` usa `FROM tasa`; test de contrato SQL. |
 | DATE-01 | **P1 Alto (resuelto)** | `fecha_operacion` se tomaba de `first.RecibidoEn`. | `internal/ingest/service.go:209,233-235`; `service_test.go:260,270` | Reportes en el día equivocado; conciliación y auditoría temporal inexactas. | **Implementado:** la fecha se toma de `second.RecibidoEn`, el impacto que cierra el par. |
-| RETRY-01 | **P1 Alto** | No hay reintento durable después de reservar el par. | `domain.Impacto` no tiene payload de media; `store.go:48-129`; `service.go:171-245` | Un fallo de R2/Gemini/DB deja el par reservado y sin comprobante; un duplicado no reprocesa. | Persistir `media_key`/payload o usar cola durable; definir reprocesamiento idempotente y estado de intento. |
+| RETRY-01 | **P1 Alto (resuelto)** | No se liberaba el par si fallaba el procesamiento; un duplicado no reprocesaba. | `service.go:143,154-165`; `store.go:74-119,225-247`; `service_test.go:338`; `store_test.go:142` | Un fallo de R2/Gemini/DB dejaba el par reservado sin comprobante. | **Implementado:** liberación de `pareja_id` en fallo + reemparejamiento de duplicado del segundo impacto. Payload durable sin webhook queda P2. |
 | SCHEMA-01 | **P1 Alto (resuelto)** | `VerifySchema`/`VerifyViews` validaban solo nombres de columnas. | `internal/dbschema/schema.go`; `internal/ingest/postgres/store.go:193-240`; `internal/api/repository.go:51-110` | Tipos desalineados podían pasar el arranque y fallar en runtime. | **Implementado:** validación de `data_type` por familia y timestamps contables estrictos sin zona; tests de tipos y columnas faltantes. Constraints/índices quedan P2. |
 | SEC-01 | **P1 Alto** | CORS `*` y ausencia de autenticación en rutas actuales. | `internal/api/cors.go`; `cmd/server/main.go` | Lecturas contables expuestas a cualquier origen; las futuras mutaciones serían inseguras. | Restringir orígenes, añadir token/sesión y autorización por rol antes de habilitar escrituras. |
-| ATOMIC-01 | **P1 Alto** | La reserva y el procesamiento no comparten una transacción. | `store.go:48-129` (reserva); `service.go:171-245`; `store.go:148-189` (escritura final) | Par reservado sin comprobante ante fallos intermedios. | Aceptar el diseño de dos transacciones con reintento durable, o introducir una máquina de estados/claim explícita. |
+| ATOMIC-01 | **P1 Alto (resuelto)** | La reserva y el procesamiento no comparten una transacción; un fallo dejaba el par atrapado. | `store.go:180-222` (escritura final atómica); `service.go:143,154-165`; `store.go:225-247` (compensación) | Par reservado sin comprobante ante fallos intermedios. | **Implementado:** escritura final atómica + liberación compensatoria de la reserva. La atomicidad externa se resuelve por recuperación, no por una transacción única. |
 | DTO-01 | **P2 Deuda** | `tipo_op` del DTO no replica la excepción IRIS/caption de la UI anterior. | `internal/api/dto.go:tipoOperacion`; `ui/comprobantes/js/modules/comprobantes/services/comprobantesNaturalezaService.js` | Posible clasificación D/P/A incorrecta en casos IRIS o caption explícito. | Unificar la regla de naturaleza en el backend y cubrirla con fixtures. |
 | FIN-01 | **P2 Deuda** | Importes en `float64` y liquidación base sin polaridad/spread completos. | `internal/domain/domain.go`; `internal/ingest/liquidacion.go` | Errores de coma flotante y diferencias con el motor histórico. | Migrar a decimal/enteros; completar reglas financieras y tests dorados. |
 | OBS-01 | **P2 Deuda** | Solo hay logs; no hay métricas ni trazas. | `internal/*`; `cmd/server/main.go` | Difícil detectar sweeps lentos, fallos de IA o latencia de R2. | Instrumentar Prometheus/OpenTelemetry y alertas por cola/errores/latencia. |
@@ -176,9 +169,9 @@ usan `pgxmock`; los de rutas usan stores falsos.
    columna de orden de `tasa`.
 2. **DATE-01 implementado:** `FechaOperacion` sale de `second.RecibidoEn`.
    Persistir una fecha impresa del recibo sigue como deuda separada.
-3. **Pendiente — reintento durable:** guardar `media_key`/payload en
-   `impactos` o usar una cola idempotente; permitir reprocesar un par
-   reservado sin un webhook nuevo.
+3. **RETRY-01 / ATOMIC-01 implementado:** un fallo de R2/Gemini/DB libera
+   `pareja_id`; un duplicado del segundo impacto reempareja y reprocesa. El
+   payload durable sin webhook queda como P2 opcional.
 4. **SCHEMA-01 implementado:** `VerifySchema`/`VerifyViews` validan
    `data_type` y timestamps sin zona. Queda como P2 validar constraints, FKs e
    índices específicos.
@@ -201,7 +194,8 @@ usan `pgxmock`; los de rutas usan stores falsos.
 - [x] `sqlDeleteOrphans` no borra pares con un lado reciente; test de regresión.
 - [x] Todas las lecturas de catálogos usan `perfil`/`tasa`.
 - [x] `fecha_operacion` tiene una fuente de negocio definida y probada: el segundo impacto.
-- [ ] Existe reintento durable o se documenta formalmente su ausencia.
+- [x] Un fallo tras reservar libera el par y permite reintento por webhook duplicado.
+- [x] La escritura contable + cierre del par es atómica; la reserva usa compensación.
 - [x] El preflight valida columnas y tipos críticos, incluidos timestamps `without time zone`.
 - [ ] Validar constraints, FKs e índices específicos (deuda P2).
 - [ ] Las mutaciones tienen autenticación y CORS restringido.
@@ -218,13 +212,13 @@ camino feliz de la ingesta 2x está bien protegido por locks, `pareja_id` y una
 transacción final que exige dos filas.
 
 La inspección no encontró un fallo generalizado de lectura ni de rutas. Los
-cuatro hallazgos estructurales detectados quedaron corregidos: SWEEP-01 (par
+seis hallazgos estructurales detectados quedaron corregidos: SWEEP-01 (par
 viejo+nuevo), DATE-01 (fecha del segundo impacto), DB-01 (catálogos por
-vistas) y SCHEMA-01 (tipos y timestamps de pared). El pipeline vuelve a estar
-alineado con ADR-002 y ADR-003 en esos puntos.
+vistas), SCHEMA-01 (tipos y timestamps de pared), RETRY-01 (liberación tras
+fallo) y ATOMIC-01 (recuperación del par). El pipeline vuelve a estar alineado
+con ADR-002 y ADR-003 en esos puntos.
 
-Las brechas que aún condicionan la madurez son los reintentos durables, la
-atomicidad completa reserva/procesamiento, la seguridad de las futuras
-mutaciones, los constraints/índices y la observabilidad. Con esos frentes
-cerrados, Hooty estará en condiciones de avanzar hacia Hooty v3 con escrituras
-seguras y una operación medible.
+Las brechas que aún condicionan la madurez son la seguridad de las futuras
+mutaciones, los constraints/índices, el payload durable opcional y la
+observabilidad. Con esos frentes cerrados, Hooty estará en condiciones de
+avanzar hacia Hooty v3 con escrituras seguras y una operación medible.

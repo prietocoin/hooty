@@ -96,6 +96,14 @@ WHERE id = ANY($1)
   AND pareja_id IS NOT NULL
   AND procesado = FALSE`
 
+	// Libera la reserva si el procesamiento externo falla. No toca pares ya
+	// procesados; un duplicado del segundo impacto podrá reemparejarlos.
+	sqlReleasePair = `
+UPDATE impactos
+SET pareja_id = NULL
+WHERE id = ANY($1)
+  AND procesado = FALSE`
+
 	// Lectura de catálogos a través de las vistas canónicas de ADR-003. Las
 	// tablas físicas perfiles_glaukov y tasas_glaukov quedan reservadas para
 	// escritura.

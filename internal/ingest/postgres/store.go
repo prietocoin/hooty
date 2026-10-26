@@ -77,6 +77,37 @@ func (s *Store) RegistrarImpacto(ctx context.Context, impacto domain.Impacto) (d
 		if selectErr != nil {
 			return domain.Registro{}, fmt.Errorf("leer impacto existente: %w", selectErr)
 		}
+
+		// Recuperación de un par liberado: si el duplicado corresponde al
+		// impacto más nuevo (el que cerró el par) y hay una contraparte libre,
+		// se vuelve a reservar para reprocesar con la media del evento actual.
+		if !existing.Procesado && existing.ParejaID == nil {
+			counterpart, findErr := scanImpacto(tx.QueryRow(ctx, sqlFindCounterpart,
+				existing.HashLargo, existing.IDGrupo))
+			switch {
+			case findErr == nil && existing.ID > counterpart.ID:
+				if err := reserve(ctx, tx, existing.ID, counterpart.ID); err != nil {
+					return domain.Registro{}, err
+				}
+				if err := reserve(ctx, tx, counterpart.ID, existing.ID); err != nil {
+					return domain.Registro{}, err
+				}
+				existing.ParejaID = &counterpart.ID
+				counterpart.ParejaID = &existing.ID
+				if err := tx.Commit(ctx); err != nil {
+					return domain.Registro{}, fmt.Errorf("commit de reintento de par: %w", err)
+				}
+				return domain.Registro{
+					Status:  domain.StatusPairReady,
+					Impacto: existing,
+					Pair:    []domain.Impacto{counterpart, existing},
+					Conteo:  2,
+				}, nil
+			case findErr != nil && !errors.Is(findErr, pgx.ErrNoRows):
+				return domain.Registro{}, fmt.Errorf("buscar contraparte para reintento: %w", findErr)
+			}
+		}
+
 		if err := tx.Commit(ctx); err != nil {
 			return domain.Registro{}, fmt.Errorf("commit de duplicado: %w", err)
 		}
@@ -187,6 +218,28 @@ func (s *Store) GuardarComprobanteYMarcar(ctx context.Context, comprobante domai
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit del comprobante: %w", err)
+	}
+	return nil
+}
+
+// ReleasePair limpia la reserva mutua de un par que falló antes del UPSERT.
+// No toca filas ya procesadas: si el comprobante se escribió, la reserva debe
+// permanecer cerrada.
+func (s *Store) ReleasePair(ctx context.Context, ids []int64) error {
+	if len(ids) != 2 || ids[0] == ids[1] || ids[0] <= 0 || ids[1] <= 0 {
+		return fmt.Errorf("postgres: se requieren dos ids distintos y positivos")
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("abrir transacción de liberación: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, sqlReleasePair, ids); err != nil {
+		return fmt.Errorf("liberar pareja_id: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit de liberación: %w", err)
 	}
 	return nil
 }

@@ -138,6 +138,9 @@ func (s *Service) Recibir(ctx context.Context, event Evento) (domain.Decision, e
 			return decision, fmt.Errorf("ingest: par_ready con %d impactos", len(registro.Pair))
 		}
 		if err := s.process(ctx, registro.Pair, event); err != nil {
+			// La reserva se libera para que un reintento del webhook (o un
+			// duplicado del segundo impacto) pueda volver a procesar el par.
+			s.releasePair(ctx, registro.Pair)
 			return decision, err
 		}
 		decision.Status = domain.StatusProcessed
@@ -146,6 +149,20 @@ func (s *Service) Recibir(ctx context.Context, event Evento) (domain.Decision, e
 	default:
 		return decision, fmt.Errorf("ingest: estado desconocido %q", registro.Status)
 	}
+}
+
+func (s *Service) releasePair(ctx context.Context, pair []domain.Impacto) {
+	if len(pair) != 2 {
+		return
+	}
+	ids := []int64{pair[0].ID, pair[1].ID}
+	releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := s.store.ReleasePair(releaseCtx, ids); err != nil {
+		s.log.Warn("hooty.ingest.release_pair_error", "ids", ids, "error", err)
+		return
+	}
+	s.log.Info("hooty.ingest.pair_released", "ids", ids)
 }
 
 func (s *Service) process(ctx context.Context, pair []domain.Impacto, event Evento) error {
