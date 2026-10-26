@@ -16,16 +16,16 @@
   <link rel="apple-touch-icon" href="./icon-192.png">
 
   <link rel="icon" type="image/png" href="./logo-fundablock.png">
-  <link rel="stylesheet" href="/shared/vendor/glauk2/tailwind.css?v=20261026_03">
-  <link rel="stylesheet" href="/shared/css/mobile.css?v=20261026_03">
-  <link rel="stylesheet" href="/shared/css/fintech.css?v=20261026_04">
+  <link rel="stylesheet" href="/shared/vendor/glauk2/tailwind.css?v=20261026_05">
+  <link rel="stylesheet" href="/shared/css/mobile.css?v=20261026_05">
+  <link rel="stylesheet" href="/shared/css/fintech.css?v=20261026_05">
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
-  <script src="../config.js?v=20261026_03"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261026_04"></script>
-  <script type="module" src="./js/pwa.js?v=20261026_04"></script>
-  <script src="/shared/vendor/glauk2/alpine.min.js?v=20261026_03" defer></script>
-  <script src="/shared/vendor/html2canvas.min.js?v=20261026_03"></script>
+  <script src="../config.js?v=20261026_05"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261026_05"></script>
+  <script type="module" src="./js/pwa.js?v=20261026_05"></script>
+  <script src="/shared/vendor/glauk2/alpine.min.js?v=20261026_05" defer></script>
+  <script src="/shared/vendor/html2canvas.min.js?v=20261026_05"></script>
 
   <style>
     [x-cloak] { display: none !important; }
@@ -1289,7 +1289,17 @@
         <span class="px-2 py-0.5 bg-purple-950/80 border border-purple-500/40 text-purple-300 rounded-lg text-[10px] font-bold font-mono truncate"
               x-text="(reporteSocio || 'Sin socio') + ' · ' + reporteItems.length + ' ítems'"></span>
       </div>
-      <button type="button" class="glauk-modal__close" @click="modalReporteAbierto = false" aria-label="Cerrar estado de cuenta">✕</button>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button type="button"
+                class="glauk-reporte-zoom"
+                @click="alternarAjusteReporte()"
+                :aria-pressed="reporteAjustePantalla ? 'true' : 'false'"
+                :title="reporteAjustePantalla ? 'Ver la hoja al 100% con scroll manual' : 'Ajustar la hoja al ancho de pantalla'">
+          <span aria-hidden="true">🔍</span>
+          <span x-text="reporteAjustePantalla ? '100%' : 'Ajustar'"></span>
+        </button>
+        <button type="button" class="glauk-modal__close" @click="modalReporteAbierto = false" aria-label="Cerrar estado de cuenta">✕</button>
+      </div>
     </header>
 
     <!-- CUERPO SCROLLEABLE -->
@@ -1358,8 +1368,18 @@
     </div>
 
     <!-- DOCUMENTO RENDERIZADO PARA CAPTURA DE IMAGEN -->
-    <div class="glauk-reporte-scroll">
-      <div id="reporte-html-documento" class="bg-white text-slate-900 p-6 flex flex-col shrink-0 mx-auto" style="width:800px; max-width:800px">
+    <div class="glauk-reporte-scroll"
+         x-ref="reporteScroll"
+         :class="{ 'is-ajustado': reporteAjustePantalla && reporteEscala < 1 }"
+         x-effect="reporteAjustePantalla; reportePaginaSegura; reporteItems.length; reporteCargando; actualizarAjusteReporte()"
+         @resize.window.debounce.150ms="actualizarAjusteReporte()">
+      <div class="reporte-fit"
+           :style="{
+             '--reporte-escala': reporteEscala,
+             width: (reporteAjustePantalla && reporteEscala < 1) ? reporteAnchoHoja + 'px' : null,
+             height: (reporteAjustePantalla && reporteEscala < 1) ? reporteAltoHoja + 'px' : null
+           }">
+        <div id="reporte-html-documento" class="bg-white text-slate-900 p-6 flex flex-col shrink-0 mx-auto" style="width:800px; max-width:800px">
         <div>
           <div class="border-b-2 border-slate-900 pb-3 mb-4 flex justify-between items-start gap-4">
             <div>
@@ -1442,6 +1462,7 @@
             <span class="shrink-0" x-text="'Página ' + reportePaginaSegura + ' de ' + reporteTotalPaginas"></span>
           </div>
         </div>
+      </div>
       </div>
       </div>
       </div>
@@ -1550,6 +1571,6 @@
        @click.stop>
 </div>
 
-<script type="module" src="/shared/js/mobile-nav.js?v=20261026_03"></script>
+<script type="module" src="/shared/js/mobile-nav.js?v=20261026_05"></script>
 </body>
 </html>

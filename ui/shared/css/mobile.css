@@ -1823,6 +1823,60 @@ body.glauk-sheet-open .glauk-main {
   }
 }
 
+/* Auto-ajuste del visor de reportes: la hoja conserva 800 px de layout y solo
+   se transforma visualmente. El wrapper se dimensiona a la escala para que no
+   aparezcan scrollbars laterales ni franjas vacías. */
+.reporte-fit {
+  width: 800px;
+  margin-inline: auto;
+  overflow: hidden;
+}
+
+.reporte-fit > #reporte-html-documento {
+  transform: scale(var(--reporte-escala, 1));
+  transform-origin: top left;
+  will-change: transform;
+}
+
+.glauk-reporte-scroll.is-ajustado {
+  overflow-x: hidden;
+  padding: 12px;
+}
+
+.glauk-reporte-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid rgba(34, 211, 238, .3);
+  border-radius: 8px;
+  background: rgba(34, 211, 238, .08);
+  color: #67e8f9;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.glauk-reporte-zoom:hover {
+  background: rgba(34, 211, 238, .16);
+  border-color: rgba(34, 211, 238, .5);
+}
+
+/* Durante la captura html2canvas se anula el auto-ajuste: la imagen se genera
+   siempre desde el layout original de 800 px (resolución 1:1). */
+body.glauk-capturando-reporte .reporte-fit {
+  width: 800px !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+body.glauk-capturando-reporte .reporte-fit > #reporte-html-documento {
+  transform: none !important;
+}
+
 @media print {
   .glauk-bottom-nav,
   .glauk-sheet-backdrop,

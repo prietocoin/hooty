@@ -47,7 +47,9 @@ export async function capturarReporteEstadoCuenta(elemento, opciones = {}) {
     minHeight: elemento.style.minHeight,
     height: elemento.style.height,
     maxHeight: elemento.style.maxHeight,
-    overflow: elemento.style.overflow
+    overflow: elemento.style.overflow,
+    transform: elemento.style.transform,
+    transformOrigin: elemento.style.transformOrigin
   };
 
   // El lienzo vive dentro de un contenedor con scroll horizontal en móvil.
@@ -70,13 +72,18 @@ export async function capturarReporteEstadoCuenta(elemento, opciones = {}) {
     elemento.style.height = 'auto';
     elemento.style.maxHeight = 'none';
     elemento.style.overflow = 'visible';
+    // La captura siempre se hace sobre el layout original de 800 px: el
+    // auto-ajuste visual del modal nunca altera la resolución de la imagen.
+    elemento.style.transform = 'none';
+    elemento.style.transformOrigin = 'top left';
 
     if (document.fonts?.ready) await document.fonts.ready;
     await esperarLayout();
 
     // Auto-recorte: la altura se mide sobre el contenido real de la tabla y el
-    // pie, evitando franjas blancas inferiores.
-    const altoReal = Math.ceil(Math.max(elemento.scrollHeight, elemento.getBoundingClientRect().height, 1));
+    // pie, evitando franjas blancas inferiores. scrollHeight es la altura de
+    // layout (no la escalada), así que la imagen conserva su nitidez 1:1.
+    const altoReal = Math.ceil(Math.max(elemento.scrollHeight, 1));
     const alto = Math.min(altoReal, altoMaximo);
 
     elemento.style.height = `${alto}px`;

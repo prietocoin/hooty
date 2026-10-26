@@ -34,6 +34,12 @@ function claveReporte(item = {}) {
   return String(item?.hash_largo || item?.id || '').trim().toLowerCase();
 }
 
+// La hoja del reporte conserva su ancho lógico de 800 px. El auto-ajuste solo
+// cambia la escala visual; la captura html2canvas siempre trabaja a 1:1.
+const ANCHO_HOJA_REPORTE = 800;
+const MARGEN_AJUSTE_REPORTE = 24;
+const ESCALA_MINIMA_REPORTE = 0.2;
+
 function formatearFechaReporte(item = {}) {
   const fecha = fechaCaracasISO(item);
   if (!fecha) return '-';
@@ -67,6 +73,14 @@ export function createComprobantesReporteState() {
     reporteSolicitudActual: 0,
     reportePaginaActual: 1,
     reporteItemsPorPagina: 20,
+
+    // Auto-ajuste del visor: en móvil la hoja de 800 px se escala al ancho
+    // disponible; el botón de lupa alterna con el modo 100 % + scroll manual.
+    reporteAjustePantalla: true,
+    reporteEscala: 1,
+    reporteAnchoHoja: ANCHO_HOJA_REPORTE,
+    reporteAltoHoja: 0,
+    reporteAltoOriginal: 0,
 
     get reporteEsDescendente() {
       return this.reporteOrden === 'fecha_desc';
@@ -227,8 +241,42 @@ export function createComprobantesReporteState() {
       this.reporteItemsBase = [];
       this.reportePaginaActual = 1;
       this.modalReporteAbierto = true;
+      this.actualizarAjusteReporte();
 
       return this.cargarReporteSocio();
+    },
+
+    alternarAjusteReporte() {
+      this.reporteAjustePantalla = !this.reporteAjustePantalla;
+      this.actualizarAjusteReporte();
+    },
+
+    /**
+     * Escala visual del visor:
+     *   escala = (anchoDisponibleDelModal - margenes) / anchoOriginalHoja
+     * El layout de la hoja sigue siendo de 800 px; solo se transforma su
+     * render, de modo que html2canvas capture siempre a resolución 1:1.
+     */
+    actualizarAjusteReporte() {
+      this.$nextTick(() => {
+        requestAnimationFrame(() => {
+          const hoja = document.getElementById('reporte-html-documento');
+          const scroll = document.querySelector('.glauk-reporte-scroll');
+          if (!hoja || !scroll) return;
+
+          const anchoDisponible = Math.max(0, scroll.clientWidth - MARGEN_AJUSTE_REPORTE);
+          const escala = this.reporteAjustePantalla
+            ? Math.min(1, anchoDisponible / ANCHO_HOJA_REPORTE)
+            : 1;
+          const escalaFinal = Math.max(ESCALA_MINIMA_REPORTE, Number(escala.toFixed(4)) || 1);
+          const altoOriginal = Math.max(1, hoja.scrollHeight);
+
+          this.reporteEscala = escalaFinal;
+          this.reporteAltoOriginal = altoOriginal;
+          this.reporteAnchoHoja = Math.ceil(ANCHO_HOJA_REPORTE * escalaFinal);
+          this.reporteAltoHoja = Math.ceil(altoOriginal * escalaFinal);
+        });
+      });
     },
 
     async cargarReporteSocio() {
@@ -276,7 +324,10 @@ export function createComprobantesReporteState() {
           this.reporteItemsBase = [];
         }
       } finally {
-        if (token === this.reporteSolicitudActual) this.reporteCargando = false;
+        if (token === this.reporteSolicitudActual) {
+          this.reporteCargando = false;
+          this.actualizarAjusteReporte();
+        }
       }
     },
 
@@ -305,12 +356,16 @@ export function createComprobantesReporteState() {
     },
 
     reportePaginaAnterior() {
-      if (this.reportePaginaSegura > 1) this.reportePaginaActual = this.reportePaginaSegura - 1;
+      if (this.reportePaginaSegura > 1) {
+        this.reportePaginaActual = this.reportePaginaSegura - 1;
+        this.actualizarAjusteReporte();
+      }
     },
 
     reportePaginaSiguiente() {
       if (this.reportePaginaSegura < this.reporteTotalPaginas) {
         this.reportePaginaActual = this.reportePaginaSegura + 1;
+        this.actualizarAjusteReporte();
       }
     },
 

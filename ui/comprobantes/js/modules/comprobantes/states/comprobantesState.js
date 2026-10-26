@@ -25,7 +25,7 @@ import {
 import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261025_02';
 import { aplicarRangoHash } from '../services/comprobantesFilterService.js?v=20261025_02';
 import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261025_02';
-import { capturarReporteEstadoCuenta } from '../services/comprobantesReporteService.js?v=20261025_02';
+import { capturarReporteEstadoCuenta } from '../services/comprobantesReporteService.js?v=20261026_05';
 import { obtenerSaldoAnteriorSocio, obtenerSujetoAuditado } from '../services/comprobantesSaldosService.js?v=20261025_02';
 import { obtenerRangoMesActualCaracas, formatearFechaLatina } from '../utils/comprobantesFechaUtils.js?v=20261025_02';
 
