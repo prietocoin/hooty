@@ -19,7 +19,7 @@ function construirBandera(code) {
   return [imagen, respaldo];
 }
 
-function construirTarjeta(code, valor, alCambiar, index = 0) {
+function construirTarjeta(code, valorProd, valorNuevo, alCambiar, index = 0) {
   const tarjeta = el('div', { class: 'currency-card' });
   tarjeta.style.setProperty('--card-index', String(index));
   const estado = el('span', {
@@ -38,14 +38,14 @@ function construirTarjeta(code, valor, alCambiar, index = 0) {
     'div',
     { class: 'prod-row' },
     el('span', {}, 'PROD:'),
-    el('span', { class: 'prod-value' }, String(valor))
+    el('span', { class: 'prod-value' }, String(valorProd))
   );
 
   const entrada = el('input', {
     type: 'number',
     step: 'any',
     class: 'rate-input',
-    value: String(valor),
+    value: String(valorNuevo),
     'aria-label': `Nuevo lote para ${code}`
   });
   entrada.addEventListener('input', () => alCambiar(code, entrada.value));
@@ -61,9 +61,16 @@ function construirTarjeta(code, valor, alCambiar, index = 0) {
   return tarjeta;
 }
 
-export function renderMonitorGrid(contenedor, mapaTasas, alCambiar) {
-  const tarjetas = Object.entries(mapaTasas)
-    .filter(([clave]) => esClaveMeta(clave))
-    .map(([code, valor], index) => construirTarjeta(code, valor, alCambiar, index));
+export function renderMonitorGrid(contenedor, tasasProd, tasasNuevo, alCambiar) {
+  const codigos = new Set([...Object.keys(tasasProd), ...Object.keys(tasasNuevo)]);
+  const tarjetas = [...codigos]
+    .filter((clave) => esClaveMeta(clave))
+    .map((code, index) => construirTarjeta(
+      code,
+      tasasProd[code] ?? 0,
+      tasasNuevo[code] ?? tasasProd[code] ?? 0,
+      alCambiar,
+      index
+    ));
   contenedor.replaceChildren(...tarjetas);
 }

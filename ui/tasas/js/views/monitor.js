@@ -1,10 +1,10 @@
 import { qs } from '../../../shared/js/dom.js';
 import { api } from '../api.js?v=20261030_01';
 import { fusionarTasas } from '../config.js';
-import { state } from '../state.js';
+import { state } from '../state.js?v=20261030_02';
 import { abrirModal, cerrarModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
-import { renderMonitorGrid } from '../components/monitor-grid.js';
+import { renderMonitorGrid } from '../components/monitor-grid.js?v=20261030_02';
 
 function alHacer(selector, evento, manejador) {
   const elemento = qs(selector);
@@ -29,9 +29,23 @@ export function initMonitor() {
     state.borradorTasas[code] = parseFloat(valor) || 0;
   }
 
-  function aplicarMapa(mapaTasas) {
-    state.borradorTasas = fusionarTasas(mapaTasas);
-    renderMonitorGrid(grid, state.borradorTasas, actualizarValor);
+  function renderGrid() {
+    renderMonitorGrid(grid, state.loteVigente, state.borradorTasas, actualizarValor);
+  }
+
+  // La base de datos (PROD) y el lote editable son estados independientes.
+  // Al cargar la vista, el borrador parte del lote vigente.
+  function aplicarLoteVigente(mapaTasas) {
+    const tasas = fusionarTasas(mapaTasas);
+    state.loteVigente = tasas;
+    state.borradorTasas = { ...tasas };
+    renderGrid();
+  }
+
+  // El borrador HOO solo puede tocar las casillas de "NUEVO LOTE".
+  function aplicarBorrador(mapaTasas) {
+    state.borradorTasas = fusionarTasas({ ...state.borradorTasas, ...mapaTasas });
+    renderGrid();
   }
 
   function actualizarEtiquetaLote() {
@@ -43,7 +57,7 @@ export function initMonitor() {
       const datos = await api.monitor();
       state.loteActualCodigo = datos.id_tasa || 'T000';
       actualizarEtiquetaLote();
-      aplicarMapa(datos.tasas || {});
+      aplicarLoteVigente(datos.tasas || {});
       return true;
     } catch (error) {
       console.error('Error monitor:', error);
@@ -83,7 +97,7 @@ export function initMonitor() {
         showToast('❌ No se recibió un borrador reciente de Hoo');
         return;
       }
-      aplicarMapa({ ...state.borradorTasas, ...datos.borrador });
+      aplicarBorrador(datos.borrador);
       showToast('✅ Borrador cargado en NUEVO LOTE');
     } catch (error) {
       showToast(`❌ Error de conexión al leer el borrador: ${error.message}`);
@@ -140,5 +154,5 @@ export function initMonitor() {
     mostrarEstadoGrid(grid, 'Cargando tasas del lote vigente...');
   }
 
-  return { refresh, aplicarMapa };
+  return { refresh, aplicarBorrador, aplicarLoteVigente };
 }
