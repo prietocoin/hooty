@@ -77,21 +77,3 @@ if (window.Alpine) {
 } else {
   document.addEventListener('alpine:init', registrarApp);
 }
-
-// Enlace nativo de respaldo para el guardado del modal de comprobantes.
-// Garantiza que el clic se registre incluso si el footer queda fuera del
-// scope de Alpine (por ejemplo, dentro de un teleport o un x-if recreado).
-document.addEventListener('click', (evento) => {
-  const boton = evento.target.closest?.('#btn-guardar-comprobante');
-  if (!boton) return;
-  console.log('[Hooty] Click nativo en Guardar Comprobante');
-  let datos = globalThis.Alpine?.$data?.(boton);
-  if (!datos?.guardarModal) {
-    datos = boton.closest?.('[x-data]')?._x_dataStack?.[0];
-  }
-  if (!datos?.guardarModal) {
-    console.error('[Hooty] No se encontró guardarModal en el scope del modal', datos);
-    return;
-  }
-  datos.guardarModal();
-});

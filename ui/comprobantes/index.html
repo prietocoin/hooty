@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261030_04"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261030_05"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -989,7 +989,6 @@
 <div x-data="{
   modalAbierto: false,
   guardando: false,
-  ultimoClick: 0,
   itemEdicion: null,
 
   numeroPuro(valor) {
@@ -1164,12 +1163,6 @@
 
   async guardarModal() {
     console.log('[Hooty] Click en Guardar Comprobante disparado');
-    const ahora = Date.now();
-    if (this.ultimoClick && ahora - this.ultimoClick < 300) {
-      console.log('[Hooty] Clic duplicado ignorado');
-      return;
-    }
-    this.ultimoClick = ahora;
     let toast = null;
     try {
       toast = await import('/shared/js/toast.js');
@@ -1301,7 +1294,7 @@
       me2: me2
     };
 
-    console.log('[Hooty] Enviando payload PUT:', payload);
+    console.log('[Hooty] Ejecutando fetch PUT /api/v1/comprobantes/' + hashTarget, payload);
     this.guardando = true;
     try {
       const { guardarCambiosComprobante } = await import('/comprobantes/js/modules/comprobantes/services/comprobantesApiService.js?v=20261030_04');
