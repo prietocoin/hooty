@@ -1,5 +1,5 @@
 import { qs } from '../../../shared/js/dom.js';
-import { api } from '../api.js';
+import { api } from '../api.js?v=20261030_01';
 import { fusionarTasas } from '../config.js';
 import { state } from '../state.js';
 import { abrirModal, cerrarModal } from '../ui/modal.js';
@@ -83,7 +83,7 @@ export function initMonitor() {
         showToast('❌ No se recibió un borrador reciente de Hoo');
         return;
       }
-      aplicarMapa(datos.borrador);
+      aplicarMapa({ ...state.borradorTasas, ...datos.borrador });
       showToast('✅ Borrador cargado en NUEVO LOTE');
     } catch (error) {
       showToast(`❌ Error de conexión al leer el borrador: ${error.message}`);

@@ -1,6 +1,7 @@
 import { apiUrl } from '../../shared/js/api-base.js';
 
 const BASE = '/api/v1/tasas';
+const HOO_RATES_URL = 'https://hoo.jairokov.com/global-rates';
 
 export class ApiError extends Error {
   constructor(mensaje, estado = 0, ruta = '') {
@@ -57,14 +58,34 @@ export const api = {
 
   /**
    * Borrador HOO del monitor en segundo plano (se refresca cada 2 minutos).
-   * Es distinto del lote vigente de /monitor: solo rellena "NUEVO LOTE".
+   * El origen devuelve un array y claves en minúsculas; se normalizan a
+   * mayúsculas para el estado de "NUEVO LOTE".
    */
   async borradorHoo() {
-    const datos = await solicitarJson('/hoo-borrador');
-    return {
-      id_tasa: datos.id_tasa || datos.ID || '',
-      borrador: datos.borrador ?? datos.tasas ?? datos.rates ?? datos.rates_draft ?? {}
-    };
+    let respuesta;
+    try {
+      respuesta = await fetch(HOO_RATES_URL, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      });
+    } catch (error) {
+      throw new ApiError('No se pudo conectar con HOO', 0, HOO_RATES_URL);
+    }
+    if (!respuesta.ok) {
+      throw new ApiError(`HOO respondió HTTP ${respuesta.status}`, respuesta.status, HOO_RATES_URL);
+    }
+    const data = await respuesta.json().catch(() => null);
+    const tasas = Array.isArray(data) ? data[0] : data;
+    const borrador = {};
+    if (tasas && typeof tasas === 'object') {
+      for (const [clave, valor] of Object.entries(tasas)) {
+        const code = String(clave).trim().toUpperCase();
+        if (!/^[A-Z]{3,5}$/.test(code)) continue;
+        const numero = typeof valor === 'number' ? valor : Number(String(valor).replace(',', '.'));
+        if (Number.isFinite(numero) && numero >= 0) borrador[code] = numero;
+      }
+    }
+    return { id_tasa: '', borrador };
   },
 
   guardarLote(tasas) {
