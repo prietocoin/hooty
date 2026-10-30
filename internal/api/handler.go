@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -24,6 +25,8 @@ type Store interface {
 	UpdateComprobante(ctx context.Context, hash string, patch ComprobantePatch) (ComprobanteRow, error)
 	ListPerfiles(ctx context.Context) ([]Perfil, error)
 	LatestTasa(ctx context.Context) (Tasa, error)
+	SaveLote(ctx context.Context, tasas map[string]any) (string, error)
+	PublishLote(ctx context.Context) (string, int, error)
 	ReportFilters(ctx context.Context) (ReportFilters, error)
 }
 
@@ -68,6 +71,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/perfiles/{$}", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/tasas/monitor/{$}", h.LatestTasa)
+	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote", h.SaveLote)
+	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote/{$}", h.SaveLote)
+	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote", h.PublishLote)
+	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote/{$}", h.PublishLote)
 	mux.HandleFunc("GET /api/v1/reportes/filtros", h.ReportFilters)
 	mux.HandleFunc("GET /api/v1/reportes/filtros/{$}", h.ReportFilters)
 }
@@ -95,6 +102,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 	case r.Method == http.MethodPut && strings.HasPrefix(path, "/api/v1/comprobantes/"):
 		h.UpdateComprobante(w, r)
+	case r.Method == http.MethodPut && path == "/api/v1/tasas/guardar-lote":
+		h.SaveLote(w, r)
+	case r.Method == http.MethodPut && path == "/api/v1/tasas/publicar-lote":
+		h.PublishLote(w, r)
 	case r.Method == http.MethodPut:
 		w.Header().Set("Allow", "GET, PUT, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -296,6 +307,76 @@ func (h *Handler) LatestTasa(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, NewTasaDTO(tasa))
+}
+
+// SaveLote responde PUT /api/v1/tasas/guardar-lote. Inserta un lote nuevo en
+// tasas_glaukov y devuelve el identificador asignado.
+func (h *Handler) SaveLote(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Tasas map[string]any `json:"tasas"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err := decoder.Decode(&body); err != nil || len(body.Tasas) == 0 {
+		writeError(w, http.StatusBadRequest, "invalid_rate_lote")
+		return
+	}
+	tasas := make(map[string]any, len(body.Tasas))
+	for clave, valor := range body.Tasas {
+		switch typed := valor.(type) {
+		case float64:
+			if typed >= 0 && !math.IsNaN(typed) && !math.IsInf(typed, 0) {
+				tasas[clave] = typed
+			}
+		case string:
+			if strings.EqualFold(clave, "CREATED_AT") {
+				tasas[clave] = typed
+			}
+		}
+	}
+	if len(tasas) == 0 {
+		writeError(w, http.StatusBadRequest, "invalid_rate_lote")
+		return
+	}
+	if _, ok := tasas["CREATED_AT"]; !ok {
+		tasas["CREATED_AT"] = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	}
+	id, err := h.store.SaveLote(r.Context(), tasas)
+	if err != nil {
+		h.log.Error("hooty.api.tasas_guardar", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id_tasa": id})
+}
+
+// PublishLote responde PUT /api/v1/tasas/publicar-lote. Confirma el lote
+// vigente y cuenta los socios con cartelera activa.
+func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ModoPruebaGlobal bool `json:"modo_prueba_global"`
+	}
+	if r.Body != nil && r.ContentLength != 0 {
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+		if err := decoder.Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_publish_payload")
+			return
+		}
+	}
+	id, procesados, err := h.store.PublishLote(r.Context())
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusBadRequest, "no hay lote vigente")
+		return
+	}
+	if err != nil {
+		h.log.Error("hooty.api.tasas_publicar", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id_tasa":    id,
+		"procesados": procesados,
+		"prueba":     body.ModoPruebaGlobal,
+	})
 }
 
 func (h *Handler) ReportFilters(w http.ResponseWriter, r *http.Request) {

@@ -62,6 +62,14 @@ func (routeStore) ReportFilters(context.Context) (api.ReportFilters, error) {
 	return api.ReportFilters{Roles: []string{"SOCIO"}}, nil
 }
 
+func (routeStore) SaveLote(context.Context, map[string]any) (string, error) {
+	return "T999", nil
+}
+
+func (routeStore) PublishLote(context.Context) (string, int, error) {
+	return "T999", 2, nil
+}
+
 func newTestMux(t *testing.T) http.Handler {
 	t.Helper()
 	uiHandler, err := hootyui.UIHandler()

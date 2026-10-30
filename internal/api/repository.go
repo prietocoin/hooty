@@ -562,6 +562,74 @@ ORDER BY nombre`)
 	return items, nil
 }
 
+func nextLoteID(ultimo string) string {
+	digits := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, ultimo)
+	numero, err := strconv.Atoi(digits)
+	if err != nil {
+		numero = 0
+	}
+	return fmt.Sprintf("T%03d", numero+1)
+}
+
+// SaveLote inserta un lote nuevo en la tabla física tasas_glaukov. El ID se
+// deriva serializando la escritura para que dos guardados simultáneos no
+// colisionen.
+func (r *Repository) SaveLote(ctx context.Context, tasas map[string]any) (string, error) {
+	raw, err := json.Marshal(tasas)
+	if err != nil {
+		return "", fmt.Errorf("api: serializar lote: %w", err)
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return "", fmt.Errorf("api: abrir transacción de lote: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('hooty:tasas_glaukov'))`); err != nil {
+		return "", fmt.Errorf("api: bloquear lote: %w", err)
+	}
+	var ultimo string
+	err = tx.QueryRow(ctx, `SELECT COALESCE(id_tasa, '') FROM tasas_glaukov ORDER BY id DESC LIMIT 1`).Scan(&ultimo)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("api: leer último lote: %w", err)
+	}
+	id := nextLoteID(ultimo)
+	if _, err := tx.Exec(ctx, `INSERT INTO tasas_glaukov (id_tasa, tasas) VALUES ($1, $2::jsonb)`, id, raw); err != nil {
+		return "", fmt.Errorf("api: guardar lote: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("api: confirmar lote: %w", err)
+	}
+	return id, nil
+}
+
+// PublishLote confirma el lote vigente y devuelve cuántos socios tienen la
+// cartelera activa. El despacho externo queda fuera de esta lectura atómica.
+func (r *Repository) PublishLote(ctx context.Context) (string, int, error) {
+	tasa, err := r.LatestTasa(ctx)
+	if err != nil {
+		return "", 0, err
+	}
+	var procesados int
+	err = r.pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM perfil
+WHERE UPPER(BTRIM(COALESCE(nombre, ''))) NOT IN ('', 'GENERAL')
+  AND CASE
+      WHEN LOWER(COALESCE(mostrar->>'tasas', '')) IN ('true', 'false')
+        THEN (mostrar->>'tasas')::boolean
+      ELSE TRUE
+  END`).Scan(&procesados)
+	if err != nil {
+		return "", 0, fmt.Errorf("api: contar socios activos: %w", err)
+	}
+	return tasa.IDTasa, procesados, nil
+}
+
 // LatestTasa devuelve el último registro de la vista tasa.
 func (r *Repository) LatestTasa(ctx context.Context) (Tasa, error) {
 	var item Tasa

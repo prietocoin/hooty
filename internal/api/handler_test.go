@@ -14,16 +14,19 @@ import (
 )
 
 type fakeStore struct {
-	rows      []ComprobanteRow
-	total     int
-	perfiles  []Perfil
-	tasa      Tasa
-	filters   ReportFilters
-	last      Filter
-	listErr   error
-	getErr    error
-	perfilErr error
-	tasaErr   error
+	rows       []ComprobanteRow
+	total      int
+	perfiles   []Perfil
+	tasa       Tasa
+	filters    ReportFilters
+	last       Filter
+	savedTasas map[string]any
+	listErr    error
+	getErr     error
+	perfilErr  error
+	tasaErr    error
+	saveErr    error
+	publishErr error
 }
 
 func (f *fakeStore) ListComprobantes(_ context.Context, filter Filter) ([]ComprobanteRow, int, error) {
@@ -57,6 +60,18 @@ func (f *fakeStore) ListPerfiles(_ context.Context) ([]Perfil, error) {
 
 func (f *fakeStore) LatestTasa(_ context.Context) (Tasa, error) {
 	return f.tasa, f.tasaErr
+}
+
+func (f *fakeStore) SaveLote(_ context.Context, tasas map[string]any) (string, error) {
+	f.savedTasas = tasas
+	return "T999", f.saveErr
+}
+
+func (f *fakeStore) PublishLote(_ context.Context) (string, int, error) {
+	if f.publishErr != nil {
+		return "", 0, f.publishErr
+	}
+	return "T999", 2, nil
 }
 
 func (f *fakeStore) ReportFilters(_ context.Context) (ReportFilters, error) {
@@ -434,6 +449,49 @@ func TestSimularComprobanteUsaMotorCanonico(t *testing.T) {
 	}
 	if result.Tasa1 != 1629 || result.Tasa2 != 1596 {
 		t.Fatalf("tasas de simulación inesperadas: %+v", result)
+	}
+}
+
+func TestTasasGuardarYPublicarUsanPUT(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	NewHandler(store, nil).Register(mux)
+
+	body := `{"tasas":{"ARS":1622,"COP":3094}}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/tasas/guardar-lote", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT guardar-lote status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if store.savedTasas["ARS"] != float64(1622) {
+		t.Fatalf("tasas no guardadas: %+v", store.savedTasas)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/tasas/guardar-lote", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST guardar-lote status = %d, se esperaba 405", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodPut, "/api/v1/tasas/publicar-lote", strings.NewReader(`{}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT publicar-lote status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var publicado struct {
+		IDTasa     string `json:"id_tasa"`
+		Procesados int    `json:"procesados"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &publicado); err != nil {
+		t.Fatalf("respuesta de publicación inválida: %v", err)
+	}
+	if publicado.IDTasa != "T999" || publicado.Procesados != 2 {
+		t.Fatalf("publicación inesperada: %+v", publicado)
 	}
 }
 

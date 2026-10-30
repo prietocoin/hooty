@@ -90,14 +90,14 @@ export const api = {
 
   guardarLote(tasas) {
     return solicitarJson('/guardar-lote', {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify({ tasas })
     });
   },
 
   publicarLote(modoPruebaGlobal) {
     return solicitarJson('/publicar-lote', {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify({ modo_prueba_global: modoPruebaGlobal })
     });
   },
