@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261030_01"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261030_02"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -1052,16 +1052,14 @@
       socio_1: socio1,
       monto_1: this.numeroPuro(this.itemEdicion.monto_1),
       tasa_1: tasa1,
-      me1: this.numeroPuro(this.itemEdicion.me1),
       socio_2: socio2,
       monto_2: this.numeroPuro(this.itemEdicion.monto_2),
-      tasa_2: tasa2,
-      me2: this.numeroPuro(this.itemEdicion.me2)
+      tasa_2: tasa2
     };
 
     this.cargando = true;
     try {
-      const { guardarCambiosComprobante } = await import('/comprobantes/js/modules/comprobantes/services/comprobantesApiService.js?v=20261030_01');
+      const { guardarCambiosComprobante } = await import('/comprobantes/js/modules/comprobantes/services/comprobantesApiService.js?v=20261030_02');
       const actualizado = await guardarCambiosComprobante(hashTarget, payload);
 
       window.dispatchEvent(new CustomEvent('comprobante-actualizado', {
@@ -1097,10 +1095,8 @@
       moneda_recibo: String(raw.moneda_recibo || raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
       tasa_1: Number(raw.tasa_1 ?? 0),
       monto_1: Number(raw.monto_1 ?? 0),
-      me1: Number(raw.me1 ?? raw.m1_socio ?? 0),
       tasa_2: Number(raw.tasa_2 ?? 0),
       monto_2: Number(raw.monto_2 ?? 0),
-      me2: Number(raw.me2 ?? raw.m2_socio ?? 0),
       tipo_manual: String(raw.tipo_manual || raw.tipo_op1 || raw.tipo_op || raw.tipo || 'D').split('-')[0].toUpperCase(),
       moneda: String(raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
       lote_tasa_asignado: raw.lote_tasa_asignado || raw.lote_tasa || raw.lote || 'T070'
@@ -1207,7 +1203,7 @@
                       </template>
                     </select>
                   </div>
-                  <div class="grid grid-cols-3 gap-2">
+                  <div class="grid grid-cols-2 gap-2">
                     <div>
                       <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-tasa-1">Tasa</label>
                       <input id="editar-tasa-1" type="number" step="any" x-model="itemEdicion.tasa_1"
@@ -1217,11 +1213,6 @@
                       <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-monto-1">Monto</label>
                       <input id="editar-monto-1" type="number" step="any" x-model="itemEdicion.monto_1"
                              class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
-                    </div>
-                    <div>
-                      <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-me1">ME</label>
-                      <input id="editar-me1" type="number" step="any" x-model="itemEdicion.me1"
-                             class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-amber-300 font-mono font-bold outline-none">
                     </div>
                   </div>
                 </section>
@@ -1245,7 +1236,7 @@
                       </template>
                     </select>
                   </div>
-                  <div class="grid grid-cols-3 gap-2">
+                  <div class="grid grid-cols-2 gap-2">
                     <div>
                       <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-tasa-2">Tasa</label>
                       <input id="editar-tasa-2" type="number" step="any" x-model="itemEdicion.tasa_2"
@@ -1255,11 +1246,6 @@
                       <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-monto-2">Monto</label>
                       <input id="editar-monto-2" type="number" step="any" x-model="itemEdicion.monto_2"
                              class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
-                    </div>
-                    <div>
-                      <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-me2">ME</label>
-                      <input id="editar-me2" type="number" step="any" x-model="itemEdicion.me2"
-                             class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-amber-300 font-mono font-bold outline-none">
                     </div>
                   </div>
                 </section>
@@ -1299,7 +1285,7 @@
                 </div>
 
                 <div class="text-[10px] text-slate-400 bg-[#020617] border border-blue-900/60 rounded-xl p-2.5">
-                  La edición conserva hash, grupos, lote y URL de imagen. Socio 1 y Socio 2 se guardan de forma independiente; el backend valida que sean distintos y que montos, tasas y ME sean contables.
+                  La edición conserva hash, grupos, lote y URL de imagen. Socio 1 y Socio 2 se guardan de forma independiente; el backend valida que sean distintos y que montos y tasas sean contables. El ME se conserva como dato estadístico.
                 </div>
 
               </div>

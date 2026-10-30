@@ -287,12 +287,20 @@ export async function guardarCambiosComprobante(hashLargo, payload = {}) {
     socio_1: socio1,
     monto_1: numero(payload.monto_1),
     tasa_1: numero(payload.tasa_1),
-    me1: numero(payload.me1),
     socio_2: socio2,
     monto_2: numero(payload.monto_2),
-    tasa_2: numero(payload.tasa_2),
-    me2: numero(payload.me2)
+    tasa_2: numero(payload.tasa_2)
   };
+
+  // ME es estadístico, no editable. Solo se reenvía si un consumidor lo
+  // proporciona explícitamente con un valor finito; si se omite, el backend
+  // conserva el me1/me2 originales de la fila (ComprobantePatch usa punteros).
+  for (const clave of ['me1', 'me2']) {
+    const valor = payload[clave];
+    if (valor === undefined || valor === null || valor === '') continue;
+    const numerico = Number(valor);
+    if (Number.isFinite(numerico) && numerico !== 0) body[clave] = numerico;
+  }
 
   const res = await fetch(apiUrl(`${API_RUTA}/${encodeURIComponent(idValido)}`), {
     method: 'PUT',
