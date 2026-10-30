@@ -63,6 +63,50 @@ func (l *Liquidator) Liquidar(ctx context.Context, input domain.LiquidacionInput
 	return ingest.CalcularLiquidacion(input, perfil1, perfil2, lote, l.now.Now())
 }
 
+// Simular ejecuta la liquidación canónica sin persistir el comprobante.
+func (l *Liquidator) Simular(ctx context.Context, input ingest.SimulacionInput) (ingest.SimulacionResult, error) {
+	perfil1, err := l.perfil(ctx, input.Socio1)
+	if err != nil {
+		return ingest.SimulacionResult{}, err
+	}
+	perfil2, err := l.perfil(ctx, input.Socio2)
+	if err != nil {
+		return ingest.SimulacionResult{}, err
+	}
+	lote, err := l.lote(ctx, input.LoteTasa)
+	if err != nil {
+		return ingest.SimulacionResult{}, err
+	}
+	return ingest.SimularLiquidacion(input, perfil1, perfil2, lote)
+}
+
+func (l *Liquidator) lote(ctx context.Context, id string) (domain.LoteTasas, error) {
+	if strings.TrimSpace(id) == "" {
+		return l.loteVigente(ctx)
+	}
+	var loteID string
+	var raw []byte
+	err := l.pool.QueryRow(ctx, `
+SELECT COALESCE(id_tasa, ''), COALESCE(tasas::text, '{}')
+FROM tasa
+WHERE id_tasa = $1
+LIMIT 1`, strings.TrimSpace(id)).Scan(&loteID, &raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return l.loteVigente(ctx)
+	}
+	if err != nil {
+		return domain.LoteTasas{}, fmt.Errorf("postgres: leer lote %q: %w", id, err)
+	}
+	tasas, err := parseRates(raw)
+	if err != nil {
+		return domain.LoteTasas{}, err
+	}
+	if len(tasas) == 0 {
+		return domain.LoteTasas{}, domain.Validationf("el lote de tasas %q está vacío", loteID)
+	}
+	return domain.LoteTasas{ID: strings.TrimSpace(loteID), Tasas: tasas}, nil
+}
+
 func (l *Liquidator) perfil(ctx context.Context, grupo string) (domain.Perfil, error) {
 	if !domain.IsRealGroup(grupo) {
 		return domain.Perfil{}, domain.Validationf("el grupo %q no es un socio real", grupo)

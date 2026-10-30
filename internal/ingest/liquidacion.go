@@ -101,6 +101,63 @@ func CalcularLiquidacion(input domain.LiquidacionInput, perfil1, perfil2 domain.
 	return comprobante, nil
 }
 
+type SimulacionInput struct {
+	MonedaRecibo string  `json:"moneda_recibo"`
+	MontoRecibo  float64 `json:"monto_recibo"`
+	Socio1       string  `json:"socio_1"`
+	Socio2       string  `json:"socio_2"`
+	LoteTasa     string  `json:"lote_tasa"`
+}
+
+// SimulacionResult es el contrato de POST /api/v1/comprobantes/simular.
+type SimulacionResult struct {
+	Tasa1  float64 `json:"tasa_1"`
+	Tasa2  float64 `json:"tasa_2"`
+	Monto1 float64 `json:"monto_1"`
+	Monto2 float64 `json:"monto_2"`
+	ME1    float64 `json:"me1"`
+	ME2    float64 `json:"me2"`
+}
+
+// SimularLiquidacion ejecuta la misma fórmula que la ingesta, sin escribir el
+// comprobante. Los perfiles y el lote los resuelve el adaptador PostgreSQL.
+func SimularLiquidacion(input SimulacionInput, perfil1, perfil2 domain.Perfil, lote domain.LoteTasas) (SimulacionResult, error) {
+	if input.MontoRecibo <= 0 || math.IsNaN(input.MontoRecibo) || math.IsInf(input.MontoRecibo, 0) {
+		return SimulacionResult{}, domain.Validationf("monto_recibo debe ser positivo")
+	}
+	if strings.TrimSpace(input.MonedaRecibo) == "" {
+		return SimulacionResult{}, domain.Validationf("moneda_recibo es obligatoria")
+	}
+	if !domain.IsRealSocio(perfil1.Nombre) || !domain.IsRealSocio(perfil2.Nombre) {
+		return SimulacionResult{}, domain.Validationf("ambos grupos deben resolver a socios reales")
+	}
+	if domain.Canonical(perfil1.Nombre) == domain.Canonical(perfil2.Nombre) {
+		return SimulacionResult{}, domain.Validationf("los dos grupos resolvieron al mismo socio")
+	}
+	if strings.TrimSpace(lote.ID) == "" {
+		return SimulacionResult{}, domain.Validationf("no hay lote de tasas vigente")
+	}
+
+	currency := domain.NormalizeCurrency(input.MonedaRecibo, "")
+	receiptRate, err := rateFor(lote, currency)
+	if err != nil {
+		return SimulacionResult{}, err
+	}
+	tasa1, monto1, me1, err := side(perfil1, input.MontoRecibo, receiptRate, lote)
+	if err != nil {
+		return SimulacionResult{}, fmt.Errorf("lado 1: %w", err)
+	}
+	tasa2, monto2, me2, err := side(perfil2, input.MontoRecibo, receiptRate, lote)
+	if err != nil {
+		return SimulacionResult{}, fmt.Errorf("lado 2: %w", err)
+	}
+	return SimulacionResult{
+		Tasa1: tasa1, Tasa2: tasa2,
+		Monto1: monto1, Monto2: monto2,
+		ME1: me1, ME2: me2,
+	}, nil
+}
+
 func side(perfil domain.Perfil, amount, receiptRate float64, lote domain.LoteTasas) (float64, float64, float64, error) {
 	if strings.TrimSpace(perfil.MonedaBase) == "" {
 		return 0, 0, 0, domain.Validationf("el socio %q no tiene moneda base", perfil.Nombre)

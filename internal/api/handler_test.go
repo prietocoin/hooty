@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"hooty/internal/ingest"
 )
 
 type fakeStore struct {
@@ -382,6 +384,40 @@ func TestReconcileSideCalculaYEvaluaSigno(t *testing.T) {
 	}
 	if monto != -2.4 || me != -0.64 {
 		t.Fatalf("excepción manual no respetada: monto=%v me=%v", monto, me)
+	}
+}
+
+type fakeSimulator struct {
+	result ingest.SimulacionResult
+	err    error
+}
+
+func (f fakeSimulator) Simular(context.Context, ingest.SimulacionInput) (ingest.SimulacionResult, error) {
+	return f.result, f.err
+}
+
+func TestSimularComprobanteUsaMotorCanonico(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	NewHandler(testStore(), nil, fakeSimulator{result: ingest.SimulacionResult{
+		Tasa1: 1629, Tasa2: 1596, Monto1: 30.07, Monto2: 30.07, ME1: 30.07, ME2: 30.07,
+	}}).Register(mux)
+
+	body := `{"moneda_recibo":"ARS","monto_recibo":49000,"socio_1":"CHASAN","socio_2":"NELSY","lote_tasa":"T070"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/comprobantes/simular", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST simular status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var result ingest.SimulacionResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("respuesta de simulación inválida: %v", err)
+	}
+	if result.Tasa1 != 1629 || result.Tasa2 != 1596 {
+		t.Fatalf("tasas de simulación inesperadas: %+v", result)
 	}
 }
 

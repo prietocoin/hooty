@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"hooty/internal/domain"
+	"hooty/internal/ingest"
 )
 
 // Store es la superficie de lectura que consumen los handlers.
@@ -28,16 +29,26 @@ type Store interface {
 
 // Handler atiende las rutas GET /api/v1/*.
 type Handler struct {
-	store Store
-	log   *slog.Logger
+	store     Store
+	log       *slog.Logger
+	simulator Simulator
+}
+
+// Simulator expone el motor de liquidación canónico para el modal de edición.
+type Simulator interface {
+	Simular(ctx context.Context, input ingest.SimulacionInput) (ingest.SimulacionResult, error)
 }
 
 // NewHandler construye el handler de lectura.
-func NewHandler(store Store, logger *slog.Logger) *Handler {
+func NewHandler(store Store, logger *slog.Logger, simuladores ...Simulator) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Handler{store: store, log: logger}
+	handler := &Handler{store: store, log: logger}
+	if len(simuladores) > 0 {
+		handler.simulator = simuladores[0]
+	}
+	return handler
 }
 
 // Register monta las rutas completas con método en el ServeMux principal.
@@ -52,6 +63,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/comprobantes/{hash}/{$}", h.GetComprobante)
 	mux.HandleFunc("PUT /api/v1/comprobantes/{hash}", h.UpdateComprobante)
 	mux.HandleFunc("PUT /api/v1/comprobantes/{hash}/{$}", h.UpdateComprobante)
+	mux.HandleFunc("POST /api/v1/comprobantes/simular", h.Simular)
 	mux.HandleFunc("GET /api/v1/perfiles", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/perfiles/{$}", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
@@ -68,14 +80,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Options(w, r)
 		return
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodPut {
-		w.Header().Set("Allow", "GET, PUT, OPTIONS")
+	if r.Method != http.MethodGet && r.Method != http.MethodPut && r.Method != http.MethodPost {
+		w.Header().Set("Allow", "GET, PUT, POST, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 		return
 	}
 
 	path := strings.TrimRight(r.URL.Path, "/")
 	switch {
+	case r.Method == http.MethodPost && path == "/api/v1/comprobantes/simular":
+		h.Simular(w, r)
+	case r.Method == http.MethodPost:
+		w.Header().Set("Allow", "GET, PUT, POST, OPTIONS")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 	case r.Method == http.MethodPut && strings.HasPrefix(path, "/api/v1/comprobantes/"):
 		h.UpdateComprobante(w, r)
 	case r.Method == http.MethodPut:
@@ -168,6 +185,31 @@ func (h *Handler) GetComprobante(w http.ResponseWriter, r *http.Request) {
 	index := MapPerfiles(perfiles)
 	writeJSON(w, http.StatusOK, NewComprobanteDTO(row,
 		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)]))
+}
+
+// Simular resuelve tasas y montos con el motor canónico, sin persistir.
+func (h *Handler) Simular(w http.ResponseWriter, r *http.Request) {
+	if h.simulator == nil {
+		writeError(w, http.StatusServiceUnavailable, "simulator_unavailable")
+		return
+	}
+	var input ingest.SimulacionInput
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err := decoder.Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	result, err := h.simulator.Simular(r.Context(), input)
+	if errors.Is(err, domain.ErrValidation) {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if err != nil {
+		h.log.Error("hooty.api.comprobante_simular", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // UpdateComprobante edita cabecera y ambos lados del binomio sin tocar la
@@ -348,7 +390,7 @@ func parseDate(raw string) (string, error) {
 
 func setCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-Id, Authorization, X-Hooty-Token")
 	w.Header().Set("Access-Control-Expose-Headers", "X-Total-Count, X-Limit, X-Offset, X-Has-More")
 }

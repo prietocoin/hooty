@@ -110,7 +110,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	readAPI := api.NewHandler(readRepository, logger)
+	readAPI := api.NewHandler(readRepository, logger, liquidator)
 
 	webhook := ingest.NewHTTPHandler(service, ingest.HTTPOptions{
 		Token:           cfg.WebhookToken,

@@ -108,7 +108,7 @@ WHERE id = ANY($1)
 	// tablas físicas perfiles_glaukov y tasas_glaukov quedan reservadas para
 	// escritura.
 	sqlLatestRateLot = `
-SELECT COALESCE(id_tasa, ''), COALESCE(tasas, '{}'::jsonb)
+SELECT COALESCE(id_tasa, ''), COALESCE(tasas::text, '{}')
 FROM tasa`
 
 	sqlProfileByGroup = `
