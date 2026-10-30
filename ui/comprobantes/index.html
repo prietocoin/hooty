@@ -1139,26 +1139,33 @@
     if (this.itemEdicion) {
       this.monto1Manual = false;
       this.monto2Manual = false;
-      if (!(this.numeroPuro(this.itemEdicion.tasa_1) > 0)) this.aplicarTasaPorDefecto(1);
-      if (!(this.numeroPuro(this.itemEdicion.tasa_2) > 0)) this.aplicarTasaPorDefecto(2);
-      if (!(this.numeroPuro(this.itemEdicion.monto_1) > 0)) this.recalcularLado(1, true);
-      else this.recalcularME(1);
-      if (!(this.numeroPuro(this.itemEdicion.monto_2) > 0)) this.recalcularLado(2, true);
-      else this.recalcularME(2);
+      // Nunca se tocan tasa_1/tasa_2 al abrir: son las tasas históricas del
+      // comprobante y deben mostrarse exactamente como se guardaron.
+      this.recalcularME(1);
+      this.recalcularME(2);
     }
   },
 
   async cambiarMonedaRecibo() {
     await this.cargarTasasEdicion();
+    this.monto1Manual = false;
+    this.monto2Manual = false;
     this.aplicarTasasPorDefecto();
     this.recalcularTodo();
   },
 
   async cambiarSocio(lado, base) {
     if (base) this.itemEdicion[`base_socio_${lado}`] = String(base).toUpperCase();
+    this[`monto${lado}Manual`] = false;
     await this.cargarTasasEdicion();
     this.aplicarTasaPorDefecto(lado);
-    this.recalcularLado(lado);
+    this.recalcularLado(lado, true);
+  },
+
+  cambiarTasa(lado, valor) {
+    this[`monto${lado}Manual`] = false;
+    this.itemEdicion[`tasa_${lado}`] = valor;
+    this.recalcularLado(lado, true);
   },
 
   async guardarEdicionComprobante() {
@@ -1254,12 +1261,12 @@
       monto: Number(raw.monto ?? raw.monto_local ?? 0),
       monto_recibo: Number(raw.monto_recibo ?? raw.monto ?? raw.monto_local ?? 0),
       moneda_recibo: String(raw.moneda_recibo || raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
-      tasa_1: Number(raw.tasa_1 ?? 0),
-      monto_1: Number(raw.monto_1 ?? 0),
-      me1: Number(raw.me1 ?? raw.m1_socio ?? 0),
-      tasa_2: Number(raw.tasa_2 ?? 0),
-      monto_2: Number(raw.monto_2 ?? 0),
-      me2: Number(raw.me2 ?? raw.m2_socio ?? 0),
+      tasa_1: numeroPuro(raw.tasa_1 || raw.tasa1 || raw.grupo_1?.tasa),
+      monto_1: numeroPuro(raw.monto_1 ?? raw.grupo_1?.monto),
+      me1: numeroPuro(raw.me1 ?? raw.m1_socio ?? raw.grupo_1?.monto),
+      tasa_2: numeroPuro(raw.tasa_2 || raw.tasa2 || raw.grupo_2?.tasa),
+      monto_2: numeroPuro(raw.monto_2 ?? raw.grupo_2?.monto),
+      me2: numeroPuro(raw.me2 ?? raw.m2_socio ?? raw.grupo_2?.monto),
       base_socio_1: String(raw.moneda_base_socio1 || raw.moneda_socio_1 || 'USDT').toUpperCase(),
       base_socio_2: String(raw.moneda_base_socio2 || raw.moneda_socio_2 || 'USDT').toUpperCase(),
       tipo_manual: String(raw.tipo_manual || raw.tipo_op1 || raw.tipo_op || raw.tipo || 'D').split('-')[0].toUpperCase(),
@@ -1390,7 +1397,7 @@
                     <div>
                       <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-tasa-1">Tasa</label>
                       <input id="editar-tasa-1" name="tasa_1" type="number" step="any" x-model="itemEdicion.tasa_1"
-                             @input="itemEdicion.tasa_1 = $event.target.value; recalcularLado(1)"
+                             @input="cambiarTasa(1, $event.target.value)"
                              :style="errorTasa1 ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                              class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-cyan-200 font-mono font-bold outline-none">
                     </div>
@@ -1440,7 +1447,7 @@
                     <div>
                       <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-tasa-2">Tasa</label>
                       <input id="editar-tasa-2" name="tasa_2" type="number" step="any" x-model="itemEdicion.tasa_2"
-                             @input="itemEdicion.tasa_2 = $event.target.value; recalcularLado(2)"
+                             @input="cambiarTasa(2, $event.target.value)"
                              :style="errorTasa2 ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                              class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-pink-200 font-mono font-bold outline-none">
                     </div>
