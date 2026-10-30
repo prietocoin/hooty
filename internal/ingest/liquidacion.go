@@ -153,8 +153,8 @@ func SimularLiquidacion(input SimulacionInput, perfil1, perfil2 domain.Perfil, l
 	}
 	return SimulacionResult{
 		Tasa1: tasa1, Tasa2: tasa2,
-		Monto1: monto1, Monto2: monto2,
-		ME1: me1, ME2: me2,
+		Monto1: monto1, Monto2: -monto2,
+		ME1: me1, ME2: -me2,
 	}, nil
 }
 

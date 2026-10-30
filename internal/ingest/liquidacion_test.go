@@ -26,7 +26,7 @@ func TestSimularLiquidacionUsaFormulaCanonica(t *testing.T) {
 	if resultado.Tasa1 != 1 || resultado.Monto1 != 100 || resultado.ME1 != 100 {
 		t.Fatalf("lado 1 inesperado: %+v", resultado)
 	}
-	if resultado.Tasa2 != 0.270270 || resultado.Monto2 != 370 || resultado.ME2 != 100 {
+	if resultado.Tasa2 != 0.270270 || resultado.Monto2 != -370 || resultado.ME2 != -100 {
 		t.Fatalf("lado 2 inesperado: %+v", resultado)
 	}
 }
