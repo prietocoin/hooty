@@ -1182,7 +1182,7 @@
         return;
       }
 
-      const dom = (name, fallback = '') => document.querySelector(`[name="${name}"]`)?.value ?? fallback;
+      const dom = (name, fallback = '') => (document.getElementsByName(name)[0]?.value ?? fallback);
       const numero = (valor, fallback = 0) => {
         const n = parseFloat(String(valor ?? '').replace(',', '.'));
         return Number.isFinite(n) ? n : fallback;
