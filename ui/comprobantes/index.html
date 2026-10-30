@@ -988,7 +988,7 @@
 
 <div x-data="{
   modalAbierto: false,
-  cargando: false,
+  guardando: false,
   itemEdicion: null,
 
   numeroPuro(valor) {
@@ -1008,6 +1008,11 @@
   tasasError: '',
   monto1Manual: false,
   monto2Manual: false,
+  errorSocios: false,
+  errorMontoRecibo: false,
+  errorTasa1: false,
+  errorTasa2: false,
+  errorMontos: false,
 
   truncar(valor, decimales = 2) {
     const num = Number(valor);
@@ -1157,8 +1162,6 @@
   },
 
   async guardarModal() {
-    if (!this.itemEdicion || this.cargando) return;
-
     let toast = null;
     try {
       toast = await import('/shared/js/toast.js');
@@ -1171,14 +1174,36 @@
       else alert(mensaje);
     };
 
+    if (!this.itemEdicion) {
+      console.warn('[comprobantesState] Guardar sin itemEdicion en el modal.');
+      aviso('error', 'No hay un comprobante cargado para guardar.');
+      return;
+    }
+    if (this.guardando) {
+      console.warn('[comprobantesState] Guardado ya en curso; clic ignorado.');
+      return;
+    }
+
     const hashTarget = String(this.itemEdicion.hash_largo || this.itemEdicion.id || '').trim();
     if (!hashTarget) {
       aviso('error', 'El comprobante no tiene hash largo; no se puede guardar.');
       return;
     }
 
-    await this.cargarTasasEdicion();
-    this.recalcularTodo();
+    this.guardando = true;
+    const fallar = (mensaje) => {
+      this.guardando = false;
+      aviso('error', mensaje);
+    };
+
+    try {
+      await this.cargarTasasEdicion();
+      this.recalcularTodo();
+    } catch (error) {
+      console.error('[comprobantesState ❌ Error preparando tasas]:', error);
+      fallar('No se pudieron preparar las tasas para guardar: ' + error.message);
+      return;
+    }
 
     const normalizar = (valor) => String(valor || '').normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
@@ -1189,32 +1214,47 @@
     const tasa1 = this.numeroPuro(this.itemEdicion.tasa_1);
     const tasa2 = this.numeroPuro(this.itemEdicion.tasa_2);
 
+    this.errorSocios = false;
+    this.errorMontoRecibo = false;
+    this.errorTasa1 = false;
+    this.errorTasa2 = false;
+    this.errorMontos = false;
+
     if (!(montoRecibo > 0)) {
-      aviso('error', 'El monto del recibo debe ser mayor que cero.');
+      this.errorMontoRecibo = true;
+      fallar('El monto del recibo debe ser mayor que cero.');
       return;
     }
     if (!socio1 || !socio2 || normalizar(socio1) === normalizar(socio2)) {
-      aviso('error', 'Debes indicar dos socios distintos para el binomio.');
+      this.errorSocios = true;
+      fallar('Los socios 1 y 2 deben ser diferentes y no pueden estar vacíos.');
       return;
     }
-    if (!(tasa1 > 0) || !(tasa2 > 0)) {
-      aviso('error', 'Ambas tasas deben ser mayores que cero.');
+    if (!(tasa1 > 0)) {
+      this.errorTasa1 = true;
+      fallar('La tasa del Socio 1 debe ser mayor que cero.');
+      return;
+    }
+    if (!(tasa2 > 0)) {
+      this.errorTasa2 = true;
+      fallar('La tasa del Socio 2 debe ser mayor que cero.');
       return;
     }
     if (!(this.numeroPuro(this.itemEdicion.monto_1) > 0) || !(this.numeroPuro(this.itemEdicion.monto_2) > 0)) {
-      aviso('error', 'Los montos de Socio 1 y Socio 2 deben ser mayores que cero.');
+      this.errorMontos = true;
+      fallar('Los montos de Socio 1 y Socio 2 deben ser mayores que cero.');
       return;
     }
     if (!(this.tasaDeLote(moneda) > 0)) {
-      aviso('error', `No hay tasa vigente para ${moneda}. Actualiza el lote antes de guardar.`);
+      fallar(`No hay tasa vigente para ${moneda}. Actualiza el lote antes de guardar.`);
       return;
     }
     if (!(this.tasaDeLote(this.baseSocio(1)) > 0) || !(this.tasaDeLote(this.baseSocio(2)) > 0)) {
-      aviso('error', 'Falta la tasa de la moneda base de uno de los socios.');
+      fallar('Falta la tasa de la moneda base de uno de los socios.');
       return;
     }
     if (this.numeroPuro(this.itemEdicion.me1) === 0 || this.numeroPuro(this.itemEdicion.me2) === 0) {
-      aviso('error', 'El equivalente ME calculado no es válido; revisa las tasas.');
+      fallar('El equivalente ME calculado no es válido; revisa las tasas.');
       return;
     }
 
@@ -1234,7 +1274,7 @@
       me2: this.numeroPuro(this.itemEdicion.me2)
     };
 
-    this.cargando = true;
+    this.guardando = true;
     try {
       const { guardarCambiosComprobante } = await import('/comprobantes/js/modules/comprobantes/services/comprobantesApiService.js?v=20261030_02');
       const actualizado = await guardarCambiosComprobante(hashTarget, payload);
@@ -1248,7 +1288,7 @@
       console.error('[comprobantesState ❌ Error al guardar comprobante]:', err);
       aviso('error', 'No se pudo guardar el comprobante: ' + err.message);
     } finally {
-      this.cargando = false;
+      this.guardando = false;
     }
   }
 }"
@@ -1389,6 +1429,7 @@
                     <select id="editar-socio-1"
                             x-model="itemEdicion.nombre_socio_1"
                             @change="itemEdicion.nombre_socio_1 = $event.target.value; cambiarSocio(1, $event.target.selectedOptions[0]?.dataset.base)"
+                            :style="errorSocios ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                             class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none">
                       <option value="GENERAL">GENERAL</option>
                       <template x-for="(s, idx) in (typeof directorio !== 'undefined' ? directorio : (typeof todosLosSocios !== 'undefined' ? todosLosSocios : []))" :key="'ed-s1-' + idx">
@@ -1404,12 +1445,14 @@
                       <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-tasa-1">Tasa</label>
                       <input id="editar-tasa-1" type="number" step="any" x-model="itemEdicion.tasa_1"
                              @input="itemEdicion.tasa_1 = $event.target.value; recalcularLado(1)"
+                             :style="errorTasa1 ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                              class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-cyan-200 font-mono font-bold outline-none">
                     </div>
                     <div>
                       <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-monto-1">Monto (editable)</label>
                       <input id="editar-monto-1" type="number" step="any" x-model="itemEdicion.monto_1"
                              @input="marcarMontoManual(1, $event.target.value)"
+                             :style="errorMontos ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                              class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
                     </div>
                   </div>
@@ -1436,6 +1479,7 @@
                     <select id="editar-socio-2"
                             x-model="itemEdicion.nombre_socio_2"
                             @change="itemEdicion.nombre_socio_2 = $event.target.value; cambiarSocio(2, $event.target.selectedOptions[0]?.dataset.base)"
+                            :style="errorSocios ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                             class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none">
                       <option value="GENERAL">GENERAL</option>
                       <template x-for="(s, idx) in (typeof directorio !== 'undefined' ? directorio : (typeof todosLosSocios !== 'undefined' ? todosLosSocios : []))" :key="'ed-s2-' + idx">
@@ -1451,12 +1495,14 @@
                       <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-tasa-2">Tasa</label>
                       <input id="editar-tasa-2" type="number" step="any" x-model="itemEdicion.tasa_2"
                              @input="itemEdicion.tasa_2 = $event.target.value; recalcularLado(2)"
+                             :style="errorTasa2 ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                              class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-pink-200 font-mono font-bold outline-none">
                     </div>
                     <div>
                       <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-monto-2">Monto (editable)</label>
                       <input id="editar-monto-2" type="number" step="any" x-model="itemEdicion.monto_2"
                              @input="marcarMontoManual(2, $event.target.value)"
+                             :style="errorMontos ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                              class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
                     </div>
                   </div>
@@ -1492,6 +1538,7 @@
                            step="any"
                            x-model="itemEdicion.monto_recibo"
                            @input="itemEdicion.monto_recibo = $event.target.value; recalcularTodo()"
+                           :style="errorMontoRecibo ? 'border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.18)' : ''"
                            class="w-full bg-[#080e26] border border-emerald-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
                   </div>
 
@@ -1520,10 +1567,10 @@
               </button>
               <button type="button"
                       @click="guardarModal()"
-                      :disabled="cargando"
+                      :disabled="guardando"
                       class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black shadow-lg shadow-cyan-950/50 transition-all active:scale-95 text-xs cursor-pointer disabled:opacity-50">
-                <span x-show="!cargando">💾 Guardar Cambios</span>
-                <span x-show="cargando">⏳ Guardando...</span>
+                <span x-show="!guardando">💾 Guardar Cambios</span>
+                <span x-show="guardando">⏳ Guardando...</span>
               </button>
             </footer>
           </div>
