@@ -31,6 +31,31 @@ func TestSimularLiquidacionUsaFormulaCanonica(t *testing.T) {
 	}
 }
 
+func TestSimularLiquidacionRespetaTasasExplicitas(t *testing.T) {
+	t.Parallel()
+
+	perfil1 := domain.Perfil{Nombre: "TORRES", MonedaBase: "USD"}
+	perfil2 := domain.Perfil{Nombre: "NELSY", MonedaBase: "USD"}
+	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1}}
+	resultado, err := SimularLiquidacion(SimulacionInput{
+		MonedaRecibo: "ARS",
+		MontoRecibo:  49000,
+		Socio1:       "TORRES",
+		Socio2:       "NELSY",
+		Tasa1:        1629,
+		Tasa2:        1596,
+	}, perfil1, perfil2, lote)
+	if err != nil {
+		t.Fatalf("simulación con tasas explícitas rechazada: %v", err)
+	}
+	if resultado.Tasa1 != 1629 || resultado.Tasa2 != 1596 {
+		t.Fatalf("tasas explícitas no respetadas: %+v", resultado)
+	}
+	if resultado.Monto1 != 30.07 || resultado.Monto2 != -30.70 {
+		t.Fatalf("montos inesperados: %+v", resultado)
+	}
+}
+
 func TestSimularLiquidacionRechazaMismoSocio(t *testing.T) {
 	t.Parallel()
 

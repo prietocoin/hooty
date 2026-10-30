@@ -6,6 +6,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -123,8 +124,9 @@ type LiquidacionInput struct {
 
 // Perfil es la porción de perfiles_glaukov que necesita la liquidación base.
 type Perfil struct {
-	Nombre     string `json:"nombre"`
-	MonedaBase string `json:"moneda_base"`
+	Nombre     string          `json:"nombre"`
+	MonedaBase string          `json:"moneda_base"`
+	Monedas    json.RawMessage `json:"monedas,omitempty"`
 }
 
 // LoteTasas es el lote congelado que se usará para ambos lados.

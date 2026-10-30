@@ -112,8 +112,9 @@ func (l *Liquidator) perfil(ctx context.Context, grupo string) (domain.Perfil, e
 		return domain.Perfil{}, domain.Validationf("el grupo %q no es un socio real", grupo)
 	}
 	var perfil domain.Perfil
+	var monedas []byte
 	err := l.pool.QueryRow(ctx, sqlProfileByGroup, strings.TrimSpace(grupo)).
-		Scan(&perfil.Nombre, &perfil.MonedaBase)
+		Scan(&perfil.Nombre, &perfil.MonedaBase, &monedas)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Perfil{}, domain.Validationf("el grupo %q no está registrado en la vista perfil", grupo)
 	}
@@ -122,6 +123,7 @@ func (l *Liquidator) perfil(ctx context.Context, grupo string) (domain.Perfil, e
 	}
 	perfil.Nombre = domain.CleanText(perfil.Nombre, 120)
 	perfil.MonedaBase = domain.NormalizeCurrency(perfil.MonedaBase, "USDT")
+	perfil.Monedas = json.RawMessage(monedas)
 	return perfil, nil
 }
 

@@ -112,7 +112,7 @@ SELECT COALESCE(id_tasa, ''), COALESCE(tasas::text, '{}')
 FROM tasa`
 
 	sqlProfileByGroup = `
-SELECT COALESCE(nombre, ''), COALESCE(moneda_base, 'USDT')
+SELECT COALESCE(nombre, ''), COALESCE(moneda_base, 'USDT'), COALESCE(monedas::text, '{}')
 FROM perfil
 WHERE LOWER(BTRIM(COALESCE(id_grupo, ''))) = LOWER(BTRIM($1))
    OR LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))

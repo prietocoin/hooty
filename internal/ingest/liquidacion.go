@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -107,6 +108,8 @@ type SimulacionInput struct {
 	Socio1       string  `json:"socio_1"`
 	Socio2       string  `json:"socio_2"`
 	LoteTasa     string  `json:"lote_tasa"`
+	Tasa1        float64 `json:"tasa_1"`
+	Tasa2        float64 `json:"tasa_2"`
 }
 
 // SimulacionResult es el contrato de POST /api/v1/comprobantes/simular.
@@ -139,26 +142,37 @@ func SimularLiquidacion(input SimulacionInput, perfil1, perfil2 domain.Perfil, l
 	}
 
 	currency := domain.NormalizeCurrency(input.MonedaRecibo, "")
-	receiptRate, err := rateFor(lote, currency)
-	if err != nil {
-		return SimulacionResult{}, err
+	var receiptRate float64
+	var err error
+	if input.Tasa1 <= 0 || input.Tasa2 <= 0 {
+		receiptRate, err = rateFor(lote, currency)
+		if err != nil {
+			return SimulacionResult{}, err
+		}
 	}
-	tasa1, monto1, me1, err := side(perfil1, input.MontoRecibo, receiptRate, lote)
+	tasa1, monto1, me1, err := calcularLado(perfil1, input.MontoRecibo, receiptRate, input.Tasa1, lote)
 	if err != nil {
 		return SimulacionResult{}, fmt.Errorf("lado 1: %w", err)
 	}
-	tasa2, monto2, me2, err := side(perfil2, input.MontoRecibo, receiptRate, lote)
+	tasa2, monto2, me2, err := calcularLado(perfil2, input.MontoRecibo, receiptRate, input.Tasa2, lote)
 	if err != nil {
 		return SimulacionResult{}, fmt.Errorf("lado 2: %w", err)
 	}
+	signo1 := signoLado(perfil1, currency, 1)
+	signo2 := signoLado(perfil2, currency, 2)
+	if signo1 == signo2 {
+		signo2 = -signo1
+	}
 	return SimulacionResult{
 		Tasa1: tasa1, Tasa2: tasa2,
-		Monto1: monto1, Monto2: -monto2,
-		ME1: me1, ME2: -me2,
+		Monto1: signo1 * monto1, Monto2: signo2 * monto2,
+		ME1: signo1 * me1, ME2: signo2 * me2,
 	}, nil
 }
 
-func side(perfil domain.Perfil, amount, receiptRate float64, lote domain.LoteTasas) (float64, float64, float64, error) {
+// calcularLado aplica la fórmula canónica. Si el cliente envía una tasa
+// explícita, se usa tal cual; si no, se deriva del lote y la moneda base.
+func calcularLado(perfil domain.Perfil, amount, receiptRate, explicitRate float64, lote domain.LoteTasas) (float64, float64, float64, error) {
 	if strings.TrimSpace(perfil.MonedaBase) == "" {
 		return 0, 0, 0, domain.Validationf("el socio %q no tiene moneda base", perfil.Nombre)
 	}
@@ -166,12 +180,15 @@ func side(perfil domain.Perfil, amount, receiptRate float64, lote domain.LoteTas
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	tasa := domain.RoundRate(receiptRate / baseRate)
+	tasa := domain.RoundRate(explicitRate)
+	if tasa <= 0 {
+		tasa = domain.RoundRate(receiptRate / baseRate)
+	}
 	if tasa <= 0 {
 		return 0, 0, 0, domain.Validationf("tasa no positiva para %q", perfil.Nombre)
 	}
-	monto := domain.Round2(amount / tasa)
-	me := domain.Round2(monto / baseRate)
+	monto := domain.Truncar2(amount / tasa)
+	me := domain.Truncar2(monto / baseRate)
 	if math.Abs(monto) < 0.01 {
 		return tasa, monto, me, domain.Validationf("el importe de %q se trunca a cero", perfil.Nombre)
 	}
@@ -179,6 +196,48 @@ func side(perfil domain.Perfil, amount, receiptRate float64, lote domain.LoteTas
 		return tasa, monto, me, domain.Validationf("el equivalente de %q se trunca a cero", perfil.Nombre)
 	}
 	return tasa, monto, me, nil
+}
+
+// signoLado lee polar_D/polar_P del perfil para la divisa del recibo. Si no
+// existe una regla, usa +1 para el lado A y -1 para el lado B.
+func signoLado(perfil domain.Perfil, moneda string, lado int) float64 {
+	defecto := 1.0
+	if lado == 2 {
+		defecto = -1
+	}
+	if len(perfil.Monedas) == 0 {
+		return defecto
+	}
+	var reglas map[string]map[string]any
+	if err := json.Unmarshal(perfil.Monedas, &reglas); err != nil {
+		return defecto
+	}
+	code := domain.NormalizeCurrency(moneda, "")
+	var regla map[string]any
+	for clave, valor := range reglas {
+		if domain.NormalizeCurrency(clave, "") == code {
+			regla = valor
+			break
+		}
+	}
+	if regla == nil {
+		return defecto
+	}
+	clave := "polar_D"
+	if lado == 2 {
+		clave = "polar_P"
+	}
+	if signo, ok := regla[clave].(string); ok && strings.TrimSpace(signo) == "-" {
+		return -1
+	}
+	if signo, ok := regla[clave].(string); ok && strings.TrimSpace(signo) == "+" {
+		return 1
+	}
+	return defecto
+}
+
+func side(perfil domain.Perfil, amount, receiptRate float64, lote domain.LoteTasas) (float64, float64, float64, error) {
+	return calcularLado(perfil, amount, receiptRate, 0, lote)
 }
 
 func rateFor(lote domain.LoteTasas, currency string) (float64, error) {
