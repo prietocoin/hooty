@@ -56,15 +56,14 @@ export const api = {
   },
 
   /**
-   * Hooty v2 no implementa el borrador legacy de HOO (`/hoo-borrador`).
-   * La lectura canónica del lote es `/monitor`; se normaliza la respuesta
-   * al contrato que consume la vista para no romper la carga.
+   * Borrador HOO del monitor en segundo plano (se refresca cada 2 minutos).
+   * Es distinto del lote vigente de /monitor: solo rellena "NUEVO LOTE".
    */
   async borradorHoo() {
-    const datos = await solicitarJson('/monitor');
+    const datos = await solicitarJson('/hoo-borrador');
     return {
-      id_tasa: datos.id_tasa,
-      borrador: datos.tasas ?? datos.borrador ?? {}
+      id_tasa: datos.id_tasa || datos.ID || '',
+      borrador: datos.borrador ?? datos.tasas ?? datos.rates ?? datos.rates_draft ?? {}
     };
   },
 

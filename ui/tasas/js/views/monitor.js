@@ -76,21 +76,17 @@ export function initMonitor() {
   }
 
   async function traerBorradorHoo() {
-    showToast('📑 Leyendo el lote vigente de Hooty...');
+    showToast('📑 Leyendo el borrador Hoo...');
     try {
       const datos = await api.borradorHoo();
       if (!datos.borrador || Object.keys(datos.borrador).length === 0) {
-        showToast('❌ No se recibieron tasas desde Hooty');
+        showToast('❌ No se recibió un borrador reciente de Hoo');
         return;
       }
-      if (datos.id_tasa) {
-        state.loteActualCodigo = datos.id_tasa;
-        actualizarEtiquetaLote();
-      }
       aplicarMapa(datos.borrador);
-      showToast('✅ Lote vigente cargado desde Hooty');
+      showToast('✅ Borrador cargado en NUEVO LOTE');
     } catch (error) {
-      showToast(`❌ Error de conexión al leer Hooty: ${error.message}`);
+      showToast(`❌ Error de conexión al leer el borrador: ${error.message}`);
     }
   }
 
