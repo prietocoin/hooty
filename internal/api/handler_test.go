@@ -356,6 +356,37 @@ func TestApplyComprobantePatchRechazaMontoReciboNegativo(t *testing.T) {
 	}
 }
 
+func TestReconcileSideCalculaYEvaluaSigno(t *testing.T) {
+	t.Parallel()
+
+	monto := 0.0
+	me := 0.0
+	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, nil, nil); err != nil {
+		t.Fatalf("cálculo válido rechazado: %v", err)
+	}
+	if monto != 2.5 || me != 0.67 {
+		t.Fatalf("monto=%v me=%v, se esperaba 2.5/0.67", monto, me)
+	}
+
+	negMonto := -2.5
+	negME := -0.67
+	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, &negMonto, &negME); err != nil {
+		t.Fatalf("signo negativo coherente rechazado: %v", err)
+	}
+	if monto != -2.5 || me != -0.67 {
+		t.Fatalf("signo no preservado: monto=%v me=%v", monto, me)
+	}
+
+	incoherenteMonto := -2.4
+	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, &incoherenteMonto, nil); err == nil {
+		t.Fatal("un monto incoherente debe rechazarse")
+	}
+	incoherente := 0.68
+	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, nil, &incoherente); err == nil {
+		t.Fatal("un ME incoherente debe rechazarse")
+	}
+}
+
 func TestServidorHTTPResponde200EnComprobantes(t *testing.T) {
 	t.Parallel()
 

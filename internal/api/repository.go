@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -195,8 +196,12 @@ func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch C
 	if err != nil {
 		return ComprobanteRow{}, err
 	}
+	previous := existing
 
 	if err := applyComprobantePatch(&existing, patch); err != nil {
+		return ComprobanteRow{}, err
+	}
+	if err := r.reconcileEditedFinancials(ctx, tx, &existing, previous, patch); err != nil {
 		return ComprobanteRow{}, err
 	}
 	existing = domain.NormalizeComprobante(existing)
@@ -268,6 +273,186 @@ func comprobanteFromRow(row ComprobanteRow) domain.Comprobante {
 		FechaOperacion: row.FechaOperacion,
 		CreadoEn:       row.CreadoEn,
 		ActualizadoEn:  row.ActualizadoEn,
+	}
+}
+
+func sameFinancialTuple(a, b domain.Comprobante) bool {
+	return a.MontoRecibo == b.MontoRecibo &&
+		domain.NormalizeCurrency(a.MonedaRecibo, "") == domain.NormalizeCurrency(b.MonedaRecibo, "") &&
+		domain.Canonical(a.Socio1) == domain.Canonical(b.Socio1) &&
+		domain.Canonical(a.Socio2) == domain.Canonical(b.Socio2) &&
+		a.Tasa1 == b.Tasa1 && a.Tasa2 == b.Tasa2 &&
+		a.Monto1 == b.Monto1 && a.Monto2 == b.Monto2 &&
+		a.ME1 == b.ME1 && a.ME2 == b.ME2
+}
+
+// reconcileEditedFinancials recalcula la tupla derivada y rechaza valores
+// incoherentes enviados por el cliente. Así no se puede guardar un monto
+// etiquetado en una divisa con tasas de otra, ni un ME desfasado.
+func (r *Repository) reconcileEditedFinancials(ctx context.Context, tx pgx.Tx, c *domain.Comprobante, previous domain.Comprobante, patch ComprobantePatch) error {
+	if sameFinancialTuple(previous, *c) {
+		return nil
+	}
+
+	rates, err := r.latestRates(ctx, tx)
+	if err != nil {
+		return err
+	}
+	receiptRate, ok := rateForCode(rates, c.MonedaRecibo)
+	if !ok {
+		return domain.Validationf("no hay tasa vigente para la moneda %q", c.MonedaRecibo)
+	}
+
+	base1, err := r.baseCurrency(ctx, tx, c.Socio1)
+	if err != nil {
+		return err
+	}
+	base2, err := r.baseCurrency(ctx, tx, c.Socio2)
+	if err != nil {
+		return err
+	}
+	baseRate1, ok1 := rateForCode(rates, base1)
+	baseRate2, ok2 := rateForCode(rates, base2)
+	if !ok1 || !ok2 {
+		return domain.Validationf("falta la tasa de la moneda base de un socio")
+	}
+
+	currencyChanged := patch.MonedaRecibo != nil || patch.Moneda != nil
+	socio1Changed := patch.Socio1 != nil || patch.NombreSocio1 != nil
+	socio2Changed := patch.Socio2 != nil || patch.NombreSocio2 != nil
+
+	if (currencyChanged || socio1Changed || c.Tasa1 <= 0) && patch.Tasa1 == nil {
+		c.Tasa1 = domain.RoundRate(receiptRate / baseRate1)
+	}
+	if (currencyChanged || socio2Changed || c.Tasa2 <= 0) && patch.Tasa2 == nil {
+		c.Tasa2 = domain.RoundRate(receiptRate / baseRate2)
+	}
+	c.Tasa1 = domain.RoundRate(c.Tasa1)
+	c.Tasa2 = domain.RoundRate(c.Tasa2)
+
+	if err := reconcileSide("1", c.MontoRecibo, c.Tasa1, &c.Monto1, &c.ME1, baseRate1, patch.Monto1, patch.ME1); err != nil {
+		return err
+	}
+	return reconcileSide("2", c.MontoRecibo, c.Tasa2, &c.Monto2, &c.ME2, baseRate2, patch.Monto2, patch.ME2)
+}
+
+func reconcileSide(label string, amount, tasa float64, monto, me *float64, baseRate float64, providedMonto, providedME *float64) error {
+	if !(amount > 0) || math.IsNaN(amount) || math.IsInf(amount, 0) {
+		return domain.Validationf("monto_recibo debe ser un número positivo")
+	}
+	amount = domain.Truncar2(math.Abs(amount))
+	if !(tasa > 0) || math.IsNaN(tasa) || math.IsInf(tasa, 0) {
+		return domain.Validationf("tasa_%s debe ser un número positivo", label)
+	}
+	if !(baseRate > 0) || math.IsNaN(baseRate) || math.IsInf(baseRate, 0) {
+		return domain.Validationf("falta la tasa base para el socio %s", label)
+	}
+
+	expectedMonto := domain.Truncar2(amount / tasa)
+	expectedME := domain.Truncar2(expectedMonto / baseRate)
+	if expectedMonto <= 0 || expectedME <= 0 {
+		return domain.Validationf("la liquidación del socio %s se trunca a cero", label)
+	}
+
+	sign := 1.0
+	if providedMonto != nil {
+		if *providedMonto < 0 {
+			sign = -1
+		}
+	} else if *monto < 0 {
+		sign = -1
+	}
+
+	if providedMonto != nil && math.Abs(math.Abs(*providedMonto)-expectedMonto) > 1e-6 {
+		return domain.Validationf("monto_%s no corresponde a monto_recibo/tasa_%s", label, label)
+	}
+	if providedME != nil {
+		if math.Abs(math.Abs(*providedME)-expectedME) > 1e-6 {
+			return domain.Validationf("me%s no corresponde a la tasa y moneda base del socio %s", label, label)
+		}
+		if *providedME != 0 && math.Signbit(*providedME) != math.Signbit(sign) {
+			return domain.Validationf("el signo de me%s no corresponde al movimiento del socio %s", label, label)
+		}
+	}
+
+	*monto = sign * expectedMonto
+	*me = sign * expectedME
+	return nil
+}
+
+func (r *Repository) latestRates(ctx context.Context, tx pgx.Tx) (map[string]float64, error) {
+	var raw []byte
+	query := `SELECT COALESCE(tasas::text, '{}') FROM tasa ORDER BY ` + r.tasaOrder + ` LIMIT 1`
+	if err := tx.QueryRow(ctx, query).Scan(&raw); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.Validationf("no hay lote de tasas vigente")
+		}
+		return nil, fmt.Errorf("api: leer lote de tasas para edición: %w", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return nil, fmt.Errorf("api: decodificar tasas para edición: %w", err)
+	}
+	rates := make(map[string]float64, len(decoded))
+	for code, value := range decoded {
+		rate, ok := numericRate(value)
+		if !ok || rate <= 0 {
+			continue
+		}
+		rates[domain.NormalizeCurrency(code, "")] = rate
+	}
+	if len(rates) == 0 {
+		return nil, domain.Validationf("el lote de tasas vigente está vacío")
+	}
+	return rates, nil
+}
+
+func (r *Repository) baseCurrency(ctx context.Context, tx pgx.Tx, socio string) (string, error) {
+	var base string
+	err := tx.QueryRow(ctx, `
+SELECT COALESCE(moneda_base, 'USDT')
+FROM perfil
+WHERE LOWER(BTRIM(nombre)) = LOWER(BTRIM($1))
+ORDER BY nombre
+LIMIT 1`, strings.TrimSpace(socio)).Scan(&base)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Compatibilidad con filas históricas cuyo socio no está en la vista.
+		return "USDT", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("api: leer moneda base de %q: %w", socio, err)
+	}
+	return domain.NormalizeCurrency(base, "USDT"), nil
+}
+
+func rateForCode(rates map[string]float64, code string) (float64, bool) {
+	code = domain.NormalizeCurrency(code, "")
+	if code == "" {
+		return 0, false
+	}
+	if code == "USD" || code == "USDT" {
+		return 1, true
+	}
+	rate, ok := rates[code]
+	return rate, ok && rate > 0
+}
+
+func numericRate(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case json.Number:
+		rate, err := typed.Float64()
+		return rate, err == nil
+	case string:
+		rate, err := strconv.ParseFloat(strings.TrimSpace(strings.ReplaceAll(typed, ",", ".")), 64)
+		return rate, err == nil
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	default:
+		return 0, false
 	}
 }
 
