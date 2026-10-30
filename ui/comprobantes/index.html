@@ -1008,6 +1008,8 @@
   tasasError: '',
   monto1Manual: false,
   monto2Manual: false,
+  tasa1Editada: false,
+  tasa2Editada: false,
   errorSocios: false,
   errorMontoRecibo: false,
   errorTasa1: false,
@@ -1041,11 +1043,38 @@
     return String(this.itemEdicion?.[`base_socio_${lado}`] || 'USDT').toUpperCase();
   },
 
+  tasaLadoCatalogo(moneda, lado) {
+    const code = String(moneda || '').trim().toUpperCase();
+    if (!code) return 0;
+    const tasas = this.tasasVigentes || {};
+    const entrada = tasas[code] ?? tasas[code.toLowerCase()];
+    const leer = (valor) => {
+      const rate = Number(String(valor ?? '').replace(',', '.'));
+      return Number.isFinite(rate) && rate > 0 ? rate : 0;
+    };
+
+    if (entrada && typeof entrada === 'object') {
+      const claves = lado === 1
+        ? ['a', 'lado_a', 'compra', 'buy', 'socio_1', 'tasa_1']
+        : ['b', 'lado_b', 'venta', 'sell', 'socio_2', 'tasa_2'];
+      for (const clave of claves) {
+        const rate = leer(entrada[clave]);
+        if (rate > 0) return rate;
+      }
+    }
+
+    const clavesPlanas = lado === 1
+      ? [`${code}_1`, `${code}1`, `${code}_A`, `${code}_LADO_A`, `${code}_COMPRA`]
+      : [`${code}_2`, `${code}2`, `${code}_B`, `${code}_LADO_B`, `${code}_VENTA`];
+    for (const clave of clavesPlanas) {
+      const rate = leer(tasas[clave]);
+      if (rate > 0) return rate;
+    }
+    return 0;
+  },
+
   tasaPorDefecto(lado) {
-    const receiptRate = this.tasaDeLote(this.itemEdicion?.moneda_recibo);
-    const baseRate = this.tasaDeLote(this.baseSocio(lado));
-    if (!(receiptRate > 0) || !(baseRate > 0)) return 0;
-    return this.truncar(receiptRate / baseRate, 6);
+    return this.tasaLadoCatalogo(this.itemEdicion?.moneda_recibo, lado);
   },
 
   aplicarTasaPorDefecto(lado) {
@@ -1139,15 +1168,31 @@
     if (this.itemEdicion) {
       this.monto1Manual = false;
       this.monto2Manual = false;
-      // Nunca se tocan tasa_1/tasa_2 al abrir: son las tasas históricas del
-      // comprobante y deben mostrarse exactamente como se guardaron.
-      this.recalcularME(1);
-      this.recalcularME(2);
+
+      if (!this.tasa1Editada) {
+        const original1 = this.numeroPuro(this.itemEdicion.tasa_original_1 ?? this.itemEdicion.tasa_1);
+        if (original1 > 0) this.itemEdicion.tasa_1 = original1;
+      }
+      if (!this.tasa2Editada) {
+        const original2 = this.numeroPuro(this.itemEdicion.tasa_original_2 ?? this.itemEdicion.tasa_2);
+        if (original2 > 0) this.itemEdicion.tasa_2 = original2;
+      }
+
+      this.$nextTick(() => {
+        const input1 = document.getElementById('editar-tasa-1');
+        const input2 = document.getElementById('editar-tasa-2');
+        if (input1 && !this.tasa1Editada) input1.value = String(this.itemEdicion.tasa_1 ?? '');
+        if (input2 && !this.tasa2Editada) input2.value = String(this.itemEdicion.tasa_2 ?? '');
+        this.recalcularME(1);
+        this.recalcularME(2);
+      });
     }
   },
 
   async cambiarMonedaRecibo() {
     await this.cargarTasasEdicion();
+    this.tasa1Editada = true;
+    this.tasa2Editada = true;
     this.monto1Manual = false;
     this.monto2Manual = false;
     this.aplicarTasasPorDefecto();
@@ -1156,6 +1201,7 @@
 
   async cambiarSocio(lado, base) {
     if (base) this.itemEdicion[`base_socio_${lado}`] = String(base).toUpperCase();
+    this[`tasa${lado}Editada`] = true;
     this[`monto${lado}Manual`] = false;
     await this.cargarTasasEdicion();
     this.aplicarTasaPorDefecto(lado);
@@ -1163,6 +1209,7 @@
   },
 
   cambiarTasa(lado, valor) {
+    this[`tasa${lado}Editada`] = true;
     this[`monto${lado}Manual`] = false;
     this.itemEdicion[`tasa_${lado}`] = valor;
     this.recalcularLado(lado, true);
@@ -1262,9 +1309,11 @@
       monto_recibo: Number(raw.monto_recibo ?? raw.monto ?? raw.monto_local ?? 0),
       moneda_recibo: String(raw.moneda_recibo || raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
       tasa_1: numeroPuro(raw.tasa_1 || raw.tasa1 || raw.grupo_1?.tasa),
+      tasa_original_1: numeroPuro(raw.tasa_1 || raw.tasa1 || raw.grupo_1?.tasa),
       monto_1: numeroPuro(raw.monto_1 ?? raw.grupo_1?.monto),
       me1: numeroPuro(raw.me1 ?? raw.m1_socio ?? raw.grupo_1?.monto),
       tasa_2: numeroPuro(raw.tasa_2 || raw.tasa2 || raw.grupo_2?.tasa),
+      tasa_original_2: numeroPuro(raw.tasa_2 || raw.tasa2 || raw.grupo_2?.tasa),
       monto_2: numeroPuro(raw.monto_2 ?? raw.grupo_2?.monto),
       me2: numeroPuro(raw.me2 ?? raw.m2_socio ?? raw.grupo_2?.monto),
       base_socio_1: String(raw.moneda_base_socio1 || raw.moneda_socio_1 || 'USDT').toUpperCase(),
@@ -1275,6 +1324,8 @@
     }));
 
     modalAbierto = true;
+    tasa1Editada = false;
+    tasa2Editada = false;
     prepararEdicion();
   }
 ">
