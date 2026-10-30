@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261030_02"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261030_03"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -1162,6 +1162,7 @@
   },
 
   async guardarModal() {
+    console.log('[Hooty] Click en Guardar Comprobante disparado');
     let toast = null;
     try {
       toast = await import('/shared/js/toast.js');
@@ -1285,7 +1286,7 @@
       this.modalAbierto = false;
       aviso('success', 'Comprobante actualizado correctamente.');
     } catch (err) {
-      console.error('[comprobantesState ❌ Error al guardar comprobante]:', err);
+      console.error('[Hooty] Error al guardar:', err);
       aviso('error', 'No se pudo guardar el comprobante: ' + err.message);
     } finally {
       this.guardando = false;
@@ -1327,17 +1328,16 @@
     prepararEdicion();
   }
 ">
-  <template x-teleport="body">
-    <div x-show="modalAbierto"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="glauk-modal"
-         @click.self="modalAbierto = false"
-         x-cloak>
+  <div x-show="modalAbierto"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="glauk-modal"
+       @click.self="modalAbierto = false"
+       x-cloak>
 
       <div class="glauk-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="glauk-editar-title">
         <div class="glauk-modal__handle" aria-hidden="true"></div>
@@ -1565,8 +1565,8 @@
                       class="px-3.5 py-2.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-600/50 text-rose-300 rounded-xl font-bold transition-all active:scale-95 text-xs cursor-pointer">
                 Cancelar
               </button>
-              <button type="button"
-                      @click="guardarModal()"
+              <button id="btn-guardar-comprobante"
+                      type="button"
                       :disabled="guardando"
                       class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black shadow-lg shadow-cyan-950/50 transition-all active:scale-95 text-xs cursor-pointer disabled:opacity-50">
                 <span x-show="!guardando">💾 Guardar Cambios</span>
@@ -1578,7 +1578,6 @@
 
       </div>
     </div>
-  </template>
 </div>
 
   <!-- ================================================================= -->
