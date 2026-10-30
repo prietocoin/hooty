@@ -238,14 +238,14 @@ func (c Comprobante) Validate() error {
 	if Canonical(c.Socio1) == Canonical(c.Socio2) {
 		return Validationf("socio_1 y socio_2 deben ser distintos")
 	}
-	if c.Tasa1 <= 0 || c.Tasa2 <= 0 {
-		return Validationf("las tasas deben ser positivas")
+	if c.Tasa1 < 0 || c.Tasa2 < 0 {
+		return Validationf("las tasas no pueden ser negativas")
 	}
-	if math.Abs(c.Monto1) < 0.01 || math.Abs(c.Monto2) < 0.01 {
-		return Validationf("ambos lados deben tener importe contable de al menos 0.01")
+	if err := validarLadoContable("1", c.Tasa1, c.Monto1, c.ME1); err != nil {
+		return err
 	}
-	if math.Abs(c.ME1) < 0.01 || math.Abs(c.ME2) < 0.01 {
-		return Validationf("ambos equivalentes deben tener importe contable de al menos 0.01")
+	if err := validarLadoContable("2", c.Tasa2, c.Monto2, c.ME2); err != nil {
+		return err
 	}
 	if strings.TrimSpace(c.LoteTasa) == "" {
 		return Validationf("lote_tasa es obligatorio")
@@ -268,6 +268,24 @@ func (c Comprobante) Validate() error {
 		if math.IsNaN(value) || math.IsInf(value, 0) {
 			return Validationf("%s no es finito", name)
 		}
+	}
+	return nil
+}
+
+// validarLadoContable exige importes cuando hay tasa y ceros cuando la tasa es
+// 0, estado válido para un socio sin regla de conversión en esa divisa.
+func validarLadoContable(label string, tasa, monto, me float64) error {
+	if tasa == 0 {
+		if monto != 0 || me != 0 {
+			return Validationf("monto_%s y me%s deben ser cero cuando la tasa es cero", label, label)
+		}
+		return nil
+	}
+	if math.Abs(monto) < 0.01 {
+		return Validationf("ambos lados deben tener importe contable de al menos 0.01")
+	}
+	if math.Abs(me) < 0.01 {
+		return Validationf("ambos equivalentes deben tener importe contable de al menos 0.01")
 	}
 	return nil
 }

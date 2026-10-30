@@ -387,6 +387,22 @@ func TestReconcileSideCalculaYEvaluaSigno(t *testing.T) {
 	}
 }
 
+func TestReconcileSideAceptaTasaCero(t *testing.T) {
+	t.Parallel()
+
+	monto := 12.5
+	me := 3.4
+	if err := reconcileSide("2", 100, 0, &monto, &me, 3.7, nil); err != nil {
+		t.Fatalf("una tasa 0 debe aceptarse: %v", err)
+	}
+	if monto != 0 || me != 0 {
+		t.Fatalf("el lado sin tasa debe quedar en cero: monto=%v me=%v", monto, me)
+	}
+	if err := reconcileSide("2", 100, -1, &monto, &me, 3.7, nil); err == nil {
+		t.Fatal("una tasa negativa debe rechazarse")
+	}
+}
+
 type fakeSimulator struct {
 	result ingest.SimulacionResult
 	err    error

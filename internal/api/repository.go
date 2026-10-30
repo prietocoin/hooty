@@ -322,10 +322,10 @@ func (r *Repository) reconcileEditedFinancials(ctx context.Context, tx pgx.Tx, c
 	socio1Changed := patch.Socio1 != nil || patch.NombreSocio1 != nil
 	socio2Changed := patch.Socio2 != nil || patch.NombreSocio2 != nil
 
-	if (currencyChanged || socio1Changed || c.Tasa1 <= 0) && patch.Tasa1 == nil {
+	if (currencyChanged || socio1Changed) && patch.Tasa1 == nil {
 		c.Tasa1 = domain.RoundRate(receiptRate / baseRate1)
 	}
-	if (currencyChanged || socio2Changed || c.Tasa2 <= 0) && patch.Tasa2 == nil {
+	if (currencyChanged || socio2Changed) && patch.Tasa2 == nil {
 		c.Tasa2 = domain.RoundRate(receiptRate / baseRate2)
 	}
 	c.Tasa1 = domain.RoundRate(c.Tasa1)
@@ -342,8 +342,15 @@ func reconcileSide(label string, amount, tasa float64, monto, me *float64, baseR
 		return domain.Validationf("monto_recibo debe ser un número positivo")
 	}
 	amount = domain.Truncar2(math.Abs(amount))
-	if !(tasa > 0) || math.IsNaN(tasa) || math.IsInf(tasa, 0) {
-		return domain.Validationf("tasa_%s debe ser un número positivo", label)
+	if tasa < 0 || math.IsNaN(tasa) || math.IsInf(tasa, 0) {
+		return domain.Validationf("tasa_%s no puede ser negativa", label)
+	}
+	// Una tasa 0 es un estado contable válido: el socio no tiene regla para esa
+	// divisa y su lado queda en cero, sin dividir por cero.
+	if tasa == 0 {
+		*monto = 0
+		*me = 0
+		return nil
 	}
 	if !(baseRate > 0) || math.IsNaN(baseRate) || math.IsInf(baseRate, 0) {
 		return domain.Validationf("falta la tasa base para el socio %s", label)

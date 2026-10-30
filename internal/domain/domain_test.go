@@ -39,6 +39,18 @@ func TestComprobanteValidateAceptaBinomioReal(t *testing.T) {
 	}
 }
 
+func TestComprobanteValidateAceptaTasaCero(t *testing.T) {
+	t.Parallel()
+
+	c := validComprobante()
+	c.Tasa2 = 0
+	c.Monto2 = 0
+	c.ME2 = 0
+	if err := c.Validate(); err != nil {
+		t.Fatalf("una tasa 0 con su lado en cero debe ser válida: %v", err)
+	}
+}
+
 func TestComprobanteValidateRechazaViolaciones(t *testing.T) {
 	t.Parallel()
 
@@ -51,7 +63,7 @@ func TestComprobanteValidateRechazaViolaciones(t *testing.T) {
 		{"socios iguales", func(c *Comprobante) { c.Socio2 = " chasan " }, "distintos"},
 		{"grupo vacío", func(c *Comprobante) { c.Grupo1 = "" }, "grupos reales"},
 		{"socio general", func(c *Comprobante) { c.Socio2 = "GENERAL" }, "socios reales"},
-		{"tasa cero", func(c *Comprobante) { c.Tasa2 = 0 }, "positivas"},
+		{"tasa negativa", func(c *Comprobante) { c.Tasa2 = -1 }, "negativas"},
 		{"monto cero", func(c *Comprobante) { c.Monto1 = 0 }, "importe"},
 		{"me cero", func(c *Comprobante) { c.ME2 = 0 }, "equivalentes"},
 		{"sin lote", func(c *Comprobante) { c.LoteTasa = "" }, "lote_tasa"},
