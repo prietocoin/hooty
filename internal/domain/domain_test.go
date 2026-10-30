@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -86,6 +87,54 @@ func TestNormalizeComprobanteNoAceptaMontoNegativo(t *testing.T) {
 	}
 	if c.HashCorto != "ABC" {
 		t.Fatalf("hash corto = %q", c.HashCorto)
+	}
+}
+
+func TestTruncar2EnterosExactos(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   float64
+		want float64
+	}{
+		{"centavos exactos", 1.15, 1.15},
+		{"cero veintinueve", 0.29, 0.29},
+		{"tres decimales", 2.675, 2.67},
+		{"milésima exacta", 1.005, 1.00},
+		{"negativo", -1.15, -1.15},
+		{"monto grande", 1234.5678, 1234.56},
+		{"menor a un centavo", 0.009, 0},
+		{"sin decimales", 42, 42},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Truncar2(tc.in); got != tc.want {
+				t.Fatalf("Truncar2(%v) = %v, se esperaba %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTruncar6Tasas(t *testing.T) {
+	t.Parallel()
+
+	if got := Truncar6(1.2345678); got != 1.234567 {
+		t.Fatalf("Truncar6 = %v, se esperaba 1.234567", got)
+	}
+	if got := Truncar6(0.025); got != 0.025 {
+		t.Fatalf("Truncar6(0.025) = %v", got)
+	}
+}
+
+func TestTruncarDecimalesNoFinitos(t *testing.T) {
+	t.Parallel()
+
+	if got := Truncar2(math.NaN()); got != 0 {
+		t.Fatalf("NaN = %v", got)
+	}
+	if got := Truncar2(math.Inf(1)); got != 0 {
+		t.Fatalf("Inf = %v", got)
 	}
 }
 

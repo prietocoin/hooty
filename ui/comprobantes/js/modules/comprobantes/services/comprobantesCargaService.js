@@ -8,7 +8,7 @@
 import {
   fetchComprobantesHasta,
   fetchComprobantesPagina
-} from './comprobantesApiService.js?v=20261025_02';
+} from './comprobantesApiService.js?v=20261030_01';
 import { prepararEdicionComprobante } from './comprobantesMapperService.js?v=20261025_02';
 import {
   aplicarRangoHash,

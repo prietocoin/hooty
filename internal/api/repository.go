@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"hooty/internal/clock"
 	"hooty/internal/dbschema"
+	"hooty/internal/domain"
 )
 
 // ErrNotFound indica que la fila solicitada no existe.
@@ -174,6 +176,165 @@ func (r *Repository) GetComprobante(ctx context.Context, hash string) (Comproban
 	return item, nil
 }
 
+// UpdateComprobante aplica una edición parcial y devuelve la fila actualizada.
+// La lectura inicial usa FOR UPDATE para que dos ediciones concurrentes no se
+// pisen, y la validación de dominio se ejecuta antes del UPDATE.
+func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch ComprobantePatch) (ComprobanteRow, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return ComprobanteRow{}, ErrNotFound
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return ComprobanteRow{}, fmt.Errorf("api: abrir edición de comprobante: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, existing, err := readComprobanteForUpdate(ctx, tx, hash)
+	if err != nil {
+		return ComprobanteRow{}, err
+	}
+
+	if err := applyComprobantePatch(&existing, patch); err != nil {
+		return ComprobanteRow{}, err
+	}
+	existing = domain.NormalizeComprobante(existing)
+	if err := existing.Validate(); err != nil {
+		return ComprobanteRow{}, err
+	}
+
+	tag, err := tx.Exec(ctx, sqlUpdateComprobante,
+		hash,
+		existing.Banco, existing.Referencia, existing.Titular,
+		existing.MontoRecibo, existing.MonedaRecibo,
+		existing.Socio1, existing.Monto1, existing.Tasa1, existing.ME1,
+		existing.Socio2, existing.Monto2, existing.Tasa2, existing.ME2,
+	)
+	if err != nil {
+		return ComprobanteRow{}, fmt.Errorf("api: actualizar comprobante: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return ComprobanteRow{}, ErrNotFound
+	}
+
+	updated, _, err := readComprobanteForUpdate(ctx, tx, hash)
+	if err != nil {
+		return ComprobanteRow{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ComprobanteRow{}, fmt.Errorf("api: commit de comprobante: %w", err)
+	}
+	return updated, nil
+}
+
+func readComprobanteForUpdate(ctx context.Context, tx pgx.Tx, hash string) (ComprobanteRow, domain.Comprobante, error) {
+	row := tx.QueryRow(ctx,
+		`SELECT `+sqlComprobanteColumns+` FROM comprobantes c WHERE c.hash_largo = $1 FOR UPDATE`, hash)
+	item, err := scanComprobante(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ComprobanteRow{}, domain.Comprobante{}, ErrNotFound
+	}
+	if err != nil {
+		return ComprobanteRow{}, domain.Comprobante{}, fmt.Errorf("api: leer comprobante para edición: %w", err)
+	}
+	return item, comprobanteFromRow(item), nil
+}
+
+func comprobanteFromRow(row ComprobanteRow) domain.Comprobante {
+	return domain.Comprobante{
+		HashLargo:      row.HashLargo,
+		HashCorto:      row.HashCorto,
+		Instancia:      row.Instancia,
+		MontoRecibo:    row.MontoRecibo,
+		MonedaRecibo:   row.MonedaRecibo,
+		Banco:          row.Banco,
+		Titular:        row.Titular,
+		Referencia:     row.Referencia,
+		URLImagen:      row.URLImagen,
+		Grupo1:         row.Grupo1,
+		Grupo2:         row.Grupo2,
+		Caption1:       row.Caption1,
+		Caption2:       row.Caption2,
+		Socio1:         row.Socio1,
+		Socio2:         row.Socio2,
+		Tasa1:          row.Tasa1,
+		Tasa2:          row.Tasa2,
+		Monto1:         row.Monto1,
+		Monto2:         row.Monto2,
+		ME1:            row.ME1,
+		ME2:            row.ME2,
+		LoteTasa:       row.LoteTasa,
+		FechaOperacion: row.FechaOperacion,
+		CreadoEn:       row.CreadoEn,
+		ActualizadoEn:  row.ActualizadoEn,
+	}
+}
+
+func applyComprobantePatch(c *domain.Comprobante, patch ComprobantePatch) error {
+	if patch.MontoRecibo != nil {
+		if *patch.MontoRecibo <= 0 || math.IsNaN(*patch.MontoRecibo) || math.IsInf(*patch.MontoRecibo, 0) {
+			return domain.Validationf("monto_recibo debe ser un número positivo")
+		}
+		c.MontoRecibo = *patch.MontoRecibo
+	} else if patch.Monto != nil {
+		if *patch.Monto <= 0 || math.IsNaN(*patch.Monto) || math.IsInf(*patch.Monto, 0) {
+			return domain.Validationf("monto debe ser un número positivo")
+		}
+		c.MontoRecibo = *patch.Monto
+	}
+
+	if patch.Banco != nil {
+		c.Banco = *patch.Banco
+	}
+	if patch.Referencia != nil {
+		c.Referencia = *patch.Referencia
+	}
+	if patch.Titular != nil {
+		c.Titular = *patch.Titular
+	}
+	if patch.MonedaRecibo != nil {
+		c.MonedaRecibo = *patch.MonedaRecibo
+	} else if patch.Moneda != nil {
+		c.MonedaRecibo = *patch.Moneda
+	}
+
+	socio1 := patch.Socio1
+	if socio1 == nil {
+		socio1 = patch.NombreSocio1
+	}
+	if socio1 != nil {
+		c.Socio1 = *socio1
+	}
+	if patch.Monto1 != nil {
+		c.Monto1 = *patch.Monto1
+	}
+	if patch.Tasa1 != nil {
+		c.Tasa1 = *patch.Tasa1
+	}
+	if patch.ME1 != nil {
+		c.ME1 = *patch.ME1
+	}
+
+	socio2 := patch.Socio2
+	if socio2 == nil {
+		socio2 = patch.NombreSocio2
+	}
+	if socio2 != nil {
+		c.Socio2 = *socio2
+	}
+	if patch.Monto2 != nil {
+		c.Monto2 = *patch.Monto2
+	}
+	if patch.Tasa2 != nil {
+		c.Tasa2 = *patch.Tasa2
+	}
+	if patch.ME2 != nil {
+		c.ME2 = *patch.ME2
+	}
+	return nil
+}
+
 // ListPerfiles devuelve la vista perfil completa.
 func (r *Repository) ListPerfiles(ctx context.Context) ([]Perfil, error) {
 	rows, err := r.pool.Query(ctx, `
@@ -301,6 +462,27 @@ LIMIT 2000`)
 	}
 	return out, nil
 }
+
+// sqlUpdateComprobante actualiza solo los campos editables del comprobante.
+// `actualizado_en` se sella con NOW() en la base (zona Caracas de la sesión),
+// no con la hora del proceso.
+const sqlUpdateComprobante = `
+UPDATE comprobantes SET
+    banco = $2,
+    referencia = $3,
+    titular = $4,
+    monto_recibo = $5,
+    moneda_recibo = $6,
+    socio_1 = $7,
+    monto_1 = $8,
+    tasa_1 = $9,
+    me1 = $10,
+    socio_2 = $11,
+    monto_2 = $12,
+    tasa_2 = $13,
+    me2 = $14,
+    actualizado_en = NOW()
+WHERE hash_largo = $1`
 
 const sqlComprobanteColumns = `
     c.hash_largo,

@@ -18,6 +18,7 @@ import (
 type Store interface {
 	ListComprobantes(ctx context.Context, filter Filter) ([]ComprobanteRow, int, error)
 	GetComprobante(ctx context.Context, hash string) (ComprobanteRow, error)
+	UpdateComprobante(ctx context.Context, hash string, patch ComprobantePatch) (ComprobanteRow, error)
 	ListPerfiles(ctx context.Context) ([]Perfil, error)
 	LatestTasa(ctx context.Context) (Tasa, error)
 	ReportFilters(ctx context.Context) (ReportFilters, error)
@@ -47,6 +48,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/comprobantes/{$}", h.ListComprobantes)
 	mux.HandleFunc("GET /api/v1/comprobantes/{hash}", h.GetComprobante)
 	mux.HandleFunc("GET /api/v1/comprobantes/{hash}/{$}", h.GetComprobante)
+	mux.HandleFunc("PUT /api/v1/comprobantes/{hash}", h.UpdateComprobante)
+	mux.HandleFunc("PUT /api/v1/comprobantes/{hash}/{$}", h.UpdateComprobante)
 	mux.HandleFunc("GET /api/v1/perfiles", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/perfiles/{$}", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
@@ -63,14 +66,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Options(w, r)
 		return
 	}
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
+	if r.Method != http.MethodGet && r.Method != http.MethodPut {
+		w.Header().Set("Allow", "GET, PUT, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 		return
 	}
 
 	path := strings.TrimRight(r.URL.Path, "/")
 	switch {
+	case r.Method == http.MethodPut && strings.HasPrefix(path, "/api/v1/comprobantes/"):
+		h.UpdateComprobante(w, r)
+	case r.Method == http.MethodPut:
+		w.Header().Set("Allow", "GET, PUT, OPTIONS")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 	case path == "/api/v1/comprobantes":
 		h.ListComprobantes(w, r)
 	case strings.HasPrefix(path, "/api/v1/comprobantes/"):
@@ -152,6 +160,57 @@ func (h *Handler) GetComprobante(w http.ResponseWriter, r *http.Request) {
 	perfiles, err := h.store.ListPerfiles(r.Context())
 	if err != nil {
 		h.log.Error("hooty.api.perfiles_para_comprobante", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	index := MapPerfiles(perfiles)
+	writeJSON(w, http.StatusOK, NewComprobanteDTO(row,
+		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)]))
+}
+
+// UpdateComprobante edita cabecera y ambos lados del binomio sin tocar la
+// identidad (hash, grupos, lote, fecha de operación ni URL de imagen).
+func (h *Handler) UpdateComprobante(w http.ResponseWriter, r *http.Request) {
+	raw := r.PathValue("hash")
+	if raw == "" {
+		raw = strings.TrimPrefix(r.URL.Path, "/api/v1/comprobantes/")
+		raw = strings.TrimSuffix(raw, "/")
+	}
+	if raw == "" || strings.Contains(raw, "/") {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+	hash, err := url.PathUnescape(raw)
+	if err != nil || strings.TrimSpace(hash) == "" {
+		writeError(w, http.StatusBadRequest, "invalid_hash")
+		return
+	}
+
+	var patch ComprobantePatch
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err := decoder.Decode(&patch); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	row, err := h.store.UpdateComprobante(r.Context(), hash, patch)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+	if errors.Is(err, domain.ErrValidation) {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	if err != nil {
+		h.log.Error("hooty.api.comprobante_update", "hash", hash, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	perfiles, err := h.store.ListPerfiles(r.Context())
+	if err != nil {
+		h.log.Error("hooty.api.perfiles_para_edicion", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
@@ -280,8 +339,8 @@ func parseDate(raw string) (string, error) {
 
 func setCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-Id")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-Id, Authorization, X-Hooty-Token")
 	w.Header().Set("Access-Control-Expose-Headers", "X-Total-Count, X-Limit, X-Offset, X-Has-More")
 }
 

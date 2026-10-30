@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -163,6 +164,12 @@ func NormalizeComprobante(c Comprobante) Comprobante {
 	c.Instancia = strings.TrimSpace(c.Instancia)
 	c.MontoRecibo = Round2(math.Abs(c.MontoRecibo))
 	c.MonedaRecibo = NormalizeCurrency(c.MonedaRecibo, "USDT")
+	c.Tasa1 = RoundRate(c.Tasa1)
+	c.Tasa2 = RoundRate(c.Tasa2)
+	c.Monto1 = Truncar2(c.Monto1)
+	c.Monto2 = Truncar2(c.Monto2)
+	c.ME1 = Truncar2(c.ME1)
+	c.ME2 = Truncar2(c.ME2)
 	c.Banco = CleanText(c.Banco, 80)
 	c.Titular = CleanText(c.Titular, 120)
 	c.Referencia = CleanText(c.Referencia, 80)
@@ -359,18 +366,49 @@ func CleanText(value string, limit int) string {
 	return string([]rune(clean)[:limit])
 }
 
-// Round2 trunca a dos decimales, igual que el motor contable histórico.
-func Round2(value float64) float64 {
-	if math.IsNaN(value) || math.IsInf(value, 0) {
-		return 0
-	}
-	return math.Trunc(value*100) / 100
+// Truncar2 corta a dos decimales exactos usando la representación decimal
+// más corta del float. No multiplica por 100: 1.15 -> 1.15, 2.675 -> 2.67,
+// 1.005 -> 1.00. Es la regla contable de montos.
+func Truncar2(value float64) float64 {
+	return truncarDecimales(value, 2)
 }
 
-// RoundRate trunca una tasa a seis decimales para congelarla en el snapshot.
+// Truncar6 corta a seis decimales exactos para tasas.
+func Truncar6(value float64) float64 {
+	return truncarDecimales(value, 6)
+}
+
+// Round2 conserva el nombre histórico y delega en el truncamiento exacto.
+func Round2(value float64) float64 {
+	return Truncar2(value)
+}
+
+// RoundRate conserva el nombre histórico y delega en el truncamiento exacto.
 func RoundRate(value float64) float64 {
+	return Truncar6(value)
+}
+
+func truncarDecimales(value float64, decimals int) float64 {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return 0
 	}
-	return math.Trunc(value*1_000_000) / 1_000_000
+	if decimals < 0 {
+		decimals = 0
+	}
+	// 'f' con precisión -1 produce la representación decimal más corta que
+	// round-trips al mismo float64, evitando el error de value*100.
+	text := strconv.FormatFloat(value, 'f', -1, 64)
+	dot := strings.IndexByte(text, '.')
+	if dot < 0 {
+		return value
+	}
+	limit := dot + 1 + decimals
+	if len(text) > limit {
+		text = text[:limit]
+	}
+	truncated, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		return 0
+	}
+	return truncated
 }

@@ -21,7 +21,7 @@ import {
 import {
   eliminarComprobantePorHash,
   fetchComprobantePorHash
-} from '../services/comprobantesApiService.js?v=20261025_02';
+} from '../services/comprobantesApiService.js?v=20261030_01';
 import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261025_02';
 import { aplicarRangoHash } from '../services/comprobantesFilterService.js?v=20261025_02';
 import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261025_02';

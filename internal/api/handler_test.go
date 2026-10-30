@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,6 +30,16 @@ func (f *fakeStore) ListComprobantes(_ context.Context, filter Filter) ([]Compro
 }
 
 func (f *fakeStore) GetComprobante(_ context.Context, _ string) (ComprobanteRow, error) {
+	if f.getErr != nil {
+		return ComprobanteRow{}, f.getErr
+	}
+	if len(f.rows) == 0 {
+		return ComprobanteRow{}, ErrNotFound
+	}
+	return f.rows[0], nil
+}
+
+func (f *fakeStore) UpdateComprobante(_ context.Context, _ string, _ ComprobantePatch) (ComprobanteRow, error) {
 	if f.getErr != nil {
 		return ComprobanteRow{}, f.getErr
 	}
@@ -236,6 +247,112 @@ func TestRegisterRutasExactasYBarraFinal(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s status = %d, body=%s", path, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+func TestUpdateComprobanteAceptaPUT(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).Register(mux)
+
+	body := `{
+		"banco":"BINANCE",
+		"referencia":"REF-1",
+		"titular":"CHASAN",
+		"monto_recibo":100,
+		"moneda_recibo":"USD",
+		"socio_1":"CHASAN","monto_1":100,"tasa_1":1,"me1":100,
+		"socio_2":"NELSY","monto_2":100,"tasa_2":1,"me2":100
+	}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/comprobantes/8a3e", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var dto ComprobanteDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &dto); err != nil {
+		t.Fatalf("respuesta PUT inválida: %v", err)
+	}
+	if dto.HashLargo != "8a3e" {
+		t.Fatalf("hash = %q", dto.HashLargo)
+	}
+}
+
+func TestUpdateComprobanteRechazaJSONInvalido(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).Register(mux)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/comprobantes/8a3e", strings.NewReader(`{`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT inválido status = %d", rec.Code)
+	}
+}
+
+func TestApplyComprobantePatchActualizaAmbosLados(t *testing.T) {
+	t.Parallel()
+
+	c := comprobanteFromRow(testStore().rows[0])
+	banco := "OTRO BANCO"
+	referencia := "REF-NUEVA"
+	titular := "TITULAR NUEVO"
+	montoRecibo := 12.34
+	moneda := "PEN"
+	socio1 := "CHASAN"
+	monto1 := 45.67
+	tasa1 := 3.7
+	me1 := 12.34
+	socio2 := "NELSY"
+	monto2 := 48.9
+	tasa2 := 3.9
+	me2 := 12.54
+
+	patch := ComprobantePatch{
+		Banco:        &banco,
+		Referencia:   &referencia,
+		Titular:      &titular,
+		MontoRecibo:  &montoRecibo,
+		MonedaRecibo: &moneda,
+		Socio1:       &socio1,
+		Monto1:       &monto1,
+		Tasa1:        &tasa1,
+		ME1:          &me1,
+		Socio2:       &socio2,
+		Monto2:       &monto2,
+		Tasa2:        &tasa2,
+		ME2:          &me2,
+	}
+	if err := applyComprobantePatch(&c, patch); err != nil {
+		t.Fatalf("patch válido rechazado: %v", err)
+	}
+	if c.Banco != banco || c.Referencia != referencia || c.Titular != titular ||
+		c.MontoRecibo != montoRecibo || c.MonedaRecibo != moneda ||
+		c.Socio1 != socio1 || c.Monto1 != monto1 || c.Tasa1 != tasa1 || c.ME1 != me1 ||
+		c.Socio2 != socio2 || c.Monto2 != monto2 || c.Tasa2 != tasa2 || c.ME2 != me2 {
+		t.Fatalf("patch no aplicado correctamente: %+v", c)
+	}
+	if c.Grupo1 != "111@g.us" || c.Grupo2 != "222@g.us" || c.LoteTasa != "T070" {
+		t.Fatalf("el patch alteró campos inmutables: %+v", c)
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("el comprobante editado debe ser válido: %v", err)
+	}
+}
+
+func TestApplyComprobantePatchRechazaMontoReciboNegativo(t *testing.T) {
+	t.Parallel()
+
+	c := comprobanteFromRow(testStore().rows[0])
+	monto := -1.0
+	if err := applyComprobantePatch(&c, ComprobantePatch{MontoRecibo: &monto}); err == nil {
+		t.Fatal("monto_recibo negativo debe rechazarse")
 	}
 }
 

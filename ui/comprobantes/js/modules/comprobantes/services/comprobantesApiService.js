@@ -190,8 +190,17 @@ export async function fetchComprobantesPagina(params = {}, opciones = {}) {
 export async function fetchComprobantePorHash(hashLargo) {
   const target = String(hashLargo || '').trim();
   if (!target) return null;
-  const pagina = await fetchComprobantesPagina({ hash: target }, { limit: 1, offset: 0 });
-  return pagina.lista[0] || null;
+
+  const res = await fetch(apiUrl(`${API_RUTA}/${encodeURIComponent(target)}`), {
+    headers: { Accept: 'application/json' }
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || data.message || `HTTP Error: ${res.status}`);
+  }
+  const data = await res.json().catch(() => null);
+  return data && typeof data === 'object' ? data : null;
 }
 
 /**
@@ -251,32 +260,54 @@ export async function fetchComprobantesPaginados(params = {}) {
 }
 
 /**
- * Guarda cambios de un comprobante editado (PUT directo al contrato canónico).
+ * Guarda la edición completa de un comprobante: cabecera + ambos socios.
+ * Envía solo el contrato editable de PUT /api/v1/comprobantes/{hash}; el
+ * backend conserva hash, grupos, lote, fecha de operación y URL de imagen.
  */
-export async function guardarCambiosComprobante(hashLargo, payload = {}, loteActivo = 'T070') {
-  try {
-    const idValido = obtenerIdentificadorValido(hashLargo, payload);
-    if (!idValido) {
-      throw new Error('No se proporcionó un hash o ID válido para actualizar');
-    }
-
-    const dataPayload = (typeof hashLargo === 'object' && hashLargo !== null) ? hashLargo : payload;
-    const body = { ...dataPayload, loteActivo };
-    if (!body.lote_tasa) body.lote_tasa = body.lote_tasa_asignado || loteActivo;
-    if (!body.lote_tasa_asignado) body.lote_tasa_asignado = body.lote_tasa;
-
-    const res = await fetch(apiUrl(`${API_RUTA}/${encodeURIComponent(idValido)}`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-    return await res.json().catch(() => true);
-  } catch (err) {
-    console.error('[comprobantesApiService ❌ Save Error]:', err.message);
-    throw err;
+export async function guardarCambiosComprobante(hashLargo, payload = {}) {
+  const idValido = obtenerIdentificadorValido(hashLargo, payload);
+  if (!idValido) {
+    throw new Error('No se proporcionó un hash válido para actualizar');
   }
+
+  const numero = (valor) => {
+    const n = Number(valor);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const texto = (valor) => String(valor ?? '').trim();
+  const socio1 = texto(payload.socio_1 ?? payload.nombre_socio_1);
+  const socio2 = texto(payload.socio_2 ?? payload.nombre_socio_2);
+
+  const body = {
+    banco: texto(payload.banco),
+    referencia: texto(payload.referencia),
+    titular: texto(payload.titular),
+    monto_recibo: numero(payload.monto_recibo ?? payload.monto),
+    moneda_recibo: texto(payload.moneda_recibo ?? payload.moneda ?? 'USDT').toUpperCase(),
+    socio_1: socio1,
+    monto_1: numero(payload.monto_1),
+    tasa_1: numero(payload.tasa_1),
+    me1: numero(payload.me1),
+    socio_2: socio2,
+    monto_2: numero(payload.monto_2),
+    tasa_2: numero(payload.tasa_2),
+    me2: numero(payload.me2)
+  };
+
+  const res = await fetch(apiUrl(`${API_RUTA}/${encodeURIComponent(idValido)}`), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.success === false) {
+    throw new Error(data?.error || data?.message || `HTTP Error: ${res.status}`);
+  }
+  return data;
 }
 
 /**

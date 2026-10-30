@@ -43,6 +43,10 @@ func (routeStore) GetComprobante(context.Context, string) (api.ComprobanteRow, e
 	return api.ComprobanteRow{}, api.ErrNotFound
 }
 
+func (routeStore) UpdateComprobante(context.Context, string, api.ComprobantePatch) (api.ComprobanteRow, error) {
+	return api.ComprobanteRow{}, api.ErrNotFound
+}
+
 func (routeStore) ListPerfiles(context.Context) ([]api.Perfil, error) {
 	return []api.Perfil{
 		{Nombre: "CHASAN", Rol: "SOCIO", MonedaBase: "USDT"},

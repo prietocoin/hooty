@@ -39,6 +39,32 @@ type ComprobanteRow struct {
 	ActualizadoEn  time.Time
 }
 
+// ComprobantePatch es el payload de PUT /api/v1/comprobantes/{hash}. Los
+// punteros distinguen “campo ausente” de “valor cero”: la edición es parcial.
+type ComprobantePatch struct {
+	Banco        *string  `json:"banco"`
+	Referencia   *string  `json:"referencia"`
+	Titular      *string  `json:"titular"`
+	MontoRecibo  *float64 `json:"monto_recibo"`
+	MonedaRecibo *string  `json:"moneda_recibo"`
+
+	Socio1 *string  `json:"socio_1"`
+	Monto1 *float64 `json:"monto_1"`
+	Tasa1  *float64 `json:"tasa_1"`
+	ME1    *float64 `json:"me1"`
+
+	Socio2 *string  `json:"socio_2"`
+	Monto2 *float64 `json:"monto_2"`
+	Tasa2  *float64 `json:"tasa_2"`
+	ME2    *float64 `json:"me2"`
+
+	// Alias de compatibilidad con la UI histórica.
+	NombreSocio1 *string  `json:"nombre_socio_1"`
+	NombreSocio2 *string  `json:"nombre_socio_2"`
+	Monto        *float64 `json:"monto"`
+	Moneda       *string  `json:"moneda"`
+}
+
 // Perfil es la fila de la vista perfil.
 type Perfil struct {
 	Nombre       string
