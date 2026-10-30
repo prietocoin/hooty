@@ -142,22 +142,18 @@ func SimularLiquidacion(input SimulacionInput, perfil1, perfil2 domain.Perfil, l
 	}
 
 	currency := domain.NormalizeCurrency(input.MonedaRecibo, "")
-	var receiptRate float64
-	var err error
-	if input.Tasa1 <= 0 || input.Tasa2 <= 0 {
-		receiptRate, err = rateFor(lote, currency)
-		if err != nil {
-			return SimulacionResult{}, err
-		}
+	tasa1 := input.Tasa1
+	if tasa1 <= 0 {
+		tasa1 = rateForLado(lote, currency, 1)
 	}
-	tasa1, monto1, me1, err := calcularLado(perfil1, input.MontoRecibo, receiptRate, input.Tasa1, lote)
-	if err != nil {
-		return SimulacionResult{}, fmt.Errorf("lado 1: %w", err)
+	tasa2 := input.Tasa2
+	if tasa2 <= 0 {
+		tasa2 = rateForLado(lote, currency, 2)
 	}
-	tasa2, monto2, me2, err := calcularLado(perfil2, input.MontoRecibo, receiptRate, input.Tasa2, lote)
-	if err != nil {
-		return SimulacionResult{}, fmt.Errorf("lado 2: %w", err)
-	}
+
+	monto1, me1 := simularMonto(perfil1, input.MontoRecibo, tasa1, lote)
+	monto2, me2 := simularMonto(perfil2, input.MontoRecibo, tasa2, lote)
+
 	signo1 := signoLado(perfil1, currency, 1)
 	signo2 := signoLado(perfil2, currency, 2)
 	if signo1 == signo2 {
@@ -170,32 +166,37 @@ func SimularLiquidacion(input SimulacionInput, perfil1, perfil2 domain.Perfil, l
 	}, nil
 }
 
-// calcularLado aplica la fórmula canónica. Si el cliente envía una tasa
-// explícita, se usa tal cual; si no, se deriva del lote y la moneda base.
-func calcularLado(perfil domain.Perfil, amount, receiptRate, explicitRate float64, lote domain.LoteTasas) (float64, float64, float64, error) {
-	if strings.TrimSpace(perfil.MonedaBase) == "" {
-		return 0, 0, 0, domain.Validationf("el socio %q no tiene moneda base", perfil.Nombre)
-	}
-	baseRate, err := rateFor(lote, perfil.MonedaBase)
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	tasa := domain.RoundRate(explicitRate)
+// simularMonto no inventa tasas: si la tasa no existe (0), el monto y el ME
+// también son 0. Nunca divide por cero ni copia la tasa del otro lado.
+func simularMonto(perfil domain.Perfil, amount, tasa float64, lote domain.LoteTasas) (float64, float64) {
 	if tasa <= 0 {
-		tasa = domain.RoundRate(receiptRate / baseRate)
-	}
-	if tasa <= 0 {
-		return 0, 0, 0, domain.Validationf("tasa no positiva para %q", perfil.Nombre)
+		return 0, 0
 	}
 	monto := domain.Truncar2(amount / tasa)
-	me := domain.Truncar2(monto / baseRate)
-	if math.Abs(monto) < 0.01 {
-		return tasa, monto, me, domain.Validationf("el importe de %q se trunca a cero", perfil.Nombre)
+	baseRate, err := rateFor(lote, perfil.MonedaBase)
+	if err != nil || baseRate <= 0 {
+		return monto, 0
 	}
-	if math.Abs(me) < 0.01 {
-		return tasa, monto, me, domain.Validationf("el equivalente de %q se trunca a cero", perfil.Nombre)
+	return monto, domain.Truncar2(monto / baseRate)
+}
+
+// rateForLado busca exclusivamente la tasa del lado solicitado. Un lote con
+// una única tasa genérica no se reutiliza para el otro socio.
+func rateForLado(lote domain.LoteTasas, currency string, lado int) float64 {
+	code := domain.NormalizeCurrency(currency, "")
+	if code == "" {
+		return 0
 	}
-	return tasa, monto, me, nil
+	sufijos := []string{"_1", "1", "_A", "_COMPRA"}
+	if lado == 2 {
+		sufijos = []string{"_2", "2", "_B", "_VENTA"}
+	}
+	for _, sufijo := range sufijos {
+		if rate, ok := lote.Tasas[code+sufijo]; ok && rate > 0 {
+			return rate
+		}
+	}
+	return 0
 }
 
 // signoLado lee polar_D/polar_P del perfil para la divisa del recibo. Si no
@@ -234,6 +235,34 @@ func signoLado(perfil domain.Perfil, moneda string, lado int) float64 {
 		return 1
 	}
 	return defecto
+}
+
+// calcularLado aplica la fórmula canónica de ingesta. Si el cliente envía una
+// tasa explícita, se usa tal cual; si no, se deriva del lote y la moneda base.
+func calcularLado(perfil domain.Perfil, amount, receiptRate, explicitRate float64, lote domain.LoteTasas) (float64, float64, float64, error) {
+	if strings.TrimSpace(perfil.MonedaBase) == "" {
+		return 0, 0, 0, domain.Validationf("el socio %q no tiene moneda base", perfil.Nombre)
+	}
+	baseRate, err := rateFor(lote, perfil.MonedaBase)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	tasa := domain.RoundRate(explicitRate)
+	if tasa <= 0 {
+		tasa = domain.RoundRate(receiptRate / baseRate)
+	}
+	if tasa <= 0 {
+		return 0, 0, 0, domain.Validationf("tasa no positiva para %q", perfil.Nombre)
+	}
+	monto := domain.Truncar2(amount / tasa)
+	me := domain.Truncar2(monto / baseRate)
+	if math.Abs(monto) < 0.01 {
+		return tasa, monto, me, domain.Validationf("el importe de %q se trunca a cero", perfil.Nombre)
+	}
+	if math.Abs(me) < 0.01 {
+		return tasa, monto, me, domain.Validationf("el equivalente de %q se trunca a cero", perfil.Nombre)
+	}
+	return tasa, monto, me, nil
 }
 
 func side(perfil domain.Perfil, amount, receiptRate float64, lote domain.LoteTasas) (float64, float64, float64, error) {
