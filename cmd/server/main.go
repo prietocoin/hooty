@@ -61,6 +61,13 @@ func run() error {
 		return err
 	}
 
+	migrateCtx, cancelMigrate := context.WithTimeout(ctx, 30*time.Second)
+	err = postgres.EnsureZeroRateAllowed(migrateCtx, pool)
+	cancelMigrate()
+	if err != nil {
+		return err
+	}
+
 	media, err := evolution.New(evolution.Config{
 		BaseURL:  cfg.EvolutionURL,
 		APIKey:   cfg.EvolutionAPIKey,

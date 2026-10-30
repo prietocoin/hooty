@@ -127,6 +127,23 @@ FROM information_schema.columns
 WHERE table_schema = 'public'
   AND table_name = ANY($1)
 ORDER BY table_name, ordinal_position`
+
+	// El estado contable admite tasa 0 cuando el socio no tiene regla para la
+	// divisa. La migración de arranque solo actúa si la restricción aún exige
+	// valores estrictamente positivos.
+	sqlRateCheckDefinition = `
+SELECT COALESCE(pg_get_constraintdef(c.oid), '')
+FROM pg_constraint c
+JOIN pg_class t ON t.oid = c.conrelid
+JOIN pg_namespace n ON n.oid = t.relnamespace
+WHERE c.conname = 'chk_tasas_positivas'
+  AND t.relname = 'comprobantes'
+  AND n.nspname = 'public'
+LIMIT 1`
+
+	sqlDropRateCheck = `ALTER TABLE comprobantes DROP CONSTRAINT IF EXISTS chk_tasas_positivas`
+
+	sqlAddRateCheck = `ALTER TABLE comprobantes ADD CONSTRAINT chk_tasas_positivas CHECK (tasa_1 >= 0 AND tasa_2 >= 0)`
 )
 
 var (
