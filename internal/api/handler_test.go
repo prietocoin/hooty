@@ -361,7 +361,7 @@ func TestReconcileSideCalculaYEvaluaSigno(t *testing.T) {
 
 	monto := 0.0
 	me := 0.0
-	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, nil, nil); err != nil {
+	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, nil); err != nil {
 		t.Fatalf("cálculo válido rechazado: %v", err)
 	}
 	if monto != 2.5 || me != 0.67 {
@@ -369,21 +369,19 @@ func TestReconcileSideCalculaYEvaluaSigno(t *testing.T) {
 	}
 
 	negMonto := -2.5
-	negME := -0.67
-	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, &negMonto, &negME); err != nil {
+	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, &negMonto); err != nil {
 		t.Fatalf("signo negativo coherente rechazado: %v", err)
 	}
 	if monto != -2.5 || me != -0.67 {
 		t.Fatalf("signo no preservado: monto=%v me=%v", monto, me)
 	}
 
-	incoherenteMonto := -2.4
-	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, &incoherenteMonto, nil); err == nil {
-		t.Fatal("un monto incoherente debe rechazarse")
+	manual := -2.4
+	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, &manual); err != nil {
+		t.Fatalf("excepción manual rechazada: %v", err)
 	}
-	incoherente := 0.68
-	if err := reconcileSide("1", 100, 40, &monto, &me, 3.7, nil, &incoherente); err == nil {
-		t.Fatal("un ME incoherente debe rechazarse")
+	if monto != -2.4 || me != -0.64 {
+		t.Fatalf("excepción manual no respetada: monto=%v me=%v", monto, me)
 	}
 }
 

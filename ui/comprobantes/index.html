@@ -1006,6 +1006,8 @@
   tasasVigentes: {},
   tasasCargando: false,
   tasasError: '',
+  monto1Manual: false,
+  monto2Manual: false,
 
   truncar(valor, decimales = 2) {
     const num = Number(valor);
@@ -1052,20 +1054,47 @@
     this.aplicarTasaPorDefecto(2);
   },
 
-  recalcularLado(lado) {
+  recalcularME(lado) {
     if (!this.itemEdicion) return;
-    const montoRecibo = this.truncar(this.numeroPuro(this.itemEdicion.monto_recibo ?? this.itemEdicion.monto), 2);
+    const monto = this.numeroPuro(this.itemEdicion[`monto_${lado}`]);
+    const baseRate = this.tasaDeLote(this.baseSocio(lado));
+    if (!(baseRate > 0)) {
+      this.itemEdicion[`me${lado}`] = 0;
+      return;
+    }
+    const signo = monto < 0 ? -1 : 1;
+    this.itemEdicion[`me${lado}`] = signo * this.truncar(Math.abs(monto) / baseRate, 2);
+  },
+
+  recalcularLado(lado, forzar = false) {
+    if (!this.itemEdicion) return;
+    const manual = Boolean(this[`monto${lado}Manual`]);
     const tasa = this.truncar(this.numeroPuro(this.itemEdicion[`tasa_${lado}`]), 6);
     this.itemEdicion[`tasa_${lado}`] = tasa;
+
+    if (manual && !forzar) {
+      this.recalcularME(lado);
+      return;
+    }
+
+    const montoRecibo = this.truncar(this.numeroPuro(this.itemEdicion.monto_recibo ?? this.itemEdicion.monto), 2);
     if (!(montoRecibo > 0) || !(tasa > 0)) return;
 
     const signo = Number(this.itemEdicion[`monto_${lado}`]) < 0 ? -1 : 1;
     const monto = this.truncar(montoRecibo / tasa, 2);
-    const baseRate = this.tasaDeLote(this.baseSocio(lado));
-    const me = baseRate > 0 ? this.truncar(monto / baseRate, 2) : 0;
-
     this.itemEdicion[`monto_${lado}`] = signo * monto;
-    this.itemEdicion[`me${lado}`] = signo * me;
+    this.recalcularME(lado);
+  },
+
+  marcarMontoManual(lado, valor) {
+    this[`monto${lado}Manual`] = true;
+    this.itemEdicion[`monto_${lado}`] = valor;
+    this.recalcularME(lado);
+  },
+
+  resetMonto(lado) {
+    this[`monto${lado}Manual`] = false;
+    this.recalcularLado(lado, true);
   },
 
   recalcularTodo() {
@@ -1103,9 +1132,14 @@
   async prepararEdicion() {
     await this.cargarTasasEdicion(true);
     if (this.itemEdicion) {
+      this.monto1Manual = false;
+      this.monto2Manual = false;
       if (!(this.numeroPuro(this.itemEdicion.tasa_1) > 0)) this.aplicarTasaPorDefecto(1);
       if (!(this.numeroPuro(this.itemEdicion.tasa_2) > 0)) this.aplicarTasaPorDefecto(2);
-      this.recalcularTodo();
+      if (!(this.numeroPuro(this.itemEdicion.monto_1) > 0)) this.recalcularLado(1, true);
+      else this.recalcularME(1);
+      if (!(this.numeroPuro(this.itemEdicion.monto_2) > 0)) this.recalcularLado(2, true);
+      else this.recalcularME(2);
     }
   },
 
@@ -1165,6 +1199,10 @@
     }
     if (!(tasa1 > 0) || !(tasa2 > 0)) {
       aviso('error', 'Ambas tasas deben ser mayores que cero.');
+      return;
+    }
+    if (!(this.numeroPuro(this.itemEdicion.monto_1) > 0) || !(this.numeroPuro(this.itemEdicion.monto_2) > 0)) {
+      aviso('error', 'Los montos de Socio 1 y Socio 2 deben ser mayores que cero.');
       return;
     }
     if (!(this.tasaDeLote(moneda) > 0)) {
@@ -1338,7 +1376,13 @@
                 <section class="rounded-xl border border-cyan-500/40 bg-[#030611] p-3 space-y-2">
                   <header class="flex items-center justify-between border-b border-cyan-500/20 pb-1.5">
                     <h4 class="text-[10px] font-black uppercase tracking-wider text-cyan-300">Socio 1 · Impacto</h4>
-                    <span class="text-[9px] font-mono text-slate-500">LADO A</span>
+                    <div class="flex items-center gap-1.5">
+                      <span x-show="monto1Manual" class="text-[8px] font-black text-amber-300">MANUAL</span>
+                      <button type="button" @click="resetMonto(1)"
+                              class="text-[8px] font-bold text-cyan-300/80 hover:text-cyan-200"
+                              title="Recalcular monto según la tasa">↺ Según tasa</button>
+                      <span class="text-[9px] font-mono text-slate-500">LADO A</span>
+                    </div>
                   </header>
                   <div>
                     <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-socio-1">Nombre del socio</label>
@@ -1363,10 +1407,10 @@
                              class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-cyan-200 font-mono font-bold outline-none">
                     </div>
                     <div>
-                      <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-monto-1">Monto (calculado)</label>
+                      <label class="block text-[8px] font-bold text-cyan-400 uppercase mb-0.5" for="editar-monto-1">Monto (editable)</label>
                       <input id="editar-monto-1" type="number" step="any" x-model="itemEdicion.monto_1"
-                             readonly
-                             class="w-full bg-[#080e26]/70 border border-cyan-500/20 rounded-lg px-2 py-1.5 text-xs text-emerald-300/90 font-mono font-bold outline-none cursor-default">
+                             @input="marcarMontoManual(1, $event.target.value)"
+                             class="w-full bg-[#080e26] border border-cyan-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
                     </div>
                   </div>
                   <div class="flex items-center justify-between gap-2 rounded-lg border border-cyan-500/20 bg-[#020617] px-2 py-1.5">
@@ -1379,7 +1423,13 @@
                 <section class="rounded-xl border border-pink-500/40 bg-[#030611] p-3 space-y-2">
                   <header class="flex items-center justify-between border-b border-pink-500/20 pb-1.5">
                     <h4 class="text-[10px] font-black uppercase tracking-wider text-pink-300">Socio 2 · Contraparte</h4>
-                    <span class="text-[9px] font-mono text-slate-500">LADO B</span>
+                    <div class="flex items-center gap-1.5">
+                      <span x-show="monto2Manual" class="text-[8px] font-black text-amber-300">MANUAL</span>
+                      <button type="button" @click="resetMonto(2)"
+                              class="text-[8px] font-bold text-pink-300/80 hover:text-pink-200"
+                              title="Recalcular monto según la tasa">↺ Según tasa</button>
+                      <span class="text-[9px] font-mono text-slate-500">LADO B</span>
+                    </div>
                   </header>
                   <div>
                     <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-socio-2">Nombre del socio</label>
@@ -1404,10 +1454,10 @@
                              class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-pink-200 font-mono font-bold outline-none">
                     </div>
                     <div>
-                      <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-monto-2">Monto (calculado)</label>
+                      <label class="block text-[8px] font-bold text-pink-400 uppercase mb-0.5" for="editar-monto-2">Monto (editable)</label>
                       <input id="editar-monto-2" type="number" step="any" x-model="itemEdicion.monto_2"
-                             readonly
-                             class="w-full bg-[#080e26]/70 border border-pink-500/20 rounded-lg px-2 py-1.5 text-xs text-emerald-300/90 font-mono font-bold outline-none cursor-default">
+                             @input="marcarMontoManual(2, $event.target.value)"
+                             class="w-full bg-[#080e26] border border-pink-500/40 rounded-lg px-2 py-1.5 text-xs text-emerald-300 font-mono font-bold outline-none">
                     </div>
                   </div>
                   <div class="flex items-center justify-between gap-2 rounded-lg border border-pink-500/20 bg-[#020617] px-2 py-1.5">

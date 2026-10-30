@@ -330,13 +330,13 @@ func (r *Repository) reconcileEditedFinancials(ctx context.Context, tx pgx.Tx, c
 	c.Tasa1 = domain.RoundRate(c.Tasa1)
 	c.Tasa2 = domain.RoundRate(c.Tasa2)
 
-	if err := reconcileSide("1", c.MontoRecibo, c.Tasa1, &c.Monto1, &c.ME1, baseRate1, patch.Monto1, patch.ME1); err != nil {
+	if err := reconcileSide("1", c.MontoRecibo, c.Tasa1, &c.Monto1, &c.ME1, baseRate1, patch.Monto1); err != nil {
 		return err
 	}
-	return reconcileSide("2", c.MontoRecibo, c.Tasa2, &c.Monto2, &c.ME2, baseRate2, patch.Monto2, patch.ME2)
+	return reconcileSide("2", c.MontoRecibo, c.Tasa2, &c.Monto2, &c.ME2, baseRate2, patch.Monto2)
 }
 
-func reconcileSide(label string, amount, tasa float64, monto, me *float64, baseRate float64, providedMonto, providedME *float64) error {
+func reconcileSide(label string, amount, tasa float64, monto, me *float64, baseRate float64, providedMonto *float64) error {
 	if !(amount > 0) || math.IsNaN(amount) || math.IsInf(amount, 0) {
 		return domain.Validationf("monto_recibo debe ser un número positivo")
 	}
@@ -348,34 +348,29 @@ func reconcileSide(label string, amount, tasa float64, monto, me *float64, baseR
 		return domain.Validationf("falta la tasa base para el socio %s", label)
 	}
 
-	expectedMonto := domain.Truncar2(amount / tasa)
-	expectedME := domain.Truncar2(expectedMonto / baseRate)
-	if expectedMonto <= 0 || expectedME <= 0 {
-		return domain.Validationf("la liquidación del socio %s se trunca a cero", label)
-	}
-
+	// El monto manual es una excepción contable explícita: se respeta y solo
+	// se recalcula el ME proporcional a ese monto. Si no hay override, se
+	// deriva de monto_recibo/tasa.
+	finalMonto := domain.Truncar2(amount / tasa)
 	sign := 1.0
 	if providedMonto != nil {
 		if *providedMonto < 0 {
 			sign = -1
 		}
+		finalMonto = domain.Truncar2(math.Abs(*providedMonto))
 	} else if *monto < 0 {
 		sign = -1
 	}
-
-	if providedMonto != nil && math.Abs(math.Abs(*providedMonto)-expectedMonto) > 1e-6 {
-		return domain.Validationf("monto_%s no corresponde a monto_recibo/tasa_%s", label, label)
-	}
-	if providedME != nil {
-		if math.Abs(math.Abs(*providedME)-expectedME) > 1e-6 {
-			return domain.Validationf("me%s no corresponde a la tasa y moneda base del socio %s", label, label)
-		}
-		if *providedME != 0 && math.Signbit(*providedME) != math.Signbit(sign) {
-			return domain.Validationf("el signo de me%s no corresponde al movimiento del socio %s", label, label)
-		}
+	if finalMonto <= 0 {
+		return domain.Validationf("monto_%s debe ser un número positivo", label)
 	}
 
-	*monto = sign * expectedMonto
+	expectedME := domain.Truncar2(finalMonto / baseRate)
+	if expectedME <= 0 {
+		return domain.Validationf("el equivalente ME del socio %s se trunca a cero", label)
+	}
+
+	*monto = sign * finalMonto
 	*me = sign * expectedME
 	return nil
 }
