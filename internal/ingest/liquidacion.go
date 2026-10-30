@@ -144,11 +144,11 @@ func SimularLiquidacion(input SimulacionInput, perfil1, perfil2 domain.Perfil, l
 	currency := domain.NormalizeCurrency(input.MonedaRecibo, "")
 	tasa1 := input.Tasa1
 	if tasa1 <= 0 {
-		tasa1 = rateForLado(lote, currency, 1)
+		tasa1 = tasaParaSocio(perfil1, currency, lote, 1)
 	}
 	tasa2 := input.Tasa2
 	if tasa2 <= 0 {
-		tasa2 = rateForLado(lote, currency, 2)
+		tasa2 = tasaParaSocio(perfil2, currency, lote, 2)
 	}
 
 	monto1, me1 := simularMonto(perfil1, input.MontoRecibo, tasa1, lote)
@@ -180,12 +180,81 @@ func simularMonto(perfil domain.Perfil, amount, tasa float64, lote domain.LoteTa
 	return monto, domain.Truncar2(monto / baseRate)
 }
 
-// rateForLado busca exclusivamente la tasa del lado solicitado. Un lote con
-// una única tasa genérica no se reutiliza para el otro socio.
-func rateForLado(lote domain.LoteTasas, currency string, lado int) float64 {
-	code := domain.NormalizeCurrency(currency, "")
+// tasaParaSocio resuelve la tasa de un socio sin depender del otro. Un socio
+// solo participa de una moneda que tenga configurada en su perfil; si le falta,
+// su tasa es 0 y el otro lado conserva la suya.
+func tasaParaSocio(perfil domain.Perfil, moneda string, lote domain.LoteTasas, lado int) float64 {
+	code := domain.NormalizeCurrency(moneda, "")
 	if code == "" {
 		return 0
+	}
+	if !perfilTieneMoneda(perfil, code) {
+		return 0
+	}
+	if rate, ok := rateForLado(lote, code, lado); ok {
+		return rate
+	}
+	base := domain.NormalizeCurrency(perfil.MonedaBase, "")
+	if base == "" {
+		return 0
+	}
+	if code == base {
+		return 1
+	}
+	receiptRate, ok := loteRate(lote, code)
+	if !ok {
+		return 0
+	}
+	baseRate, ok := loteRate(lote, base)
+	if !ok || baseRate <= 0 {
+		return 0
+	}
+	return domain.RoundRate(receiptRate / baseRate)
+}
+
+// perfilTieneMoneda indica si el socio declara la divisa en perfiles.monedas.
+// Los perfiles sin catálogo se consideran abiertos para no romper datos
+// históricos; un catálogo con contenido sí es restrictivo.
+func perfilTieneMoneda(perfil domain.Perfil, code string) bool {
+	if domain.NormalizeCurrency(perfil.MonedaBase, "") == code {
+		return true
+	}
+	if len(perfil.Monedas) == 0 {
+		return true
+	}
+	var reglas map[string]json.RawMessage
+	if err := json.Unmarshal(perfil.Monedas, &reglas); err != nil || len(reglas) == 0 {
+		return true
+	}
+	for clave := range reglas {
+		if domain.NormalizeCurrency(clave, "") == code {
+			return true
+		}
+	}
+	return false
+}
+
+// loteRate lee la tasa genérica del lote para una divisa. USD/USDT valen 1.
+func loteRate(lote domain.LoteTasas, currency string) (float64, bool) {
+	code := domain.NormalizeCurrency(currency, "")
+	if code == "" {
+		return 0, false
+	}
+	if rate, ok := lote.Tasas[code]; ok && rate > 0 {
+		return rate, true
+	}
+	if code == "USD" || code == "USDT" {
+		return 1, true
+	}
+	return 0, false
+}
+
+// rateForLado busca exclusivamente la tasa del lado solicitado. Un lote con
+// una única tasa genérica no se reutiliza para el otro socio.
+func rateForLado(lote domain.LoteTasas, currency string, lado int) (float64, bool) {
+	code := domain.NormalizeCurrency(currency, "")
+	if code == "" {
+		return 0, false
 	}
 	sufijos := []string{"_1", "1", "_A", "_COMPRA"}
 	if lado == 2 {
@@ -193,10 +262,10 @@ func rateForLado(lote domain.LoteTasas, currency string, lado int) float64 {
 	}
 	for _, sufijo := range sufijos {
 		if rate, ok := lote.Tasas[code+sufijo]; ok && rate > 0 {
-			return rate
+			return rate, true
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // signoLado lee polar_D/polar_P del perfil para la divisa del recibo. Si no
