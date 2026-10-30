@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261030_03"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261030_04"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -989,6 +989,7 @@
 <div x-data="{
   modalAbierto: false,
   guardando: false,
+  ultimoClick: 0,
   itemEdicion: null,
 
   numeroPuro(valor) {
@@ -1163,6 +1164,12 @@
 
   async guardarModal() {
     console.log('[Hooty] Click en Guardar Comprobante disparado');
+    const ahora = Date.now();
+    if (this.ultimoClick && ahora - this.ultimoClick < 300) {
+      console.log('[Hooty] Clic duplicado ignorado');
+      return;
+    }
+    this.ultimoClick = ahora;
     let toast = null;
     try {
       toast = await import('/shared/js/toast.js');
@@ -1208,12 +1215,31 @@
 
     const normalizar = (valor) => String(valor || '').normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
-    const socio1 = String(this.itemEdicion.nombre_socio_1 || this.itemEdicion.socio_1 || '').trim();
-    const socio2 = String(this.itemEdicion.nombre_socio_2 || this.itemEdicion.socio_2 || '').trim();
-    const moneda = String(this.itemEdicion.moneda_recibo || this.itemEdicion.moneda || 'USDT').trim().toUpperCase();
-    const montoRecibo = this.truncar(this.numeroPuro(this.itemEdicion.monto_recibo ?? this.itemEdicion.monto), 2);
-    const tasa1 = this.numeroPuro(this.itemEdicion.tasa_1);
-    const tasa2 = this.numeroPuro(this.itemEdicion.tasa_2);
+    const dom = (id) => document.getElementById(id);
+    const domValor = (id, fallback = '') => {
+      const elemento = dom(id);
+      return elemento ? elemento.value : fallback;
+    };
+    const domNumero = (id, fallback = 0) => {
+      const raw = domValor(id, '');
+      return raw === '' ? fallback : this.numeroPuro(raw);
+    };
+
+    const socio1 = String(domValor('editar-socio-1', this.itemEdicion.nombre_socio_1 || this.itemEdicion.socio_1)).trim();
+    const socio2 = String(domValor('editar-socio-2', this.itemEdicion.nombre_socio_2 || this.itemEdicion.socio_2)).trim();
+    const moneda = String(domValor('editar-moneda-recibo', this.itemEdicion.moneda_recibo || this.itemEdicion.moneda || 'USDT')).trim().toUpperCase();
+    const montoRecibo = this.truncar(domNumero('editar-monto-recibo', this.itemEdicion.monto_recibo ?? this.itemEdicion.monto), 2);
+    const tasa1 = domNumero('editar-tasa-1', this.itemEdicion.tasa_1);
+    const tasa2 = domNumero('editar-tasa-2', this.itemEdicion.tasa_2);
+    const monto1 = domNumero('editar-monto-1', this.itemEdicion.monto_1);
+    const monto2 = domNumero('editar-monto-2', this.itemEdicion.monto_2);
+
+    this.itemEdicion.monto_1 = monto1;
+    this.itemEdicion.monto_2 = monto2;
+    this.recalcularME(1);
+    this.recalcularME(2);
+    const me1 = this.numeroPuro(this.itemEdicion.me1);
+    const me2 = this.numeroPuro(this.itemEdicion.me2);
 
     this.errorSocios = false;
     this.errorMontoRecibo = false;
@@ -1241,7 +1267,7 @@
       fallar('La tasa del Socio 2 debe ser mayor que cero.');
       return;
     }
-    if (!(this.numeroPuro(this.itemEdicion.monto_1) > 0) || !(this.numeroPuro(this.itemEdicion.monto_2) > 0)) {
+    if (!(monto1 > 0) || !(monto2 > 0)) {
       this.errorMontos = true;
       fallar('Los montos de Socio 1 y Socio 2 deben ser mayores que cero.');
       return;
@@ -1254,30 +1280,31 @@
       fallar('Falta la tasa de la moneda base de uno de los socios.');
       return;
     }
-    if (this.numeroPuro(this.itemEdicion.me1) === 0 || this.numeroPuro(this.itemEdicion.me2) === 0) {
+    if (me1 === 0 || me2 === 0) {
       fallar('El equivalente ME calculado no es válido; revisa las tasas.');
       return;
     }
 
     const payload = {
-      banco: String(this.itemEdicion.banco || '').trim(),
-      referencia: String(this.itemEdicion.referencia || '').trim(),
-      titular: String(this.itemEdicion.titular || '').trim(),
+      banco: String(domValor('editar-banco', this.itemEdicion.banco)).trim(),
+      referencia: String(domValor('editar-referencia', this.itemEdicion.referencia)).trim(),
+      titular: String(domValor('editar-titular', this.itemEdicion.titular)).trim(),
       monto_recibo: montoRecibo,
       moneda_recibo: moneda,
       socio_1: socio1,
-      monto_1: this.numeroPuro(this.itemEdicion.monto_1),
+      monto_1: monto1,
       tasa_1: tasa1,
-      me1: this.numeroPuro(this.itemEdicion.me1),
+      me1: me1,
       socio_2: socio2,
-      monto_2: this.numeroPuro(this.itemEdicion.monto_2),
+      monto_2: monto2,
       tasa_2: tasa2,
-      me2: this.numeroPuro(this.itemEdicion.me2)
+      me2: me2
     };
 
+    console.log('[Hooty] Enviando payload PUT:', payload);
     this.guardando = true;
     try {
-      const { guardarCambiosComprobante } = await import('/comprobantes/js/modules/comprobantes/services/comprobantesApiService.js?v=20261030_02');
+      const { guardarCambiosComprobante } = await import('/comprobantes/js/modules/comprobantes/services/comprobantesApiService.js?v=20261030_04');
       const actualizado = await guardarCambiosComprobante(hashTarget, payload);
 
       window.dispatchEvent(new CustomEvent('comprobante-actualizado', {
@@ -1386,6 +1413,7 @@
                 <div>
                   <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Banco</label>
                   <input type="text"
+                         id="editar-banco"
                          x-model="itemEdicion.banco"
                          placeholder="BINANCE"
                          class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none uppercase focus:border-cyan-400">
@@ -1393,6 +1421,7 @@
                 <div>
                   <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Nº Referencia</label>
                   <input type="text"
+                         id="editar-referencia"
                          x-model="itemEdicion.referencia"
                          placeholder="418926466452"
                          class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-cyan-300 font-mono font-bold outline-none focus:border-cyan-400">
@@ -1400,6 +1429,7 @@
                 <div>
                   <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Titular Cuenta</label>
                   <input type="text"
+                         id="editar-titular"
                          x-model="itemEdicion.titular"
                          placeholder="NOMBRE DEL SOCIO"
                          class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-white font-bold outline-none uppercase focus:border-cyan-400">
@@ -1567,6 +1597,7 @@
               </button>
               <button id="btn-guardar-comprobante"
                       type="button"
+                      @click="guardarModal()"
                       :disabled="guardando"
                       class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black shadow-lg shadow-cyan-950/50 transition-all active:scale-95 text-xs cursor-pointer disabled:opacity-50">
                 <span x-show="!guardando">💾 Guardar Cambios</span>

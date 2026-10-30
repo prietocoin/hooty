@@ -210,11 +210,12 @@ func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch C
 	}
 
 	tag, err := tx.Exec(ctx, sqlUpdateComprobante,
-		hash,
-		existing.Banco, existing.Referencia, existing.Titular,
 		existing.MontoRecibo, existing.MonedaRecibo,
-		existing.Socio1, existing.Monto1, existing.Tasa1, existing.ME1,
-		existing.Socio2, existing.Monto2, existing.Tasa2, existing.ME2,
+		existing.Socio1, existing.Socio2,
+		existing.Tasa1, existing.Tasa2,
+		existing.Monto1, existing.Monto2, existing.ME1, existing.ME2,
+		existing.Banco, existing.Titular, existing.Referencia,
+		hash,
 	)
 	if err != nil {
 		return ComprobanteRow{}, fmt.Errorf("api: actualizar comprobante: %w", err)
@@ -648,21 +649,21 @@ LIMIT 2000`)
 // no con la hora del proceso.
 const sqlUpdateComprobante = `
 UPDATE comprobantes SET
-    banco = $2,
-    referencia = $3,
-    titular = $4,
-    monto_recibo = $5,
-    moneda_recibo = $6,
-    socio_1 = $7,
-    monto_1 = $8,
-    tasa_1 = $9,
-    me1 = $10,
-    socio_2 = $11,
-    monto_2 = $12,
-    tasa_2 = $13,
-    me2 = $14,
+    monto_recibo = $1,
+    moneda_recibo = $2,
+    socio_1 = $3,
+    socio_2 = $4,
+    tasa_1 = $5,
+    tasa_2 = $6,
+    monto_1 = $7,
+    monto_2 = $8,
+    me1 = $9,
+    me2 = $10,
+    banco = $11,
+    titular = $12,
+    referencia = $13,
     actualizado_en = NOW()
-WHERE hash_largo = $1`
+WHERE hash_largo = $14`
 
 const sqlComprobanteColumns = `
     c.hash_largo,

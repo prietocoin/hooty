@@ -311,9 +311,18 @@ export async function guardarCambiosComprobante(hashLargo, payload = {}) {
     body: JSON.stringify(body)
   });
 
-  const data = await res.json().catch(() => ({}));
+  const raw = await res.text();
+  let data = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch (error) {
+      data = {};
+    }
+  }
   if (!res.ok || data?.success === false) {
-    throw new Error(data?.error || data?.message || `HTTP Error: ${res.status}`);
+    console.error('[Hooty] Error en PUT:', res.status, raw);
+    throw new Error(data?.error || data?.message || raw || `HTTP Error: ${res.status}`);
   }
   return data;
 }

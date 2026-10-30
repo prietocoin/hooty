@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"hooty/internal/domain"
 )
 
@@ -204,6 +206,13 @@ func (h *Handler) UpdateComprobante(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		h.log.Error("hooty.api.comprobante_update", "hash", hash, "error", err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			// Los CHECK/FK/UNIQUE se devuelven con el mensaje de PostgreSQL
+			// para que la UI pueda mostrar la causa exacta al operador.
+			writeError(w, http.StatusUnprocessableEntity, pgErr.Message)
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
