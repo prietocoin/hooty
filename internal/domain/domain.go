@@ -127,6 +127,7 @@ type Perfil struct {
 	Nombre     string          `json:"nombre"`
 	MonedaBase string          `json:"moneda_base"`
 	Monedas    json.RawMessage `json:"monedas,omitempty"`
+	Herencia   bool            `json:"herencia,omitempty"`
 }
 
 // LoteTasas es el lote congelado que se usará para ambos lados.

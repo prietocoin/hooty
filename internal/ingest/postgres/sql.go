@@ -112,13 +112,22 @@ SELECT COALESCE(id_tasa, ''), COALESCE(tasas::text, '{}')
 FROM tasa`
 
 	sqlProfileByGroup = `
-SELECT COALESCE(nombre, ''), COALESCE(moneda_base, 'USDT'), COALESCE(monedas::text, '{}')
+SELECT COALESCE(nombre, ''), COALESCE(moneda_base, 'USDT'), COALESCE(monedas::text, '{}'),
+       COALESCE(herencia, FALSE)
 FROM perfil
 WHERE LOWER(BTRIM(COALESCE(id_grupo, ''))) = LOWER(BTRIM($1))
    OR LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))
 ORDER BY
     (LOWER(BTRIM(COALESCE(id_grupo, ''))) = LOWER(BTRIM($1))) DESC,
     nombre ASC
+LIMIT 1`
+
+	sqlFunddaProfile = `
+SELECT COALESCE(nombre, ''), COALESCE(moneda_base, 'USDT'), COALESCE(monedas::text, '{}'),
+       COALESCE(herencia, FALSE)
+FROM perfil
+WHERE UPPER(BTRIM(COALESCE(nombre, ''))) = 'FUNDDA'
+ORDER BY nombre ASC
 LIMIT 1`
 
 	sqlSchemaColumns = `

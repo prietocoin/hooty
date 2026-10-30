@@ -7,56 +7,55 @@ import (
 	"hooty/internal/domain"
 )
 
-func TestSimularLiquidacionUsaFormulaCanonica(t *testing.T) {
-	t.Parallel()
-
-	perfil1 := domain.Perfil{Nombre: "CHASAN", MonedaBase: "USD"}
-	perfil2 := domain.Perfil{Nombre: "NELSY", MonedaBase: "PEN"}
-	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{
-		"USD": 1, "PEN": 3.7,
-		"USD_1": 1, "USD_2": 3.7,
-	}}
-
-	resultado, err := SimularLiquidacion(SimulacionInput{
-		MonedaRecibo: "USD",
-		MontoRecibo:  100,
-		Socio1:       "CHASAN",
-		Socio2:       "NELSY",
-		LoteTasa:     "T070",
-	}, perfil1, perfil2, lote)
-	if err != nil {
-		t.Fatalf("simulación válida rechazada: %v", err)
-	}
-	if resultado.Tasa1 != 1 || resultado.Monto1 != 100 || resultado.ME1 != 100 {
-		t.Fatalf("lado 1 inesperado: %+v", resultado)
-	}
-	if resultado.Tasa2 != 3.7 || resultado.Monto2 != -27.02 || resultado.ME2 != -7.30 {
-		t.Fatalf("lado 2 inesperado: %+v", resultado)
-	}
-}
-
-func TestSimularLiquidacionResuelveTasasPorSocio(t *testing.T) {
+func TestSimularLiquidacionIndependienteConSpreadYPolaridad(t *testing.T) {
 	t.Parallel()
 
 	perfil1 := domain.Perfil{
 		Nombre: "TORRES", MonedaBase: "USD",
-		Monedas: json.RawMessage(`{"ARS":{"activo":true,"tipo":"D"}}`),
+		Monedas: json.RawMessage(`{"ARS":{"activo":true,"tipo":"D","polar_D":"+","porcentaje":{"deposito":0,"pago":0}}}`),
+	}
+	perfil2 := domain.Perfil{
+		Nombre: "NELSY", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"activo":true,"tipo":"D","polar_D":"-","porcentaje":{"deposito":10,"pago":0}}}`),
+	}
+	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1, "ARS": 1663}}
+
+	resultado, err := SimularLiquidacion(SimulacionInput{
+		MonedaRecibo: "ARS",
+		MontoRecibo:  166300,
+		Socio1:       "TORRES",
+		Socio2:       "NELSY",
+	}, perfil1, perfil2, domain.Perfil{}, lote)
+	if err != nil {
+		t.Fatalf("simulación válida rechazada: %v", err)
+	}
+	if resultado.Tasa1 != 1663 || resultado.Monto1 != 100 || resultado.ME1 != 100 {
+		t.Fatalf("lado 1 inesperado: %+v", resultado)
+	}
+	if resultado.Tasa2 != 1829 || resultado.Monto2 != -90.92 || resultado.ME2 != -90.92 {
+		t.Fatalf("el lado 2 debe usar su propio spread y polaridad: %+v", resultado)
+	}
+}
+
+func TestSimularLiquidacionTasaFaltanteSoloAfectaSuLado(t *testing.T) {
+	t.Parallel()
+
+	perfil1 := domain.Perfil{
+		Nombre: "TORRES", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"activo":true,"tipo":"D","polar_D":"+"}}`),
 	}
 	perfil2 := domain.Perfil{
 		Nombre: "NELSY", MonedaBase: "USD",
 		Monedas: json.RawMessage(`{"COP":{"activo":true,"tipo":"D"}}`),
 	}
-	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{
-		"USD": 1,
-		"ARS": 3145,
-	}}
+	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1, "ARS": 3145}}
 
 	resultado, err := SimularLiquidacion(SimulacionInput{
 		MonedaRecibo: "ARS",
 		MontoRecibo:  314500,
 		Socio1:       "TORRES",
 		Socio2:       "NELSY",
-	}, perfil1, perfil2, lote)
+	}, perfil1, perfil2, domain.Perfil{}, lote)
 	if err != nil {
 		t.Fatalf("simulación con un socio sin la moneda rechazada: %v", err)
 	}
@@ -68,30 +67,30 @@ func TestSimularLiquidacionResuelveTasasPorSocio(t *testing.T) {
 	}
 }
 
-func TestSimularLiquidacionSinMonedaConfiguradaDevuelveCero(t *testing.T) {
+func TestSimularLiquidacionSinTasaEnLoteDevuelveCero(t *testing.T) {
 	t.Parallel()
 
 	perfil1 := domain.Perfil{
 		Nombre: "TORRES", MonedaBase: "USD",
-		Monedas: json.RawMessage(`{"COP":{"activo":true}}`),
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"+"}}`),
 	}
 	perfil2 := domain.Perfil{
 		Nombre: "NELSY", MonedaBase: "USD",
-		Monedas: json.RawMessage(`{"PEN":{"activo":true}}`),
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"-"}}`),
 	}
-	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1, "ARS": 3145}}
+	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1}}
 
 	resultado, err := SimularLiquidacion(SimulacionInput{
 		MonedaRecibo: "ARS",
 		MontoRecibo:  314500,
 		Socio1:       "TORRES",
 		Socio2:       "NELSY",
-	}, perfil1, perfil2, lote)
+	}, perfil1, perfil2, domain.Perfil{}, lote)
 	if err != nil {
-		t.Fatalf("simulación sin moneda configurada rechazada: %v", err)
+		t.Fatalf("simulación sin tasa de divisa rechazada: %v", err)
 	}
 	if resultado.Tasa1 != 0 || resultado.Tasa2 != 0 {
-		t.Fatalf("ningún socio debe recibir la tasa genérica sin tener la moneda: %+v", resultado)
+		t.Fatalf("sin tasa en el lote ningún lado debe inventar una: %+v", resultado)
 	}
 	if resultado.Monto1 != 0 || resultado.Monto2 != 0 || resultado.ME1 != 0 || resultado.ME2 != 0 {
 		t.Fatalf("montos deben quedar en cero sin tasa: %+v", resultado)
@@ -101,8 +100,14 @@ func TestSimularLiquidacionSinMonedaConfiguradaDevuelveCero(t *testing.T) {
 func TestSimularLiquidacionRespetaTasasExplicitas(t *testing.T) {
 	t.Parallel()
 
-	perfil1 := domain.Perfil{Nombre: "TORRES", MonedaBase: "USD"}
-	perfil2 := domain.Perfil{Nombre: "NELSY", MonedaBase: "USD"}
+	perfil1 := domain.Perfil{
+		Nombre: "TORRES", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"+"}}`),
+	}
+	perfil2 := domain.Perfil{
+		Nombre: "NELSY", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"-"}}`),
+	}
 	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1}}
 	resultado, err := SimularLiquidacion(SimulacionInput{
 		MonedaRecibo: "ARS",
@@ -111,7 +116,7 @@ func TestSimularLiquidacionRespetaTasasExplicitas(t *testing.T) {
 		Socio2:       "NELSY",
 		Tasa1:        1629,
 		Tasa2:        1596,
-	}, perfil1, perfil2, lote)
+	}, perfil1, perfil2, domain.Perfil{}, lote)
 	if err != nil {
 		t.Fatalf("simulación con tasas explícitas rechazada: %v", err)
 	}
@@ -120,6 +125,37 @@ func TestSimularLiquidacionRespetaTasasExplicitas(t *testing.T) {
 	}
 	if resultado.Monto1 != 30.07 || resultado.Monto2 != -30.70 {
 		t.Fatalf("montos inesperados: %+v", resultado)
+	}
+}
+
+func TestSimularLiquidacionAplicaHerenciaDeFundda(t *testing.T) {
+	t.Parallel()
+
+	fundda := domain.Perfil{
+		Nombre: "FUNDDA", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"+","porcentaje":{"deposito":5}}}`),
+	}
+	perfil1 := domain.Perfil{
+		Nombre: "TORRES", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"+","porcentaje":{"deposito":0}}}`),
+	}
+	perfil2 := domain.Perfil{Nombre: "NELSY", MonedaBase: "USD", Herencia: true}
+	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1, "ARS": 1663}}
+
+	resultado, err := SimularLiquidacion(SimulacionInput{
+		MonedaRecibo: "ARS",
+		MontoRecibo:  166300,
+		Socio1:       "TORRES",
+		Socio2:       "NELSY",
+	}, perfil1, perfil2, fundda, lote)
+	if err != nil {
+		t.Fatalf("simulación con herencia rechazada: %v", err)
+	}
+	if resultado.Tasa2 != 1746 {
+		t.Fatalf("el lado con herencia debe usar el spread de FUNDDA: %+v", resultado)
+	}
+	if resultado.Monto2 >= 0 {
+		t.Fatalf("la herencia debe invertir el lado heredado: %+v", resultado)
 	}
 }
 
@@ -133,7 +169,7 @@ func TestSimularLiquidacionRechazaMismoSocio(t *testing.T) {
 		MontoRecibo:  100,
 		Socio1:       "CHASAN",
 		Socio2:       "chasan",
-	}, perfil, perfil, lote)
+	}, perfil, perfil, domain.Perfil{}, lote)
 	if err == nil {
 		t.Fatal("el mismo socio debe rechazarse")
 	}

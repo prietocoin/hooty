@@ -77,7 +77,11 @@ func (l *Liquidator) Simular(ctx context.Context, input ingest.SimulacionInput) 
 	if err != nil {
 		return ingest.SimulacionResult{}, err
 	}
-	return ingest.SimularLiquidacion(input, perfil1, perfil2, lote)
+	fundda, err := l.fundda(ctx)
+	if err != nil {
+		return ingest.SimulacionResult{}, err
+	}
+	return ingest.SimularLiquidacion(input, perfil1, perfil2, fundda, lote)
 }
 
 func (l *Liquidator) lote(ctx context.Context, id string) (domain.LoteTasas, error) {
@@ -114,12 +118,31 @@ func (l *Liquidator) perfil(ctx context.Context, grupo string) (domain.Perfil, e
 	var perfil domain.Perfil
 	var monedas []byte
 	err := l.pool.QueryRow(ctx, sqlProfileByGroup, strings.TrimSpace(grupo)).
-		Scan(&perfil.Nombre, &perfil.MonedaBase, &monedas)
+		Scan(&perfil.Nombre, &perfil.MonedaBase, &monedas, &perfil.Herencia)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Perfil{}, domain.Validationf("el grupo %q no está registrado en la vista perfil", grupo)
 	}
 	if err != nil {
 		return domain.Perfil{}, fmt.Errorf("postgres: leer perfil %q: %w", grupo, err)
+	}
+	perfil.Nombre = domain.CleanText(perfil.Nombre, 120)
+	perfil.MonedaBase = domain.NormalizeCurrency(perfil.MonedaBase, "USDT")
+	perfil.Monedas = json.RawMessage(monedas)
+	return perfil, nil
+}
+
+// fundda devuelve el perfil matriz para resolver la herencia de monedas. Si no
+// existe, devuelve un perfil vacío sin romper la simulación.
+func (l *Liquidator) fundda(ctx context.Context) (domain.Perfil, error) {
+	var perfil domain.Perfil
+	var monedas []byte
+	err := l.pool.QueryRow(ctx, sqlFunddaProfile).
+		Scan(&perfil.Nombre, &perfil.MonedaBase, &monedas, &perfil.Herencia)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Perfil{}, nil
+	}
+	if err != nil {
+		return domain.Perfil{}, fmt.Errorf("postgres: leer perfil FUNDDA: %w", err)
 	}
 	perfil.Nombre = domain.CleanText(perfil.Nombre, 120)
 	perfil.MonedaBase = domain.NormalizeCurrency(perfil.MonedaBase, "USDT")
