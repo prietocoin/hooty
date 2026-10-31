@@ -10,10 +10,13 @@ func pintarTasasTarjeta(lienzo *gg.Context, x, y float64, datos Tarjeta) error {
 	compra := textoDeTasa(datos.Compra)
 	venta := textoDeTasa(datos.Venta)
 
-	columnaVenta := 52.0
+	if err := fuente(lienzo, 20); err != nil {
+		return err
+	}
+	columnaVenta := maxFloat(68, ancho(lienzo, venta))
 	ventaDerecha := derecha
-	compraDerecha := derecha - columnaVenta - 24
-	separadorX := derecha - columnaVenta - 12
+	compraDerecha := derecha - columnaVenta - 26
+	separadorX := derecha - columnaVenta - 13
 
 	if err := fuente(lienzo, 9); err != nil {
 		return err
@@ -35,4 +38,11 @@ func pintarTasasTarjeta(lienzo *gg.Context, x, y float64, datos Tarjeta) error {
 	lienzo.LineTo(separadorX, centro+18)
 	lienzo.Stroke()
 	return nil
+}
+
+func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
 }

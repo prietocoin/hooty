@@ -5,7 +5,7 @@
 
 import { obtenerClaseTalla } from '../utils/tallaSocio.js';
 import { obtenerTasasVigentes } from '../services/tasasMercadoService.js';
-import { despacharTasaIndividual } from '../services/despachoTasaIndividualService.js?v=20261031_01';
+import { despacharTasaIndividual } from '../services/despachoTasaIndividualService.js?v=20261031_02';
 
 export function createTasasState() {
   return {

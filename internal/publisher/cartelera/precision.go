@@ -1,9 +1,29 @@
 package cartelera
 
-import "hooty/internal/domain"
+import (
+	"math"
 
-// ApplyRatePrecision aplica la regla financiera inquebrantable: truncamiento
-// estricto a dos decimales, sin redondeo y sin precisión adaptativa.
+	"hooty/internal/domain"
+)
+
+// ApplyRatePrecision aplica la regla financiera de presentación de tasas:
+//   - >= 100: entero truncado,
+//   - >= 1 y < 100: dos decimales truncados,
+//   - < 1: tres cifras significativas truncadas.
+//
+// Nunca redondea.
 func ApplyRatePrecision(value float64) float64 {
-	return domain.Truncar2(value)
+	if math.IsNaN(value) || math.IsInf(value, 0) || value == 0 {
+		return 0
+	}
+	abs := math.Abs(value)
+	switch {
+	case abs >= 100:
+		return math.Trunc(value)
+	case abs >= 1:
+		return domain.Truncar2(value)
+	default:
+		decimales := int(2 - math.Floor(math.Log10(abs)))
+		return domain.TruncarDecimales(value, decimales)
+	}
 }

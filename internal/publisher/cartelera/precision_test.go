@@ -2,15 +2,16 @@ package cartelera
 
 import "testing"
 
-func TestApplyRatePrecisionTruncaSiempreDosDecimales(t *testing.T) {
+func TestApplyRatePrecisionRespetaTresReglas(t *testing.T) {
 	t.Parallel()
 
 	casos := map[float64]float64{
-		1652.409: 1652.40,
-		1587.609: 1587.60,
-		1.239:    1.23,
-		0.279:    0.27,
-		-1.239:   -1.23,
+		1652.409: 1652,
+		1035.84:  1035,
+		5.649:    5.64,
+		19.999:   19.99,
+		0.9438:   0.943,
+		0.09438:  0.0943,
 	}
 	for entrada, esperado := range casos {
 		if got := ApplyRatePrecision(entrada); got != esperado {
@@ -19,15 +20,19 @@ func TestApplyRatePrecisionTruncaSiempreDosDecimales(t *testing.T) {
 	}
 }
 
-func TestTextoDeTasaMuestraSiempreDosDecimales(t *testing.T) {
+func TestTextoDeTasaMuestraReglasSinRedondear(t *testing.T) {
 	t.Parallel()
 
-	valor := 1652.40
-	if got := textoDeTasa(&valor); got != "1652.40" {
-		t.Fatalf("textoDeTasa = %q", got)
+	casos := map[float64]string{
+		1652.40: "1652",
+		5.649:   "5.64",
+		0.9438:  "0.943",
+		0.09438: "0.0943",
 	}
-	cero := 0.0
-	if got := textoDeTasa(&cero); got != "0.00" {
-		t.Fatalf("textoDeTasa(0) = %q", got)
+	for entrada, esperado := range casos {
+		valor := entrada
+		if got := textoDeTasa(&valor); got != esperado {
+			t.Fatalf("textoDeTasa(%v) = %q, se esperaba %q", entrada, got, esperado)
+		}
 	}
 }

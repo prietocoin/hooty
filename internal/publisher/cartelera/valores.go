@@ -3,6 +3,8 @@ package cartelera
 import (
 	"math"
 	"strconv"
+
+	"hooty/internal/domain"
 )
 
 // orElse devuelve el primer valor no vacío, o cadena vacía si todos lo están.
@@ -34,11 +36,25 @@ func tasa(valor float64) *float64 {
 	return &valor
 }
 
-// textoDeTasa traduce una tasa al texto que se pinta: siempre dos decimales
-// truncados, sin quitar ceros ni redondear. Un nil se muestra como "null".
+// textoDeTasa traduce una tasa al texto que se pinta con la regla financiera:
+// entero para >=100, dos decimales para >=1 y tres cifras significativas para
+// valores menores. Nunca redondea.
 func textoDeTasa(valor *float64) string {
 	if valor == nil {
 		return "null"
 	}
-	return strconv.FormatFloat(*valor, 'f', 2, 64)
+	num := *valor
+	if num == 0 {
+		return "0.00"
+	}
+	abs := math.Abs(num)
+	switch {
+	case abs >= 100:
+		return strconv.FormatFloat(math.Trunc(num), 'f', 0, 64)
+	case abs >= 1:
+		return strconv.FormatFloat(domain.Truncar2(num), 'f', 2, 64)
+	default:
+		decimales := int(2 - math.Floor(math.Log10(abs)))
+		return strconv.FormatFloat(domain.TruncarDecimales(num, decimales), 'f', decimales, 64)
+	}
 }

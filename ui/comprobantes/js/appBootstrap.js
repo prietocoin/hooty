@@ -4,10 +4,10 @@
  */
 
 import { createRouterState } from './shared/states/routerState.js';
-import { createTasasState } from './modules/tasas/states/tasasState.js?v=20261031_01';
+import { createTasasState } from './modules/tasas/states/tasasState.js?v=20261031_02';
 import { createDirectorioState } from './modules/directorio/states/directorioState.js?v=20261031_02';
-import { comprobantesState } from './modules/comprobantes/states/comprobantesState.js?v=20261031_01';
-import { createComprobantesReporteState } from './modules/comprobantes/states/comprobantesReporteState.js?v=20261031_01';
+import { comprobantesState } from './modules/comprobantes/states/comprobantesState.js?v=20261031_02';
+import { createComprobantesReporteState } from './modules/comprobantes/states/comprobantesReporteState.js?v=20261031_02';
 import { escucharSociosActualizados } from '../../shared/js/sync.js';
 
 /**

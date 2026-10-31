@@ -2,10 +2,13 @@
  * @file tasas.js
  * @description Formato estricto de tasas para el módulo de perfiles.
  *
- * Regla financiera: truncamiento estricto a 2 decimales, siempre mostrando
- * ambos decimales. Sin Math.round, sin toFixed que redondee y sin eliminar
- * ceros. El desplazamiento decimal se hace por cadena para evitar artefactos
- * binarios (4.29 * 100 = 428.99999999999994).
+ * Regla financiera:
+ *   >= 100       -> entero truncado
+ *   1.00 .. 99.99 -> dos decimales truncados
+ *   < 1.00       -> tres cifras significativas truncadas
+ *
+ * Sin Math.round ni toFixed que redondee. El desplazamiento decimal se hace por
+ * cadena para evitar artefactos binarios.
  */
 
 function truncarA(valor, decimales) {
@@ -28,5 +31,18 @@ function truncarA(valor, decimales) {
 export function formatearTasaEstricta(valor) {
   const num = Number(valor);
   if (!Number.isFinite(num)) return '0.00';
-  return truncarA(num, 2).toFixed(2);
+  if (num === 0) return '0';
+
+  const abs = Math.abs(num);
+
+  // >= 100: entero truncado.
+  if (abs >= 100) return String(Math.trunc(num));
+
+  // >= 1 y < 100: dos decimales truncados.
+  if (abs >= 1) return truncarA(num, 2).toFixed(2);
+
+  // < 1: tres cifras significativas truncadas.
+  const orden = Math.floor(Math.log10(abs));
+  const decimales = Math.max(0, 3 - 1 - orden);
+  return truncarA(num, decimales).toFixed(decimales);
 }

@@ -1,5 +1,5 @@
 import { CATALOGO_MONEDAS } from '../catalog.js';
-import { formatearTasaEstricta } from '../utils/tasas.js?v=20261031_03';
+import { formatearTasaEstricta } from '../utils/tasas.js?v=20261031_04';
 import { escapeHTML } from '../../../shared/js/dom.js';
 
 /** Truncamiento estricto a 2 decimales (sin Math.round). */
@@ -32,7 +32,7 @@ export function baseMoneda(regla, tasasBase) {
 export function tasaResultante(base, porcentaje, tipo) {
   const pct = Math.abs(Number(porcentaje) || 0) / 100;
   const factor = String(tipo).toUpperCase() === 'P' ? 1 - pct : 1 + pct;
-  return truncar2((Number(base) || 0) * factor);
+  return (Number(base) || 0) * factor;
 }
 
 /** Tasa resultante del spread, formateada con la regla estricta. */

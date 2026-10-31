@@ -1,6 +1,6 @@
 import { api } from './api.js?v=20261031_03';
 import { state } from './store.js?v=20261024_99_FIX_TASAS';
-import { crearEditor } from './controllers/editor.js?v=20261031_05';
+import { crearEditor } from './controllers/editor.js?v=20261031_06';
 import { crearDirectorio } from './controllers/directorio.js?v=20261031_01';
 import { crearAcciones } from './controllers/acciones.js?v=20261031_02';
 

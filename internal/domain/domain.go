@@ -394,6 +394,11 @@ func Truncar2(value float64) float64 {
 	return truncarDecimales(value, 2)
 }
 
+// TruncarDecimales corta hacia cero la cantidad exacta de decimales indicada.
+func TruncarDecimales(value float64, decimals int) float64 {
+	return truncarDecimales(value, decimals)
+}
+
 // Truncar6 corta a seis decimales exactos para tasas.
 func Truncar6(value float64) float64 {
 	return truncarDecimales(value, 6)

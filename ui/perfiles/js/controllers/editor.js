@@ -4,12 +4,12 @@ import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import {
   esHerencia, nuevaRegla, payloadGuardar, reglasSegunModo
 } from '../domain.js?v=20261031_02';
-import { renderModalSocio } from '../components/modal-socio.js?v=20261031_03';
+import { renderModalSocio } from '../components/modal-socio.js?v=20261031_04';
 import {
   baseMoneda, renderReglasEditor, tasaResultante
-} from '../components/reglas-editor.js?v=20261031_03';
-import { formatearTasaEstricta } from '../utils/tasas.js?v=20261031_03';
-import { renderReglasHerencia } from '../components/reglas-herencia.js?v=20261031_03';
+} from '../components/reglas-editor.js?v=20261031_04';
+import { formatearTasaEstricta } from '../utils/tasas.js?v=20261031_04';
+import { renderReglasHerencia } from '../components/reglas-herencia.js?v=20261031_04';
 import { notificarSociosActualizados } from '../../../shared/js/sync.js';
 
 export function crearEditor({ recargar = async () => {}, alertar = globalThis.alert, confirmar = globalThis.confirm } = {}) {
