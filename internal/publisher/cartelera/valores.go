@@ -34,18 +34,11 @@ func tasa(valor float64) *float64 {
 	return &valor
 }
 
-// textoDeTasa traduce una tasa al texto que se pinta, con la regla del original:
-// `String(valor)` de JavaScript.
-//
-// Un nil es la forma en que la vista representa un valor no finito, y se pinta
-// "null", exactamente como hacía la plantilla cuando el cálculo producía NaN. El
-// cero se normaliza para no imprimir "-0", que JavaScript también oculta.
+// textoDeTasa traduce una tasa al texto que se pinta: siempre dos decimales
+// truncados, sin quitar ceros ni redondear. Un nil se muestra como "null".
 func textoDeTasa(valor *float64) string {
 	if valor == nil {
 		return "null"
 	}
-	if *valor == 0 {
-		return "0"
-	}
-	return strconv.FormatFloat(*valor, 'f', -1, 64)
+	return strconv.FormatFloat(*valor, 'f', 2, 64)
 }

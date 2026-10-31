@@ -9,11 +9,11 @@ import {
   fetchComprobantesHasta,
   fetchComprobantesPagina
 } from './comprobantesApiService.js?v=20261030_04';
-import { prepararEdicionComprobante } from './comprobantesMapperService.js?v=20261025_02';
+import { prepararEdicionComprobante } from './comprobantesMapperService.js?v=20261031_01';
 import {
   aplicarRangoHash,
   ordenarComprobantes
-} from './comprobantesFilterService.js?v=20261025_02';
+} from './comprobantesFilterService.js?v=20261031_01';
 
 /**
  * Carga una página real de comprobantes para la vista de auditoría.

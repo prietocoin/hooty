@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261031_02"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261031_03"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -1055,7 +1055,15 @@
   },
 
   formatearME(valor) {
-    return Number(valor || 0).toFixed(2);
+    const num = Number(valor || 0);
+    if (!Number.isFinite(num)) return '0.00';
+    const signo = num < 0 ? -1 : 1;
+    const abs = Math.abs(num);
+    const desplazado = Number(`${abs}e2`);
+    const truncado = Number.isFinite(desplazado)
+      ? Math.trunc(desplazado) / 100
+      : Math.trunc(abs * 100) / 100;
+    return (signo * truncado).toFixed(2);
   },
 
   async actualizarSimulacion(origen = '') {

@@ -321,25 +321,7 @@ func loteRate(lote domain.LoteTasas, currency string) (float64, bool) {
 	return 0, false
 }
 
-const epsilonTasa = 0.0000001
-
-// truncarTasaSnapshot replica la precisión adaptativa del motor canónico.
+// truncarTasaSnapshot aplica la regla financiera: dos decimales truncados.
 func truncarTasaSnapshot(value float64) float64 {
-	absolute := math.Abs(value)
-	if absolute == 0 || math.IsNaN(absolute) || math.IsInf(absolute, 0) {
-		return 1
-	}
-	rounded := math.Round(absolute*1e8) / 1e8
-	var result float64
-	switch {
-	case rounded > 99.99:
-		result = math.Trunc(rounded)
-	case rounded >= 10:
-		result = math.Trunc((rounded+epsilonTasa)*100) / 100
-	default:
-		magnitude := math.Floor(math.Log10(rounded))
-		factor := math.Pow(10, 2-magnitude)
-		result = math.Trunc((rounded+epsilonTasa)*factor) / factor
-	}
-	return result
+	return domain.Truncar2(value)
 }

@@ -2,13 +2,8 @@
  * @file formatters.js
  * @description Regla universal de presentación de tasas y montos contables.
  *
- * Tasas:
- *   > 99.99        -> entero truncado ("1634")
- *   1.00 .. 99.99  -> dos decimales truncados ("5.30")
- *   < 1.00         -> tres cifras significativas truncadas ("0.985")
- *
- * Montos:
- *   siempre dos decimales truncados, sin separadores de miles ("1742.20").
+ * Tasas y montos: siempre dos decimales truncados hacia cero, sin redondear y
+ * sin eliminar los ceros ("1652.40").
  *
  * Prohibido redondear: no se usa Math.round en ningún punto.
  */
@@ -34,18 +29,11 @@ export function truncarDecimales(valor, decimales = 0) {
   return signo * (Math.trunc(desplazado) / Math.pow(10, lugares));
 }
 
-/** Formato universal de tasa según magnitud. */
+/** Formato universal de tasa: 2 decimales truncados, siempre visibles. */
 export function formatTasa(valor) {
   const num = Number(valor);
-  if (!Number.isFinite(num) || num === 0) return '0';
-
-  const abs = Math.abs(num);
-  if (abs > 99.99) return String(Math.trunc(num));
-  if (abs >= 1) return truncarDecimales(num, 2).toFixed(2);
-
-  const orden = Math.floor(Math.log10(abs));
-  const decimales = Math.max(0, 3 - 1 - orden);
-  return truncarDecimales(num, decimales).toFixed(decimales);
+  if (!Number.isFinite(num)) return '0.00';
+  return truncarDecimales(num, 2).toFixed(2);
 }
 
 /** Monto contable plano: dos decimales truncados, sin comas. */

@@ -1,12 +1,18 @@
 import { CATALOGO_MONEDAS } from '../catalog.js';
-import { formatearTasaEstricta } from '../utils/tasas.js?v=20261024_99_FIX_TASAS';
+import { formatearTasaEstricta } from '../utils/tasas.js?v=20261031_03';
 import { escapeHTML } from '../../../shared/js/dom.js';
 
 /** Truncamiento estricto a 2 decimales (sin Math.round). */
 export function truncar2(valor) {
   const num = Number(valor);
   if (!Number.isFinite(num)) return 0;
-  return Math.trunc(num * 100) / 100;
+  const signo = num < 0 ? -1 : 1;
+  const abs = Math.abs(num);
+  const desplazado = Number(`${abs}e2`);
+  const truncado = Number.isFinite(desplazado)
+    ? Math.trunc(desplazado) / 100
+    : Math.trunc(abs * 100) / 100;
+  return signo * truncado;
 }
 
 /** Tasa base de la divisa en el lote activo; cae al catálogo si no existe. */

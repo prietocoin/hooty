@@ -32,7 +32,7 @@ func TestSimularLiquidacionIndependienteConSpreadYPolaridad(t *testing.T) {
 	if resultado.Tasa1 != 1663 || resultado.Monto1 != 100 || resultado.ME1 != 100 {
 		t.Fatalf("lado 1 inesperado: %+v", resultado)
 	}
-	if resultado.Tasa2 != 1829 || resultado.Monto2 != -90.92 || resultado.ME2 != -90.92 {
+	if resultado.Tasa2 != 1829.30 || resultado.Monto2 != -90.90 || resultado.ME2 != -90.90 {
 		t.Fatalf("el lado 2 debe usar su propio spread y polaridad: %+v", resultado)
 	}
 }
@@ -151,7 +151,7 @@ func TestSimularLiquidacionAplicaHerenciaDeFundda(t *testing.T) {
 	if err != nil {
 		t.Fatalf("simulación con herencia rechazada: %v", err)
 	}
-	if resultado.Tasa2 != 1746 {
+	if resultado.Tasa2 != 1746.15 {
 		t.Fatalf("el lado con herencia debe usar el spread de FUNDDA: %+v", resultado)
 	}
 	if resultado.Monto2 >= 0 {

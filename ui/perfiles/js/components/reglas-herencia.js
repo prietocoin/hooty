@@ -1,5 +1,5 @@
 import { escapeHTML } from '../../../shared/js/dom.js';
-import { formatearTasaEstricta } from '../utils/tasas.js?v=20261024_99_FIX_TASAS';
+import { formatearTasaEstricta } from '../utils/tasas.js?v=20261031_03';
 
 function etiquetaBase(base) {
   return base ? formatearTasaEstricta(base) : '-';
