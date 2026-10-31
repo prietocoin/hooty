@@ -41,10 +41,17 @@ type Store interface {
 
 // Handler atiende las rutas GET /api/v1/*.
 type Handler struct {
-	store     Store
-	log       *slog.Logger
-	simulator Simulator
-	publisher RatePublisher
+	store       Store
+	log         *slog.Logger
+	simulator   Simulator
+	publisher   RatePublisher
+	newsletters NewsletterResolver
+}
+
+// NewsletterResolver resuelve el JID de un canal de WhatsApp a partir de su
+// código de invitación. Evolution no emite webhooks para canales.
+type NewsletterResolver interface {
+	ResolveNewsletterJID(ctx context.Context, inviteCode string) (string, error)
 }
 
 // RatePublisher despacha las carteleras del lote vigente.
@@ -91,6 +98,12 @@ func (h *Handler) WithPublisher(p RatePublisher) *Handler {
 	return h
 }
 
+// WithNewsletterResolver habilita la utilidad de resolución de canales.
+func (h *Handler) WithNewsletterResolver(r NewsletterResolver) *Handler {
+	h.newsletters = r
+	return h
+}
+
 // Register monta las rutas completas con método en el ServeMux principal.
 //
 // Go 1.22+ exige registrar el método en el patrón para que ServeMux haga el
@@ -128,6 +141,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/tasas/lote/{id}/{$}", h.DeleteLote)
 	mux.HandleFunc("GET /api/v1/reportes/filtros", h.ReportFilters)
 	mux.HandleFunc("GET /api/v1/reportes/filtros/{$}", h.ReportFilters)
+	mux.HandleFunc("GET /api/v1/admin/canales/resolver", h.ResolveNewsletter)
+	mux.HandleFunc("GET /api/v1/admin/canales/resolver/{$}", h.ResolveNewsletter)
 }
 
 // ServeHTTP conserva el router de compatibilidad para tests y consumidores
@@ -150,6 +165,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && path == "/api/v1/comprobantes/simular":
 		h.Simular(w, r)
+	case r.Method == http.MethodGet && path == "/api/v1/admin/canales/resolver":
+		h.ResolveNewsletter(w, r)
 	case r.Method == http.MethodPost && path == "/api/v1/perfiles/guardar":
 		h.SavePerfil(w, r)
 	case r.Method == http.MethodPost && path == "/api/v1/perfiles/apagar-todos":
@@ -205,6 +222,36 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Options(w http.ResponseWriter, _ *http.Request) {
 	setCORS(w)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ResolveNewsletter resuelve el JID de un canal desde su código de invitación.
+// Es una utilidad temporal de administración mientras Evolution no emite
+// webhooks para canales.
+func (h *Handler) ResolveNewsletter(w http.ResponseWriter, r *http.Request) {
+	code := strings.TrimSpace(r.URL.Query().Get("code"))
+	if code == "" {
+		writeError(w, http.StatusBadRequest, "code_required")
+		return
+	}
+	if h.newsletters == nil {
+		writeError(w, http.StatusServiceUnavailable, "newsletter_resolver_unavailable")
+		return
+	}
+
+	jid, err := h.newsletters.ResolveNewsletterJID(r.Context(), code)
+	if err != nil {
+		h.log.Error("hooty.api.newsletter_resolve", "code", code, "error", err)
+		writeError(w, http.StatusBadGateway, "newsletter_resolve_failed")
+		return
+	}
+
+	h.log.Info("newsletter_jid_encontrado", "jid", jid, "code", code)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success": true,
+		"id":      jid,
+		"jid":     jid,
+		"code":    code,
+	})
 }
 
 func (h *Handler) ListComprobantes(w http.ResponseWriter, r *http.Request) {

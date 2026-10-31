@@ -636,6 +636,56 @@ func TestApplyComprobantePatchTipoOp(t *testing.T) {
 	}
 }
 
+func TestResolveNewsletterEndpoint(t *testing.T) {
+	t.Parallel()
+
+	resolver := &fakeNewsletterResolver{jid: "120363000000000000@newsletter"}
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).WithNewsletterResolver(resolver).Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/canales/resolver?code=0029Vb7690K7z4kZ7c3Hz128", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if resolver.code != "0029Vb7690K7z4kZ7c3Hz128" {
+		t.Fatalf("code recibido = %q", resolver.code)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("respuesta inválida: %v", err)
+	}
+	if payload["id"] != resolver.jid || payload["jid"] != resolver.jid {
+		t.Fatalf("payload inesperado: %+v", payload)
+	}
+}
+
+func TestResolveNewsletterEndpointExigeCode(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).WithNewsletterResolver(&fakeNewsletterResolver{}).Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/canales/resolver", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, se esperaba 400", rec.Code)
+	}
+}
+
+type fakeNewsletterResolver struct {
+	code string
+	jid  string
+	err  error
+}
+
+func (f *fakeNewsletterResolver) ResolveNewsletterJID(_ context.Context, code string) (string, error) {
+	f.code = code
+	return f.jid, f.err
+}
+
 func TestTasasActivasInterpretaMostrar(t *testing.T) {
 	t.Parallel()
 
