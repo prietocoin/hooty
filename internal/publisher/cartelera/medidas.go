@@ -7,12 +7,13 @@ import "math"
 const (
 	anchoLienzo  = 640
 	margen       = 40.0
-	altoTarjeta  = 76.0
+	margenY      = 28.0
+	altoTarjeta  = 66.0
 	anchoTarjeta = 560.0
-	yTarjetas    = 130.0
-	baseAlto     = 260.0
-	pasoFila     = 88.0
-	altoMinimo   = 450.0
+	yTarjetas    = 92.0
+	baseAlto     = 180.0
+	pasoFila     = 74.0
+	altoMinimo   = 320.0
 
 	// Las tarjetas se dibujan dentro de su caja de borde: el relleno de 20 px y el
 	// contorno de 1 px van descontados del ancho, como en `box-sizing: border-box`.

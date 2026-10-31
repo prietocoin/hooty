@@ -5,22 +5,20 @@ import "github.com/fogleman/gg"
 // Medidas del encabezado: el logo manda la altura y el centro de la banda es el
 // punto donde se alinean el texto y la insignia.
 const (
-	altoLogo    = 52.0
+	altoLogo    = 44.0
 	separacion  = 10.0
-	centroLinea = margen + altoLogo/2
+	centroLinea = margenY + altoLogo/2
 )
 
-// pintarCabecera dibuja el logo, el nombre de la casa con el del socio y la
-// insignia OFICIAL. Si el logo no se pudiera cargar, el texto ocupa su lugar.
+// pintarCabecera dibuja el isotipo del búho, el nombre del socio y la insignia
+// OFICIAL. Se eliminó el prefijo FUNDABLOCK para dejar el nombre como protagonista.
 func pintarCabecera(lienzo *gg.Context, datos Payload) error {
 	x := pintarLogo(lienzo)
 
-	if err := fuente(lienzo, 26); err != nil {
+	if err := fuente(lienzo, 30); err != nil {
 		return err
 	}
-	x += escribirEspaciado(lienzo, "FUNDABLOCK", blanco, x, centroLinea) + 8
-	x += escribir(lienzo, "|", naranja, x, centroLinea) + 8
-	escribir(lienzo, datos.NombreSocio, gris, x, centroLinea)
+	escribir(lienzo, datos.NombreSocio, blanco, x, centroLinea)
 	return pintarOficial(lienzo)
 }
 

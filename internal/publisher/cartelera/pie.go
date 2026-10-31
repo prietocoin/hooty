@@ -15,7 +15,7 @@ func pintarPie(lienzo *gg.Context, datos Payload) error {
 	if err := fuente(lienzo, 15); err != nil {
 		return err
 	}
-	y := float64(lienzo.Height()) - margen - altoPie
+	y := float64(lienzo.Height()) - margenY - altoPie
 	pintarMarca(lienzo, margen, y)
 	pintarLote(lienzo, anchoLienzo-margen, y, datos)
 	return nil

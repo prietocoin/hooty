@@ -37,6 +37,6 @@ func pintarLogo(lienzo *gg.Context) float64 {
 	}
 	caja := imagen.Bounds()
 	ancho := math.Round(altoLogo * float64(caja.Dx()) / float64(caja.Dy()))
-	lienzo.DrawImage(escalar(imagen, int(ancho), int(altoLogo)), int(margen), int(margen))
+	lienzo.DrawImage(escalar(imagen, int(ancho), int(altoLogo)), int(margen), int(margenY))
 	return margen + ancho + separacion
 }
