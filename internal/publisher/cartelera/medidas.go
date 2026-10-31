@@ -7,23 +7,23 @@ import "math"
 const (
 	anchoLienzo  = 1080
 	margen       = 40.0
-	altoTarjeta  = 150.0
-	anchoTarjeta = 480.0
+	altoTarjeta  = 76.0
+	anchoTarjeta = 1000.0
 	yTarjetas    = 130.0
 	baseAlto     = 260.0
-	pasoFila     = 170.0
+	pasoFila     = 88.0
 	altoMinimo   = 450.0
 
 	// Las tarjetas se dibujan dentro de su caja de borde: el relleno de 20 px y el
-	// contorno de 1.5 px van descontados del ancho, como en `box-sizing: border-box`.
+	// contorno de 1 px van descontados del ancho, como en `box-sizing: border-box`.
 	rellenoTarjetaX   = 20.0
-	rellenoTarjetaY   = 14.0
-	bordeTarjetaAncho = 1.5
+	rellenoTarjetaY   = 12.0
+	bordeTarjetaAncho = 1.0
 )
 
-// filas cuenta las filas de dos tarjetas que necesita la cuadrícula.
+// filas cuenta las filas de una tarjeta que necesita la lista vertical.
 func filas(cantidad int) int {
-	return (cantidad + 1) / 2
+	return cantidad
 }
 
 // altoDelLienzo reproduce el cálculo del servicio original: una base fija más una

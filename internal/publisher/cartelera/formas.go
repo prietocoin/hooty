@@ -18,27 +18,14 @@ func pildora(lienzo *gg.Context, x, y, ancho, alto, radio float64, relleno, bord
 	lienzo.Stroke()
 }
 
-// tarjeta dibuja el marco de una tarjeta: fondo translúcido, contorno fino y la
-// franja azul superior que la plantilla declaraba como borde de 4 px.
+// tarjeta dibuja el marco de una fila: fondo sólido y contorno fino.
 func tarjeta(lienzo *gg.Context, x, y float64) {
-	marco := func() {
-		lienzo.DrawRoundedRectangle(x, y, anchoTarjeta, altoTarjeta, 16)
-	}
-	marco()
+	lienzo.DrawRoundedRectangle(x, y, anchoTarjeta, altoTarjeta, 16)
 	lienzo.SetColor(rellenoTarjeta)
 	lienzo.FillPreserve()
 	lienzo.SetColor(bordeTarjeta)
 	lienzo.SetLineWidth(bordeTarjetaAncho)
 	lienzo.Stroke()
-
-	// La franja se recorta contra el marco para que siga la curva de las esquinas,
-	// igual que un border-top con border-radius.
-	marco()
-	lienzo.Clip()
-	lienzo.DrawRectangle(x, y, anchoTarjeta, 4)
-	lienzo.SetColor(azul)
-	lienzo.Fill()
-	lienzo.ResetClip()
 }
 
 // bandera dibuja la imagen con esquinas redondeadas y su contorno tenue. El

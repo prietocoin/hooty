@@ -11,6 +11,7 @@ var (
 	blanco  = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 	gris    = color.NRGBA{R: 148, G: 163, B: 184, A: 255} // #94a3b8
 	azul    = color.NRGBA{R: 59, G: 130, B: 246, A: 255}  // #3b82f6
+	cian    = color.NRGBA{R: 34, G: 211, B: 238, A: 255}  // #22d3ee
 	naranja = color.NRGBA{R: 217, G: 119, B: 6, A: 255}   // #d97706
 	ambar   = color.NRGBA{R: 251, G: 191, B: 36, A: 255}  // #fbbf24
 	verde   = color.NRGBA{R: 52, G: 211, B: 153, A: 255}  // #34d399
@@ -26,8 +27,8 @@ var (
 	separador    = color.NRGBA{R: 255, G: 255, B: 255, A: 38} // rgba(255,255,255,0.15)
 	bordeBandera = color.NRGBA{R: 255, G: 255, B: 255, A: 51} // rgba(255,255,255,0.2)
 
-	rellenoTarjeta = color.NRGBA{R: 11, G: 19, B: 38, A: 217}  // rgba(11,19,38,0.85)
-	bordeTarjeta   = color.NRGBA{R: 59, G: 130, B: 246, A: 89} // rgba(59,130,246,0.35)
+	rellenoTarjeta = color.NRGBA{R: 13, G: 19, B: 38, A: 255} // #0d1326
+	bordeTarjeta   = color.NRGBA{R: 30, G: 41, B: 59, A: 255} // #1e293b
 
 	tinteOficial = color.NRGBA{R: 217, G: 119, B: 6, A: 38}
 	bordeOficial = color.NRGBA{R: 217, G: 119, B: 6, A: 102}

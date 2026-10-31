@@ -2,29 +2,33 @@ package cartelera
 
 import "github.com/fogleman/gg"
 
-// Medidas del encabezado de una tarjeta. El centro de la línea se mide desde el
-// borde superior: 4 px de franja, 14 de relleno y media caja de texto de 24 px.
+// Medidas del encabezado de una tarjeta horizontal.
 const (
-	centroEncabezado  = 4 + 14 + 24*1.21/2
-	separacionBandera = 12.0
+	centroEncabezado  = altoTarjeta / 2
+	separacionBandera = 10.0
+	separacionTexto   = 8.0
 )
 
-// pintarEncabezadoTarjeta dibuja la bandera, el nombre del país y la insignia de
-// tendencia, alineados como la fila superior de la plantilla.
+// pintarEncabezadoTarjeta dibuja bandera, país, siglas y tendencia en una sola
+// línea horizontal, alineados al centro vertical de la fila.
 func pintarEncabezadoTarjeta(lienzo *gg.Context, x, y float64, datos Tarjeta) error {
 	centro := y + centroEncabezado
 	textoX := x + bordeTarjetaAncho + rellenoTarjetaX
 	if imagen, ok := Bandera(datos.Bandera); ok {
-		bandera(lienzo, recortarComoCover(imagen, int(anchoBandera), int(altoBandera)), textoX, centro-altoBandera/2)
+		bandera(lienzo, recortarComoCover(imagen, int(anchoBandera), int(altoBandera)),
+			textoX, centro-altoBandera/2)
 		textoX += anchoBandera + separacionBandera
 	}
 
-	if err := fuente(lienzo, 24); err != nil {
+	if err := fuente(lienzo, 22); err != nil {
 		return err
 	}
-	escribir(lienzo, datos.NombrePais, blanco, textoX, centro)
+	textoX += escribir(lienzo, datos.NombrePais, blanco, textoX, centro) + separacionTexto
 
-	// La insignia se pega al borde derecho del contenido, como el `space-between`.
-	derecha := x + anchoTarjeta - bordeTarjetaAncho - rellenoTarjetaX
-	return pintarTendencia(lienzo, derecha-anchoInsignia, centro-altoInsignia/2, datos.Trend)
+	if err := fuente(lienzo, 12); err != nil {
+		return err
+	}
+	textoX += escribir(lienzo, datos.Code, cian, textoX, centro) + separacionTexto
+
+	return pintarTendencia(lienzo, textoX, centro-altoInsignia/2, datos.Trend)
 }

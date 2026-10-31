@@ -7,11 +7,11 @@ import (
 	"golang.org/x/image/draw"
 )
 
-// Medidas del hueco de la bandera en el encabezado de cada tarjeta: 36x26 con
-// radio 4, según la plantilla original.
+// Medidas del hueco de la bandera en el encabezado de cada tarjeta: 32x32 con
+// radio 4, según la estructura horizontal solicitada.
 const (
-	anchoBandera = 36.0
-	altoBandera  = 26.0
+	anchoBandera = 32.0
+	altoBandera  = 32.0
 )
 
 // Bandera devuelve la bandera del código ISO recibido. Un código desconocido no es

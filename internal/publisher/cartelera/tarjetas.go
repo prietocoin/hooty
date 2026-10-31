@@ -2,13 +2,9 @@ package cartelera
 
 import "github.com/fogleman/gg"
 
-// posicionTarjeta devuelve la esquina de la tarjeta en la cuadrícula de dos
-// columnas. El hueco horizontal es el margen: con dos tarjetas de 480 sobre un
-// ancho útil de 1000 quedan 40 px entre ellas, igual que en la plantilla.
+// posicionTarjeta devuelve la esquina de la tarjeta en la lista vertical.
 func posicionTarjeta(indice int) (float64, float64) {
-	columna := float64(indice % 2)
-	fila := float64(indice / 2)
-	return margen + columna*(anchoTarjeta+margen), yTarjetas + fila*pasoFila
+	return margen, yTarjetas + float64(indice)*pasoFila
 }
 
 // pintarTarjetas recorre las divisas del socio y dibuja una tarjeta por cada una.
