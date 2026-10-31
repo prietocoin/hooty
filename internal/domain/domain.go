@@ -91,6 +91,7 @@ type Comprobante struct {
 	ME2    float64 `json:"me2"`
 
 	LoteTasa       string    `json:"lote_tasa"`
+	TipoOp         string    `json:"tipo_op"`
 	FechaOperacion time.Time `json:"fecha_operacion"`
 	CreadoEn       time.Time `json:"creado_en"`
 	ActualizadoEn  time.Time `json:"actualizado_en"`
@@ -158,6 +159,28 @@ func NormalizeImpacto(i Impacto) Impacto {
 }
 
 // NormalizeComprobante limpia textos y normaliza identidades.
+// NormalizeTipoOp reduce el tipo de operación a su letra canónica D/P/A.
+func NormalizeTipoOp(value string) string {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
+	case "P":
+		return "P"
+	case "A":
+		return "A"
+	default:
+		return "D"
+	}
+}
+
+// TipoOpValido indica si la letra pertenece al contrato D/P/A.
+func TipoOpValido(value string) bool {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
+	case "D", "P", "A":
+		return true
+	default:
+		return false
+	}
+}
+
 func NormalizeComprobante(c Comprobante) Comprobante {
 	c.HashLargo = NormalizeHash(c.HashLargo)
 	if strings.TrimSpace(c.HashCorto) == "" {
@@ -184,6 +207,7 @@ func NormalizeComprobante(c Comprobante) Comprobante {
 	c.Socio1 = CleanText(c.Socio1, 120)
 	c.Socio2 = CleanText(c.Socio2, 120)
 	c.LoteTasa = strings.TrimSpace(c.LoteTasa)
+	c.TipoOp = NormalizeTipoOp(c.TipoOp)
 	return c
 }
 
@@ -250,6 +274,9 @@ func (c Comprobante) Validate() error {
 	}
 	if strings.TrimSpace(c.LoteTasa) == "" {
 		return Validationf("lote_tasa es obligatorio")
+	}
+	if c.TipoOp != "" && !TipoOpValido(c.TipoOp) {
+		return Validationf("tipo_op debe ser D, P o A")
 	}
 	if c.FechaOperacion.IsZero() {
 		return Validationf("fecha_operacion es obligatoria")

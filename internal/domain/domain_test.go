@@ -64,6 +64,7 @@ func TestComprobanteValidateRechazaViolaciones(t *testing.T) {
 		{"grupo vacío", func(c *Comprobante) { c.Grupo1 = "" }, "grupos reales"},
 		{"socio general", func(c *Comprobante) { c.Socio2 = "GENERAL" }, "socios reales"},
 		{"tasa negativa", func(c *Comprobante) { c.Tasa2 = -1 }, "negativas"},
+		{"tipo_op inválido", func(c *Comprobante) { c.TipoOp = "X" }, "tipo_op"},
 		{"monto cero", func(c *Comprobante) { c.Monto1 = 0 }, "importe"},
 		{"me cero", func(c *Comprobante) { c.ME2 = 0 }, "equivalentes"},
 		{"sin lote", func(c *Comprobante) { c.LoteTasa = "" }, "lote_tasa"},

@@ -198,6 +198,7 @@ var requiredSchema = dbschema.Schema{
 		"me1":             columnNumeric,
 		"me2":             columnNumeric,
 		"lote_tasa":       columnText,
+		"tipo_op":         columnText,
 		"fecha_operacion": columnTimestamp,
 		"creado_en":       columnTimestamp,
 		"actualizado_en":  columnTimestamp,

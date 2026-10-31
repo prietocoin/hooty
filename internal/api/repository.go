@@ -217,6 +217,7 @@ func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch C
 		existing.Tasa1, existing.Tasa2,
 		existing.Monto1, existing.Monto2, existing.ME1, existing.ME2,
 		existing.Banco, existing.Titular, existing.Referencia,
+		domain.NormalizeTipoOp(existing.TipoOp),
 		hash,
 	)
 	if err != nil {
@@ -273,6 +274,7 @@ func comprobanteFromRow(row ComprobanteRow) domain.Comprobante {
 		ME1:            row.ME1,
 		ME2:            row.ME2,
 		LoteTasa:       row.LoteTasa,
+		TipoOp:         row.TipoOp,
 		FechaOperacion: row.FechaOperacion,
 		CreadoEn:       row.CreadoEn,
 		ActualizadoEn:  row.ActualizadoEn,
@@ -487,6 +489,14 @@ func applyComprobantePatch(c *domain.Comprobante, patch ComprobantePatch) error 
 		c.MonedaRecibo = *patch.MonedaRecibo
 	} else if patch.Moneda != nil {
 		c.MonedaRecibo = *patch.Moneda
+	}
+
+	if patch.TipoOp != nil {
+		tipo := strings.ToUpper(strings.TrimSpace(*patch.TipoOp))
+		if !domain.TipoOpValido(tipo) {
+			return domain.Validationf("tipo_op debe ser D, P o A")
+		}
+		c.TipoOp = tipo
 	}
 
 	socio1 := patch.Socio1
@@ -982,8 +992,9 @@ UPDATE comprobantes SET
     banco = $11,
     titular = $12,
     referencia = $13,
+    tipo_op = $14,
     actualizado_en = NOW()
-WHERE hash_largo = $14`
+WHERE hash_largo = $15`
 
 const sqlComprobanteColumns = `
     c.hash_largo,
@@ -1008,6 +1019,7 @@ const sqlComprobanteColumns = `
     COALESCE(c.me1, 0),
     COALESCE(c.me2, 0),
     COALESCE(c.lote_tasa, ''),
+    COALESCE(c.tipo_op, 'D'),
     c.fecha_operacion,
     c.creado_en,
     c.actualizado_en`
@@ -1087,7 +1099,7 @@ func scanComprobante(row interface{ Scan(...any) error }) (ComprobanteRow, error
 		&item.Grupo1, &item.Grupo2, &item.Caption1, &item.Caption2,
 		&item.Socio1, &item.Socio2,
 		&item.Tasa1, &item.Tasa2, &item.Monto1, &item.Monto2, &item.ME1, &item.ME2,
-		&item.LoteTasa, &fecha, &creado, &actualizado,
+		&item.LoteTasa, &item.TipoOp, &fecha, &creado, &actualizado,
 	); err != nil {
 		return ComprobanteRow{}, err
 	}

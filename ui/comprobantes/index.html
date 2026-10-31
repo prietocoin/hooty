@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261031_05"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261031_06"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -1179,7 +1179,8 @@
         me2: this.numeroPuro(this.itemEdicion?.me2),
         banco: this.domValor('banco', this.itemEdicion?.banco || ''),
         titular: this.domValor('titular', this.itemEdicion?.titular || ''),
-        referencia: this.domValor('referencia', this.itemEdicion?.referencia || '')
+        referencia: this.domValor('referencia', this.itemEdicion?.referencia || ''),
+        tipo_op: String(this.itemEdicion?.tipo_op || 'D').toUpperCase().trim()
       };
 
       console.log('[Hooty] Despachando PUT con payload:', payload);
@@ -1242,6 +1243,7 @@
       base_socio_1: String(raw.moneda_base_socio1 || raw.moneda_socio_1 || 'USDT').toUpperCase(),
       base_socio_2: String(raw.moneda_base_socio2 || raw.moneda_socio_2 || 'USDT').toUpperCase(),
       tipo_manual: String(raw.tipo_manual || raw.tipo_op1 || raw.tipo_op || raw.tipo || 'D').split('-')[0].toUpperCase(),
+      tipo_op: String(raw.tipo_op || raw.tipo_op1 || raw.tipo_manual || raw.tipo || 'D').split('-')[0].toUpperCase(),
       moneda: String(raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
       lote_tasa_asignado: raw.lote_tasa_asignado || raw.lote_tasa || raw.lote || 'T070'
     }));
@@ -1438,7 +1440,7 @@
               <span class="text-[10px] font-black text-amber-400 uppercase tracking-wider">3. CABECERA CONTABLE</span>
               <div class="bg-[#030611] p-2.5 rounded-xl border border-blue-900/60 space-y-2">
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
                   <div>
                     <label class="block text-[8px] font-bold text-emerald-400 uppercase mb-0.5" for="editar-moneda-recibo">Moneda Recibo</label>
                     <select id="editar-moneda-recibo" name="moneda_recibo" x-model="itemEdicion.moneda_recibo"
@@ -1462,7 +1464,22 @@
                   <div>
                     <label class="block text-[8px] font-bold text-purple-400 uppercase mb-0.5">Lote Tasa (fijo)</label>
                     <p class="w-full bg-[#080e26] border border-purple-500/20 rounded-lg px-2 py-1.5 text-xs text-purple-300/80 font-mono font-bold uppercase"
-                       x-text="itemEdicion.lote_tasa_asignado || itemEdicion.lote_tasa || '—'"></p>
+                       x-text="itemEdicion.lote_tasa_asignado || itemEdicion.lote_tasa || '-'"></p>
+                  </div>
+
+                  <div>
+                    <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Tipo de Operación</label>
+                    <div class="inline-flex w-full rounded-lg border border-slate-700 bg-slate-900/80 p-0.5 text-[10px]">
+                      <button type="button" @click="itemEdicion.tipo_op = 'D'"
+                              :class="itemEdicion.tipo_op === 'D' ? 'bg-cyan-600 text-white font-semibold' : 'text-slate-400 hover:text-white'"
+                              class="flex-1 px-1.5 py-1 rounded transition-colors">D</button>
+                      <button type="button" @click="itemEdicion.tipo_op = 'P'"
+                              :class="itemEdicion.tipo_op === 'P' ? 'bg-rose-600 text-white font-semibold' : 'text-slate-400 hover:text-white'"
+                              class="flex-1 px-1.5 py-1 rounded transition-colors">P</button>
+                      <button type="button" @click="itemEdicion.tipo_op = 'A'"
+                              :class="itemEdicion.tipo_op === 'A' ? 'bg-amber-600 text-white font-semibold' : 'text-slate-400 hover:text-white'"
+                              class="flex-1 px-1.5 py-1 rounded transition-colors">A</button>
+                    </div>
                   </div>
                 </div>
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"hooty/internal/domain"
 	"hooty/internal/ingest"
 	"hooty/internal/publisher"
 )
@@ -575,6 +576,23 @@ func (f *fakePublisher) PublishSocio(_ context.Context, socio string, isPrueba b
 		return publisher.Result{}, f.err
 	}
 	return publisher.Result{IDTasa: "T999", Procesados: 1, Prueba: isPrueba, Detalle: []publisher.Detalle{{Socio: socio, Status: "ok"}}}, nil
+}
+
+func TestApplyComprobantePatchTipoOp(t *testing.T) {
+	t.Parallel()
+
+	c := domain.Comprobante{}
+	tipo := "A"
+	if err := applyComprobantePatch(&c, ComprobantePatch{TipoOp: &tipo}); err != nil {
+		t.Fatalf("tipo_op A rechazado: %v", err)
+	}
+	if c.TipoOp != "A" {
+		t.Fatalf("tipo_op = %q", c.TipoOp)
+	}
+	invalido := "X"
+	if err := applyComprobantePatch(&c, ComprobantePatch{TipoOp: &invalido}); err == nil {
+		t.Fatal("tipo_op inválido debe rechazarse")
+	}
 }
 
 func TestTasasActivasInterpretaMostrar(t *testing.T) {

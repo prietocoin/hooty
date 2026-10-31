@@ -62,6 +62,56 @@ func EnsurePlantillaColumn(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
+// EnsureTipoOpColumn garantiza tipo_op con contrato D/P/A y migra filas nulas.
+func EnsureTipoOpColumn(ctx context.Context, pool *pgxpool.Pool) error {
+	if pool == nil {
+		return errors.New("postgres: pool es obligatorio para migrar tipo_op")
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: abrir migración tipo_op: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('hooty:tipo_op'))`); err != nil {
+		return fmt.Errorf("postgres: bloquear migración tipo_op: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `ALTER TABLE comprobantes ADD COLUMN IF NOT EXISTS tipo_op text DEFAULT 'D'`); err != nil {
+		return fmt.Errorf("postgres: crear tipo_op: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE comprobantes SET tipo_op = 'D' WHERE tipo_op IS NULL OR UPPER(BTRIM(tipo_op)) NOT IN ('D', 'P', 'A')`); err != nil {
+		return fmt.Errorf("postgres: normalizar tipo_op: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+DO $$
+DECLARE restriccion record;
+BEGIN
+    FOR restriccion IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'public'
+          AND t.relname = 'comprobantes'
+          AND c.contype = 'c'
+          AND pg_get_constraintdef(c.oid) ILIKE '%tipo_op%'
+    LOOP
+        EXECUTE format('ALTER TABLE comprobantes DROP CONSTRAINT %I', restriccion.conname);
+    END LOOP;
+END $$`); err != nil {
+		return fmt.Errorf("postgres: limpiar restricciones tipo_op: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `ALTER TABLE comprobantes DROP CONSTRAINT IF EXISTS chk_tipo_op`); err != nil {
+		return fmt.Errorf("postgres: eliminar CHECK tipo_op previo: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `ALTER TABLE comprobantes ADD CONSTRAINT chk_tipo_op CHECK (tipo_op IN ('D', 'P', 'A'))`); err != nil {
+		return fmt.Errorf("postgres: crear CHECK tipo_op: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("postgres: confirmar migración tipo_op: %w", err)
+	}
+	return nil
+}
+
 // rateCheckAllowsZero reconoce una definición que ya admite el estado 0.
 func rateCheckAllowsZero(definition string) bool {
 	lower := strings.ToLower(definition)

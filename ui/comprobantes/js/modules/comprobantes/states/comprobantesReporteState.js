@@ -16,7 +16,7 @@ import {
   resolverSubtotalSocio,
   resolverTasaSocio,
   resolverTipoComprobante
-} from '../utils/comprobantesTasasUtils.js?v=20261031_02';
+} from '../utils/comprobantesTasasUtils.js?v=20261031_03';
 import {
   dentroRangoCaracas,
   fechaCaracasISO,

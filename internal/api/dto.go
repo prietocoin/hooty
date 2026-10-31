@@ -35,6 +35,7 @@ type ComprobanteRow struct {
 	ME1            float64
 	ME2            float64
 	LoteTasa       string
+	TipoOp         string
 	FechaOperacion time.Time
 	CreadoEn       time.Time
 	ActualizadoEn  time.Time
@@ -58,6 +59,7 @@ type ComprobantePatch struct {
 	Monto2 *float64 `json:"monto_2"`
 	Tasa2  *float64 `json:"tasa_2"`
 	ME2    *float64 `json:"me2"`
+	TipoOp *string  `json:"tipo_op"`
 
 	// Alias de compatibilidad con la UI histórica.
 	NombreSocio1 *string  `json:"nombre_socio_1"`
@@ -161,6 +163,7 @@ type ComprobanteDTO struct {
 
 	Rol1    string `json:"rol_1"`
 	Rol2    string `json:"rol_2"`
+	TipoOp  string `json:"tipo_op"`
 	TipoOp1 string `json:"tipo_op1"`
 	TipoOp2 string `json:"tipo_op2"`
 
@@ -263,6 +266,7 @@ func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil) Comprobante
 
 		Rol1:    rol1,
 		Rol2:    rol2,
+		TipoOp:  domain.NormalizeTipoOp(row.TipoOp),
 		TipoOp1: tipo1,
 		TipoOp2: tipo2,
 
