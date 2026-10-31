@@ -164,12 +164,31 @@ func TestMuxConservaWebhookYHealth(t *testing.T) {
 	server := httptest.NewServer(newTestMux(t))
 	defer server.Close()
 
+	resp, err := http.Get(server.URL + "/healthz")
+	if err != nil {
+		t.Fatalf("GET /healthz: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `"status":"ok"`) {
+		t.Fatalf("GET /healthz -> %d %q", resp.StatusCode, body)
+	}
+
+	resp, err = http.Get(server.URL + "/readyz")
+	if err != nil {
+		t.Fatalf("GET /readyz: %v", err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || string(body) != "health" {
+		t.Fatalf("GET /readyz -> %d %q", resp.StatusCode, body)
+	}
+
 	for _, tc := range []struct {
 		method string
 		path   string
 		body   string
 	}{
-		{http.MethodGet, "/healthz", "health"},
 		{http.MethodPost, "/webhooks/evolution", "webhook"},
 		{http.MethodPost, "/api/v1/webhooks/hooty", "webhook"},
 	} {

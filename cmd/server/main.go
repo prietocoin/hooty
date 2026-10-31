@@ -43,8 +43,15 @@ func run() error {
 	logger := newLogger(cfg)
 	slog.SetDefault(logger)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// El apagado solo se dispara por una señal real del sistema operativo.
+	// No se usa signal.NotifyContext para que ningún contexto hijo cancelado
+	// pueda tumbar el servidor por accidente.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quit)
 
 	pool, err := openPool(ctx, cfg)
 	if err != nil {
@@ -143,7 +150,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	mux := newMux(webhook, readAPI, healthz(pool), uiHandler)
+	mux := newMux(webhook, readAPI, readyz(pool), uiHandler)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -180,49 +187,66 @@ func run() error {
 	}
 
 	serverErr := make(chan error, 1)
-	go func() {
+	startServer := func() {
 		logger.Info("hooty.http.started", "addr", cfg.HTTPAddr)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		go func() {
+			err := server.ListenAndServe()
+			if errors.Is(err, http.ErrServerClosed) {
+				err = nil
+			}
 			serverErr <- err
-			return
-		}
-		serverErr <- nil
-	}()
+		}()
+	}
+	startServer()
 
-	select {
-	case <-ctx.Done():
-		logger.Info("hooty.shutdown.signal")
-	case err := <-serverErr:
-		if err != nil {
-			return fmt.Errorf("servidor HTTP: %w", err)
-		}
-		return nil
-	}
+	// El proceso permanece vivo mientras el servidor escuche. Solo una señal
+	// real de parada (SIGINT/SIGTERM) o un fallo del listener terminan el run.
+	for {
+		select {
+		case sig := <-quit:
+			logger.Info("hooty.shutdown.signal", "signal", sig.String())
+			cancel()
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-	defer cancel()
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Warn("hooty.http.shutdown_error", "error", err)
-	}
-	if retention != nil {
-		retentionCtx, cancelRetention := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-		defer cancelRetention()
-		if err := retention.Close(retentionCtx); err != nil {
-			logger.Warn("hooty.sweeper.shutdown_error", "error", err)
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				logger.Warn("hooty.http.shutdown_error", "error", err)
+			}
+			shutdownCancel()
+
+			if retention != nil {
+				retentionCtx, cancelRetention := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+				if err := retention.Close(retentionCtx); err != nil {
+					logger.Warn("hooty.sweeper.shutdown_error", "error", err)
+				}
+				cancelRetention()
+			}
+			logger.Info("hooty.shutdown.done")
+			return nil
+		case err := <-serverErr:
+			if err != nil {
+				return fmt.Errorf("servidor HTTP: %w", err)
+			}
+			// El listener se cerró sin una señal de parada: no se debe apagar
+			// el proceso; se vuelve a levantar el servidor.
+			logger.Warn("hooty.http.server_exited", "addr", cfg.HTTPAddr)
+			time.Sleep(time.Second)
+			startServer()
 		}
 	}
-	logger.Info("hooty.shutdown.done")
-	return nil
 }
 
 // newMux ensambla las rutas del servidor. Se aísla para que los tests puedan
 // verificar precedencia y barra final sin abrir PostgreSQL.
-func newMux(webhook http.Handler, readAPI *api.Handler, health http.Handler, ui http.Handler) *http.ServeMux {
+func newMux(webhook http.Handler, readAPI *api.Handler, ready http.Handler, ui http.Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("POST /webhooks/evolution", webhook)
 	mux.Handle("POST /api/v1/webhooks/hooty", webhook)
 	readAPI.Register(mux)
-	mux.Handle("GET /healthz", health)
+	// /healthz es liveness puro: mientras el proceso escuche, el orquestador no
+	// debe reiniciarlo por una caída transitoria de PostgreSQL. La dependencia
+	// de base de datos queda en /readyz.
+	mux.HandleFunc("GET /healthz", livez)
+	mux.Handle("GET /readyz", ready)
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/comprobantes/", http.StatusPermanentRedirect)
 	})
@@ -260,7 +284,18 @@ func openPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-func healthz(pool *pgxpool.Pool) http.HandlerFunc {
+func livez(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "method_not_allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
+}
+
+func readyz(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.Header().Set("Allow", http.MethodGet)
