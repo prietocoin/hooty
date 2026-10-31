@@ -183,7 +183,7 @@ html {
   padding: 12px;
   border: 1px solid #1e293b;
   border-radius: 12px;
-  background: #0d1527;
+  background: #0b132b;
   transition: border-color .15s ease, opacity .15s ease;
 }
 
@@ -201,8 +201,8 @@ html {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(30, 41, 59, .6);
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(30, 41, 59, .8);
 }
 
 .regla-id {
@@ -356,7 +356,7 @@ html {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .regla-field {
@@ -376,16 +376,16 @@ html {
   white-space: nowrap;
 }
 
-.regla-field--dep .regla-field-label { color: #34d399; }
+.regla-field--dep .regla-field-label { color: #22d3ee; }
 .regla-field--pago .regla-field-label { color: #fb7185; }
 
 .regla-base-input {
   width: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 4px 8px;
   border: 1px solid #334155;
-  border-radius: 8px;
-  background: rgba(2, 6, 23, .8);
+  border-radius: 4px;
+  background: #0f172a;
   color: #ffffff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
@@ -399,18 +399,19 @@ html {
 .regla-percent {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   min-width: 0;
-  padding: 4px 6px;
+  padding: 4px 8px;
   border: 1px solid #334155;
-  border-radius: 8px;
-  background: rgba(2, 6, 23, .8);
+  border-radius: 4px;
+  background: #0f172a;
 }
 
 .regla-field--dep .regla-percent:focus-within { border-color: #06b6d4; }
 .regla-field--pago .regla-percent:focus-within { border-color: #f43f5e; }
 
 .regla-percent-input {
-  width: 32px;
+  width: 24px;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -423,7 +424,6 @@ html {
 }
 
 .regla-percent span {
-  margin-right: 4px;
   color: #64748b;
   font-size: 10px;
   line-height: 1;

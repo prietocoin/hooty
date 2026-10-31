@@ -3,11 +3,11 @@ import { api } from '../api.js?v=20261031_01';
 import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import {
   esHerencia, nuevaRegla, payloadGuardar, reglasSegunModo
-} from '../domain.js?v=20261031_03';
-import { renderModalSocio } from '../components/modal-socio.js?v=20261031_05';
+} from '../domain.js?v=20261031_04';
+import { renderModalSocio } from '../components/modal-socio.js?v=20261031_06';
 import {
   baseMoneda, formatearResultadoSpread, renderReglasEditor, tasaResultante
-} from '../components/reglas-editor.js?v=20261031_05';
+} from '../components/reglas-editor.js?v=20261031_06';
 import { renderReglasHerencia } from '../components/reglas-herencia.js?v=20261031_04';
 import { notificarSociosActualizados } from '../../../shared/js/sync.js';
 

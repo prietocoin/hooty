@@ -5,7 +5,7 @@
  * la caché solo se usa como respaldo offline.
  */
 
-const CACHE = 'hooty-perfiles-20261031_03';
+const CACHE = 'hooty-perfiles-20261031_04';
 const ASSETS = [
   './', './index.html', './manifest.json',
   './css/tailwind.css', './css/perfiles.css',
