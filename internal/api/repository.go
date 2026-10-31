@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -609,26 +610,19 @@ func (r *Repository) SaveLote(ctx context.Context, tasas map[string]any) (string
 }
 
 // PublishLote confirma el lote vigente y devuelve cuántos socios tienen la
-// cartelera activa. El despacho externo queda fuera de esta lectura atómica.
+// cartelera activa. Usa la misma lectura tolerante de `mostrar` que el
+// publicador real para no depender de casts SQL.
 func (r *Repository) PublishLote(ctx context.Context) (string, int, error) {
 	tasa, err := r.LatestTasa(ctx)
 	if err != nil {
+		log.Printf("[ERROR] Fallo DB al obtener lote vigente para publicar: %v", err)
 		return "", 0, err
 	}
-	var procesados int
-	err = r.pool.QueryRow(ctx, `
-SELECT COUNT(*)
-FROM perfil
-WHERE UPPER(BTRIM(COALESCE(nombre, ''))) NOT IN ('', 'GENERAL')
-  AND CASE
-      WHEN LOWER(COALESCE(mostrar->>'tasas', '')) IN ('true', 'false')
-        THEN (mostrar->>'tasas')::boolean
-      ELSE TRUE
-  END`).Scan(&procesados)
+	socios, err := r.ActiveSocios(ctx)
 	if err != nil {
-		return "", 0, fmt.Errorf("api: contar socios activos: %w", err)
+		return "", 0, err
 	}
-	return tasa.IDTasa, procesados, nil
+	return tasa.IDTasa, len(socios), nil
 }
 
 // DeleteLote elimina un lote de tasas_glaukov y distingue "borrado" de
@@ -645,10 +639,12 @@ func (r *Repository) DeleteLote(ctx context.Context, id string) (bool, error) {
 func (r *Repository) LatestLote(ctx context.Context) (publisher.Lote, error) {
 	tasa, err := r.LatestTasa(ctx)
 	if err != nil {
+		log.Printf("[ERROR] Fallo DB al obtener tasas para publicar: %v", err)
 		return publisher.Lote{}, err
 	}
 	var decoded map[string]any
 	if err := json.Unmarshal(tasa.Tasas, &decoded); err != nil {
+		log.Printf("[ERROR] Fallo al decodificar tasas para publicar: %v", err)
 		return publisher.Lote{}, fmt.Errorf("api: decodificar tasas del lote: %w", err)
 	}
 	tasas := make(map[string]float64, len(decoded))
@@ -666,35 +662,65 @@ func (r *Repository) LatestLote(ctx context.Context) (publisher.Lote, error) {
 }
 
 // ActiveSocios implementa publisher.Source: solo socios reales con la
-// cartelera encendida (mostrar.tasas) y un chat_id utilizable.
+// cartelera encendida (mostrar.tasas) y un chat_id utilizable. La columna
+// mostrar se lee como texto y se interpreta en Go para no depender de casts
+// JSON/booleanos del motor SQL.
 func (r *Repository) ActiveSocios(ctx context.Context) ([]publisher.Socio, error) {
 	rows, err := r.pool.Query(ctx, `
-SELECT COALESCE(nombre, ''), COALESCE(id_grupo, '')
+SELECT COALESCE(nombre, ''), COALESCE(id_grupo, ''), COALESCE(mostrar::text, '{}')
 FROM perfil
 WHERE UPPER(BTRIM(COALESCE(nombre, ''))) NOT IN ('', 'GENERAL')
   AND BTRIM(COALESCE(id_grupo, '')) <> ''
-  AND CASE
-      WHEN LOWER(COALESCE(mostrar->>'tasas', '')) IN ('true', 'false')
-        THEN (mostrar->>'tasas')::boolean
-      ELSE TRUE
-  END
 ORDER BY nombre`)
 	if err != nil {
+		log.Printf("[ERROR] Fallo DB al obtener socios para publicar: %v", err)
 		return nil, fmt.Errorf("api: listar socios activos: %w", err)
 	}
 	defer rows.Close()
 	socios := make([]publisher.Socio, 0, 32)
 	for rows.Next() {
 		var socio publisher.Socio
-		if err := rows.Scan(&socio.Nombre, &socio.ChatID); err != nil {
+		var mostrar string
+		if err := rows.Scan(&socio.Nombre, &socio.ChatID, &mostrar); err != nil {
+			log.Printf("[ERROR] Fallo DB al escanear socio para publicar: %v", err)
 			return nil, fmt.Errorf("api: escanear socio activo: %w", err)
+		}
+		if !tasasActivas(mostrar) {
+			continue
 		}
 		socios = append(socios, socio)
 	}
 	if err := rows.Err(); err != nil {
+		log.Printf("[ERROR] Fallo DB al recorrer socios para publicar: %v", err)
 		return nil, fmt.Errorf("api: recorrer socios activos: %w", err)
 	}
 	return socios, nil
+}
+
+func tasasActivas(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "null" || raw == "{}" {
+		return true
+	}
+	var mostrar map[string]any
+	if err := json.Unmarshal([]byte(raw), &mostrar); err != nil {
+		return true
+	}
+	valor, ok := mostrar["tasas"]
+	if !ok {
+		return true
+	}
+	switch typed := valor.(type) {
+	case bool:
+		return typed
+	case string:
+		texto := strings.ToLower(strings.TrimSpace(typed))
+		return texto != "false" && texto != "0" && texto != "off"
+	case float64:
+		return typed != 0
+	default:
+		return true
+	}
 }
 
 // LatestTasa devuelve el último registro de la vista tasa.

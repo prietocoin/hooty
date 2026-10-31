@@ -521,6 +521,28 @@ func (f *fakePublisher) Publish(_ context.Context, isPrueba bool) (publisher.Res
 	return publisher.Result{IDTasa: "T999", Procesados: 1, Prueba: isPrueba}, nil
 }
 
+func TestTasasActivasInterpretaMostrar(t *testing.T) {
+	t.Parallel()
+
+	casos := map[string]bool{
+		`{}`:                  true,
+		`null`:                true,
+		`{"tasas":true}`:      true,
+		`{"tasas":false}`:     false,
+		`{"tasas":"false"}`:   false,
+		`{"tasas":"true"}`:    true,
+		`{"tasas":0}`:         false,
+		`{"tasas":1}`:         true,
+		`{"dashboard":false}`: true,
+		`texto-invalido`:      true,
+	}
+	for raw, esperado := range casos {
+		if got := tasasActivas(raw); got != esperado {
+			t.Fatalf("tasasActivas(%q) = %v, se esperaba %v", raw, got, esperado)
+		}
+	}
+}
+
 func TestPublicarLoteLeeIsPruebaYDespacha(t *testing.T) {
 	t.Parallel()
 
