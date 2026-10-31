@@ -159,6 +159,38 @@ func TestSimularLiquidacionAplicaHerenciaDeFundda(t *testing.T) {
 	}
 }
 
+func TestSimularLiquidacionSocio2UsaSuTasaYMonedaLocal(t *testing.T) {
+	t.Parallel()
+
+	perfil1 := domain.Perfil{
+		Nombre: "TORRES", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"+"}}`),
+	}
+	perfil2 := domain.Perfil{
+		Nombre: "NELSY", MonedaBase: "PEN",
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"D","polar_D":"-"}}`),
+	}
+	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1, "PEN": 3.44}}
+
+	resultado, err := SimularLiquidacion(SimulacionInput{
+		MonedaRecibo: "ARS",
+		MontoRecibo:  23200,
+		Socio1:       "TORRES",
+		Socio2:       "NELSY",
+		Tasa1:        400,
+		Tasa2:        444,
+	}, perfil1, perfil2, domain.Perfil{}, lote)
+	if err != nil {
+		t.Fatalf("simulación rechazada: %v", err)
+	}
+	if resultado.Tasa2 != 444 || resultado.Monto2 != -52.25 {
+		t.Fatalf("socio 2 debe liquidar 23200/444 = -52.25 PEN: %+v", resultado)
+	}
+	if resultado.ME2 != -15.18 {
+		t.Fatalf("ME2 debe ser el equivalente en USD de 52.25 PEN: %+v", resultado)
+	}
+}
+
 func TestSimularLiquidacionRechazaMismoSocio(t *testing.T) {
 	t.Parallel()
 

@@ -50,6 +50,16 @@ export function obtenerME2(item) {
     : (item.monto_2 !== undefined ? item.monto_2 : 0);
 }
 
+export function obtenerMonto1(item) {
+  if (!item) return 0;
+  return item.monto_1 ?? item.monto1 ?? 0;
+}
+
+export function obtenerMonto2(item) {
+  if (!item) return 0;
+  return item.monto_2 ?? item.monto2 ?? 0;
+}
+
 export function obtenerTasaSocioCalculada(item, numSocio) {
   return resolverTasaSocio(item, numSocio);
 }

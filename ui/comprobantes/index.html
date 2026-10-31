@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261031_04"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261031_05"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -581,7 +581,7 @@
             </div>
             <strong class="glauk-socio-subtotal"
                     :class="signoSocio(item, 1) < 0 ? 'is-negative' : 'is-positive'"
-                    x-text="(signoSocio(item, 1) < 0 ? '-' : '+') + formatMonto(Math.abs(parseFloat(obtenerME1(item) || 0))) + ' ' + s1Moneda"></strong>
+                    x-text="(signoSocio(item, 1) < 0 ? '-' : '+') + formatMonto(Math.abs(parseFloat(obtenerMonto1(item) || 0))) + ' ' + s1Moneda"></strong>
           </div>
 
           <div class="glauk-socio-row is-socio2" x-show="s2Visible">
@@ -594,7 +594,7 @@
             </div>
             <strong class="glauk-socio-subtotal"
                     :class="signoSocio(item, 2) < 0 ? 'is-negative' : 'is-positive'"
-                    x-text="(signoSocio(item, 2) < 0 ? '-' : '+') + formatMonto(Math.abs(parseFloat(obtenerME2(item) || 0))) + ' ' + s2Moneda"></strong>
+                    x-text="(signoSocio(item, 2) < 0 ? '-' : '+') + formatMonto(Math.abs(parseFloat(obtenerMonto2(item) || 0))) + ' ' + s2Moneda"></strong>
           </div>
         </div>
       </div>

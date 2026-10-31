@@ -5,10 +5,10 @@
  */
 
 import {
-  formatMonto, formatTasa, obtenerME1, obtenerME2,
+  formatMonto, formatTasa, obtenerME1, obtenerME2, obtenerMonto1, obtenerMonto2,
   obtenerTasaSocioCalculada, claseInsignia, formatDiaHora,
   resolverTipoComprobante, resolverTasaSocio
-} from '../utils/comprobantesFormatters.js?v=20261031_02';
+} from '../utils/comprobantesFormatters.js?v=20261031_03';
 
 import { apiUrl } from '../../../../../shared/js/api-base.js?v=20261031_02';
 import { notify } from '../../../../../shared/js/toast.js?v=20261031_02';
@@ -649,7 +649,8 @@ export function comprobantesState() {
       }
     },
 
-    formatMonto, formatTasa, obtenerME1, obtenerME2, obtenerTasaSocioCalculada, claseInsignia, formatDiaHora,
+    formatMonto, formatTasa, obtenerME1, obtenerME2, obtenerMonto1, obtenerMonto2,
+    obtenerTasaSocioCalculada, claseInsignia, formatDiaHora,
     resolverTipoComprobante
   };
 
