@@ -33,6 +33,13 @@ type Cartelera struct {
 	Generada time.Time
 }
 
+// Envio es una cartelera ya rasterizada por el cliente.
+type Envio struct {
+	Socio  string
+	ChatID string
+	PNG    []byte
+}
+
 // Source obtiene el lote vigente y los socios activos (ON).
 type Source interface {
 	LatestLote(ctx context.Context) (Lote, error)
@@ -155,7 +162,6 @@ func (p *Publisher) Publish(ctx context.Context, isPrueba bool) (Result, error) 
 }
 
 func (p *Publisher) enviar(ctx context.Context, socio Socio, lote Lote, prueba bool) Detalle {
-	detalle := Detalle{Socio: socio.Nombre, ChatID: socio.ChatID, Status: "error"}
 	png, err := p.renderer.Render(Cartelera{
 		Socio:    socio.Nombre,
 		Lote:     lote.ID,
@@ -164,15 +170,83 @@ func (p *Publisher) enviar(ctx context.Context, socio Socio, lote Lote, prueba b
 		Generada: p.now(),
 	})
 	if err != nil {
-		detalle.Error = err.Error()
 		p.log.Error("hooty.publish.render", "socio", socio.Nombre, "chat_id", socio.ChatID, "error", err)
-		return detalle
+		return Detalle{Socio: socio.Nombre, ChatID: socio.ChatID, Status: "error", Error: err.Error()}
 	}
+	return p.enviarImagen(ctx, socio, lote.ID, png, prueba)
+}
+
+// PublishImages despacha las carteleras que el frontend ya generó. Si el
+// cliente no envía ninguna, conserva el fallback de renderizado del servidor.
+func (p *Publisher) PublishImages(ctx context.Context, isPrueba bool, envios []Envio) (Result, error) {
+	lote, err := p.source.LatestLote(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	resultado := Result{IDTasa: lote.ID, Prueba: isPrueba}
+
+	if isPrueba {
+		if p.testChatID == "" {
+			return resultado, errors.New("publisher: falta configurar EVOLUTION_TEST_GROUP para publicar en prueba")
+		}
+		destino := Socio{Nombre: "PRUEBA", ChatID: p.testChatID}
+		var detalle Detalle
+		if len(envios) > 0 && len(envios[0].PNG) > 0 {
+			detalle = p.enviarImagen(ctx, destino, lote.ID, envios[0].PNG, true)
+		} else {
+			detalle = p.enviar(ctx, destino, lote, true)
+		}
+		resultado.Detalle = []Detalle{detalle}
+		if detalle.Status == "ok" {
+			resultado.Procesados = 1
+		} else {
+			resultado.Fallidos = 1
+			return resultado, fmt.Errorf("publisher: falló el envío de prueba: %s", detalle.Error)
+		}
+		return resultado, nil
+	}
+
+	if len(envios) == 0 {
+		return p.Publish(ctx, false)
+	}
+	for _, envio := range envios {
+		if strings.TrimSpace(envio.ChatID) == "" {
+			resultado.Fallidos++
+			detalle := Detalle{Socio: envio.Socio, Status: "error", Error: "chat_id vacío"}
+			resultado.Detalle = append(resultado.Detalle, detalle)
+			p.log.Error("hooty.publish.send", "socio", envio.Socio, "error", detalle.Error)
+			continue
+		}
+		var detalle Detalle
+		if len(envio.PNG) > 0 {
+			detalle = p.enviarImagen(ctx, Socio{Nombre: envio.Socio, ChatID: envio.ChatID},
+				lote.ID, envio.PNG, false)
+		} else {
+			detalle = p.enviar(ctx, Socio{Nombre: envio.Socio, ChatID: envio.ChatID}, lote, false)
+		}
+		resultado.Detalle = append(resultado.Detalle, detalle)
+		if detalle.Status == "ok" {
+			resultado.Procesados++
+		} else {
+			resultado.Fallidos++
+		}
+	}
+	sort.Slice(resultado.Detalle, func(i, j int) bool {
+		return resultado.Detalle[i].Socio < resultado.Detalle[j].Socio
+	})
+	if resultado.Procesados == 0 {
+		return resultado, errors.New("publisher: fallaron todos los envíos")
+	}
+	return resultado, nil
+}
+
+func (p *Publisher) enviarImagen(ctx context.Context, socio Socio, loteID string, png []byte, prueba bool) Detalle {
+	detalle := Detalle{Socio: socio.Nombre, ChatID: socio.ChatID, Status: "error"}
 	prefijo := "📊 [OFICIAL]"
 	if prueba {
 		prefijo = "🧪 [PRUEBA]"
 	}
-	caption := fmt.Sprintf("%s Cartelera *%s* - Lote: %s", prefijo, socio.Nombre, lote.ID)
+	caption := fmt.Sprintf("%s Cartelera *%s* - Lote: %s", prefijo, socio.Nombre, loteID)
 	if err := p.sender.Send(ctx, socio.ChatID, png, caption); err != nil {
 		detalle.Error = err.Error()
 		p.log.Error("hooty.publish.send", "socio", socio.Nombre, "chat_id", socio.ChatID,

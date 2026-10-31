@@ -1,10 +1,102 @@
 import { qs } from '../../../shared/js/dom.js';
-import { api } from '../api.js?v=20261030_2101';
+import { api } from '../api.js?v=20261030_2201';
 import { fusionarTasas } from '../config.js';
 import { state } from '../state.js?v=20261030_02';
 import { abrirModal, cerrarModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
 import { renderMonitorGrid } from '../components/monitor-grid.js?v=20261030_02';
+
+function escaparHTML(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+}
+
+function parsearJSON(valor) {
+  if (typeof valor === 'string') {
+    try { return JSON.parse(valor); } catch (error) { return {}; }
+  }
+  return valor && typeof valor === 'object' ? valor : {};
+}
+
+function socioActivo(perfil) {
+  const mostrar = parsearJSON(perfil?.mostrar);
+  const tasas = mostrar.tasas;
+  return !(tasas === false || tasas === 'false' || tasas === 0 || tasas === '0');
+}
+
+function truncar2(valor) {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return 0;
+  return Math.trunc(numero * 100) / 100;
+}
+
+function tasasDelSocio(perfil, tasas) {
+  const configuradas = parsearJSON(perfil?.monedas);
+  const filas = [];
+  for (const [codigo, valor] of Object.entries(tasas || {})) {
+    const code = String(codigo).toUpperCase();
+    const base = Number(valor);
+    if (!Number.isFinite(base) || base <= 0) continue;
+    const regla = configuradas[code] || configuradas[codigo];
+    if (regla && regla.activo === false) continue;
+    let factor = 1;
+    if (regla) {
+      const tipo = String(regla.tipo || regla.def || 'D').toUpperCase();
+      const porcentaje = tipo === 'P'
+        ? (regla.porcentaje?.pago ?? regla.pago ?? 0)
+        : (regla.porcentaje?.deposito ?? regla.deposito ?? 0);
+      factor = tipo === 'P'
+        ? 1 - Math.abs(Number(porcentaje) || 0) / 100
+        : 1 + Math.abs(Number(porcentaje) || 0) / 100;
+    }
+    filas.push({ code, value: truncar2(base * factor) });
+  }
+  return filas.sort((a, b) => a.code.localeCompare(b.code));
+}
+
+function htmlCartelera(nombre, loteID, filas, prueba) {
+  const badge = prueba
+    ? '<span style="display:inline-block;margin-top:18px;padding:8px 14px;border-radius:10px;background:#f59e0b;color:#0f172a;font-size:16px;font-weight:800;">PRUEBA</span>'
+    : '';
+  const tarjetas = filas.map((fila) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#151b34;border-radius:14px;padding:16px 24px;margin-top:12px;">
+      <span style="font-size:24px;font-weight:800;color:#e2e8f0;">${escaparHTML(fila.code)}</span>
+      <span style="font-size:24px;font-weight:800;color:#34d399;">${fila.value.toFixed(2)}</span>
+    </div>`).join('');
+  return `
+    <div style="width:900px;box-sizing:border-box;padding:44px;background:#090d18;color:#f8fafc;font-family:Inter,Arial,sans-serif;">
+      <div style="font-size:48px;font-weight:800;color:#22d3ee;letter-spacing:1px;">HOOTY</div>
+      <div style="font-size:16px;font-weight:700;color:#94a3b8;margin-top:4px;">MERCADO &amp; TASAS</div>
+      <div style="font-size:22px;font-weight:800;margin-top:26px;">LOTE ${escaparHTML(loteID)}</div>
+      <div style="font-size:32px;font-weight:800;margin-top:18px;">${escaparHTML(nombre)}</div>
+      ${badge}
+      <div style="margin-top:24px;">${tarjetas || '<div style="color:#94a3b8;font-size:18px;">Sin tasas configuradas</div>'}</div>
+      <div style="font-size:14px;color:#64748b;margin-top:28px;">Generado ${new Date().toLocaleString('es-VE')}</div>
+    </div>`;
+}
+
+async function capturarCartelera(nombre, lote, prueba, perfil) {
+  const contenedor = document.getElementById('carteleraCaptura');
+  if (!contenedor) throw new Error('Falta el contenedor de captura');
+  if (typeof globalThis.html2canvas !== 'function') {
+    throw new Error('html2canvas no está disponible');
+  }
+  const filas = tasasDelSocio(perfil, lote.tasas);
+  contenedor.innerHTML = htmlCartelera(nombre, lote.id_tasa || 'T000', filas, prueba);
+  const objetivo = contenedor.firstElementChild;
+  try {
+    const canvas = await globalThis.html2canvas(objetivo, {
+      backgroundColor: '#090d18',
+      scale: 1,
+      logging: false,
+      useCORS: true
+    });
+    return canvas.toDataURL('image/png');
+  } finally {
+    contenedor.replaceChildren();
+  }
+}
 
 function alHacer(selector, evento, manejador) {
   const elemento = qs(selector);
@@ -80,10 +172,30 @@ export function initMonitor() {
   }
 
   async function publicarLote() {
-    showToast('⚡ Despachando lote a socios en ON...');
+    const prueba = Boolean(state.modoPruebaGlobal);
+    showToast(prueba ? '🧪 Generando cartelera de prueba...' : '⚡ Generando carteleras para socios ON...');
     try {
-      const datos = await api.publicarLote(state.modoPruebaGlobal);
-      showToast(`🚀 Publicado a ${datos.procesados} socios ON`);
+      const lote = await api.monitor();
+      const capturas = [];
+      if (prueba) {
+        const imagen = await capturarCartelera('PRUEBA', lote, true, null);
+        capturas.push({ socio: 'PRUEBA', chat_id: '', imagen });
+      } else {
+        const perfiles = await api.perfiles();
+        const socios = (Array.isArray(perfiles) ? perfiles : [])
+          .filter((perfil) => perfil && perfil.nombre && perfil.id_grupo &&
+            String(perfil.nombre).trim().toUpperCase() !== 'GENERAL' && socioActivo(perfil));
+        if (!socios.length) throw new Error('No hay socios activos ON');
+        for (let i = 0; i < socios.length; i++) {
+          const socio = socios[i];
+          showToast(`🎨 Capturando ${socio.nombre} (${i + 1}/${socios.length})`);
+          const imagen = await capturarCartelera(socio.nombre, lote, false, socio);
+          capturas.push({ socio: socio.nombre, chat_id: socio.id_grupo, imagen });
+        }
+      }
+      showToast(`📤 Enviando ${capturas.length} cartelera(s)...`);
+      const datos = await api.publicarLote(prueba, capturas);
+      showToast(`🚀 Publicado a ${datos.procesados ?? capturas.length} socios ON`);
     } catch (error) {
       showToast(`❌ Error al publicar: ${error.message}`);
     }

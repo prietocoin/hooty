@@ -34,7 +34,8 @@ async function solicitarJson(ruta, opciones = {}) {
 
   let respuesta;
   try {
-    respuesta = await fetch(apiUrl(`${BASE}${ruta}`), init);
+    const destino = ruta.startsWith('/api/v1/') ? ruta : `${BASE}${ruta}`;
+    respuesta = await fetch(apiUrl(destino), init);
   } catch (error) {
     throw new ApiError('No se pudo conectar con Hooty', 0, ruta);
   }
@@ -59,6 +60,10 @@ export const api = {
   /** Lectura canónica del lote vigente y sus tasas. */
   monitor() {
     return solicitarJson('/monitor');
+  },
+
+  perfiles() {
+    return solicitarJson('/api/v1/perfiles');
   },
 
   /**
@@ -100,10 +105,14 @@ export const api = {
     });
   },
 
-  publicarLote(modoPruebaGlobal) {
+  publicarLote(modoPruebaGlobal, carteleras = []) {
     return solicitarJson('/publicar-lote', {
       method: WRITE_METHOD,
-      body: JSON.stringify({ modo_prueba_global: modoPruebaGlobal })
+      body: JSON.stringify({
+        is_prueba: Boolean(modoPruebaGlobal),
+        modo_prueba_global: Boolean(modoPruebaGlobal),
+        carteleras
+      })
     });
   },
 

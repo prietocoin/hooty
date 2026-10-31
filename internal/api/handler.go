@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -43,6 +44,11 @@ type Handler struct {
 // RatePublisher despacha las carteleras del lote vigente.
 type RatePublisher interface {
 	Publish(ctx context.Context, isPrueba bool) (publisher.Result, error)
+}
+
+// ImagePublisher recibe las carteleras que el frontend generó con html2canvas.
+type ImagePublisher interface {
+	PublishImages(ctx context.Context, isPrueba bool, envios []publisher.Envio) (publisher.Result, error)
 }
 
 // Simulator expone el motor de liquidación canónico para el modal de edición.
@@ -372,15 +378,21 @@ func (h *Handler) SaveLote(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"id_tasa": id})
 }
 
-// PublishLote responde PUT /api/v1/tasas/publicar-lote. Lee is_prueba (o el
-// alias modo_prueba_global) y delega el despacho real en el publisher.
+// PublishLote responde PUT /api/v1/tasas/publicar-lote. Acepta las carteleras
+// ya rasterizadas por el frontend y, si no llegan, conserva el fallback de
+// renderizado del servidor.
 func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		IsPrueba         *bool `json:"is_prueba"`
 		ModoPruebaGlobal *bool `json:"modo_prueba_global"`
+		Carteleras       []struct {
+			Socio  string `json:"socio"`
+			ChatID string `json:"chat_id"`
+			Imagen string `json:"imagen"`
+		} `json:"carteleras"`
 	}
 	if r.Body != nil && r.ContentLength != 0 {
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<20))
 		if err := decoder.Decode(&body); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_publish_payload")
 			return
@@ -393,8 +405,36 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 		isPrueba = *body.ModoPruebaGlobal
 	}
 
+	envios := make([]publisher.Envio, 0, len(body.Carteleras))
+	for _, cartelera := range body.Carteleras {
+		imagen := strings.TrimSpace(cartelera.Imagen)
+		if comma := strings.Index(imagen, ","); strings.HasPrefix(imagen, "data:") && comma >= 0 {
+			imagen = imagen[comma+1:]
+		}
+		png, err := base64.StdEncoding.DecodeString(imagen)
+		if err != nil || len(png) == 0 {
+			writeError(w, http.StatusBadRequest, "invalid_cartelera_image")
+			return
+		}
+		envios = append(envios, publisher.Envio{
+			Socio: cartelera.Socio, ChatID: cartelera.ChatID, PNG: png,
+		})
+	}
+
 	if h.publisher != nil {
-		resultado, err := h.publisher.Publish(r.Context(), isPrueba)
+		var (
+			resultado publisher.Result
+			err       error
+		)
+		if len(envios) > 0 {
+			if images, ok := h.publisher.(ImagePublisher); ok {
+				resultado, err = images.PublishImages(r.Context(), isPrueba, envios)
+			} else {
+				resultado, err = h.publisher.Publish(r.Context(), isPrueba)
+			}
+		} else {
+			resultado, err = h.publisher.Publish(r.Context(), isPrueba)
+		}
 		if err != nil {
 			h.log.Error("hooty.api.tasas_publicar", "prueba", isPrueba, "error", err)
 			writeError(w, http.StatusBadGateway, err.Error())

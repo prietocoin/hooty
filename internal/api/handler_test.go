@@ -509,6 +509,7 @@ func TestTasasGuardarYPublicarUsanPUT(t *testing.T) {
 type fakePublisher struct {
 	prueba bool
 	calls  int
+	images []publisher.Envio
 	err    error
 }
 
@@ -519,6 +520,16 @@ func (f *fakePublisher) Publish(_ context.Context, isPrueba bool) (publisher.Res
 		return publisher.Result{}, f.err
 	}
 	return publisher.Result{IDTasa: "T999", Procesados: 1, Prueba: isPrueba}, nil
+}
+
+func (f *fakePublisher) PublishImages(_ context.Context, isPrueba bool, envios []publisher.Envio) (publisher.Result, error) {
+	f.prueba = isPrueba
+	f.calls++
+	f.images = envios
+	if f.err != nil {
+		return publisher.Result{}, f.err
+	}
+	return publisher.Result{IDTasa: "T999", Procesados: len(envios), Prueba: isPrueba}, nil
 }
 
 func TestTasasActivasInterpretaMostrar(t *testing.T) {
@@ -559,6 +570,29 @@ func TestPublicarLoteLeeIsPruebaYDespacha(t *testing.T) {
 	}
 	if despachador.calls != 1 || !despachador.prueba {
 		t.Fatalf("is_prueba no llegó al despachador: %+v", despachador)
+	}
+}
+
+func TestPublicarLoteDespachaCartelerasDelCliente(t *testing.T) {
+	t.Parallel()
+
+	despachador := &fakePublisher{}
+	mux := http.NewServeMux()
+	NewHandler(testStore(), nil).WithPublisher(despachador).Register(mux)
+
+	body := `{"is_prueba":false,"carteleras":[{"socio":"ANA","chat_id":"ana@g.us","imagen":"data:image/png;base64,iVBORw0KGgo="}]}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/tasas/publicar-lote", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("publicar con imágenes status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if len(despachador.images) != 1 {
+		t.Fatalf("carteleras recibidas = %d", len(despachador.images))
+	}
+	envio := despachador.images[0]
+	if envio.Socio != "ANA" || envio.ChatID != "ana@g.us" || len(envio.PNG) == 0 {
+		t.Fatalf("envío inesperado: %+v", envio)
 	}
 }
 

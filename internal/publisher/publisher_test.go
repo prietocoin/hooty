@@ -135,6 +135,49 @@ func TestCarteleraRenderizaPNG(t *testing.T) {
 	}
 }
 
+func TestPublishImagesUsaImagenesDelCliente(t *testing.T) {
+	t.Parallel()
+
+	sender := &fakeSender{}
+	p := testPublisher("prueba@g.us", sender)
+	resultado, err := p.PublishImages(context.Background(), false, []Envio{
+		{Socio: "ANA", ChatID: "ana@g.us", PNG: []byte("png-ana")},
+		{Socio: "BETO", ChatID: "beto@g.us", PNG: []byte("png-beto")},
+	})
+	if err != nil {
+		t.Fatalf("publicación con imágenes rechazada: %v", err)
+	}
+	destinos := sender.chatIDs()
+	sort.Strings(destinos)
+	if len(destinos) != 2 || destinos[0] != "ana@g.us" || destinos[1] != "beto@g.us" {
+		t.Fatalf("destinos = %v", destinos)
+	}
+	if resultado.Procesados != 2 {
+		t.Fatalf("resultado inesperado: %+v", resultado)
+	}
+}
+
+func TestPublishImagesPruebaIgnoraChatsDeSocios(t *testing.T) {
+	t.Parallel()
+
+	sender := &fakeSender{}
+	p := testPublisher("prueba@g.us", sender)
+	resultado, err := p.PublishImages(context.Background(), true, []Envio{
+		{Socio: "ANA", ChatID: "ana@g.us", PNG: []byte("png-ana")},
+		{Socio: "BETO", ChatID: "beto@g.us", PNG: []byte("png-beto")},
+	})
+	if err != nil {
+		t.Fatalf("publicación de prueba rechazada: %v", err)
+	}
+	destinos := sender.chatIDs()
+	if len(destinos) != 1 || destinos[0] != "prueba@g.us" {
+		t.Fatalf("prueba debe usar solo el grupo test: %v", destinos)
+	}
+	if resultado.Procesados != 1 || !resultado.Prueba {
+		t.Fatalf("resultado inesperado: %+v", resultado)
+	}
+}
+
 func TestPublishPruebaSinGrupoFalla(t *testing.T) {
 	t.Parallel()
 
