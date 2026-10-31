@@ -36,6 +36,7 @@ function tasasDelSocio(perfil, tasas) {
   const filas = [];
   for (const [codigo, valor] of Object.entries(tasas || {})) {
     const code = String(codigo).toUpperCase();
+    if (!/^[A-Z]{3,5}$/.test(code)) continue;
     const base = Number(valor);
     if (!Number.isFinite(base) || base <= 0) continue;
     const regla = configuradas[code] || configuradas[codigo];
