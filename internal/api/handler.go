@@ -51,6 +51,11 @@ type ImagePublisher interface {
 	PublishImages(ctx context.Context, isPrueba bool, envios []publisher.Envio) (publisher.Result, error)
 }
 
+// Previewer renderiza una cartelera individual con el mismo generador oficial.
+type Previewer interface {
+	Preview(ctx context.Context, socio string, prueba bool) ([]byte, error)
+}
+
 // Simulator expone el motor de liquidación canónico para el modal de edición.
 type Simulator interface {
 	Simular(ctx context.Context, input ingest.SimulacionInput) (ingest.SimulacionResult, error)
@@ -92,6 +97,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/perfiles/{$}", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/tasas/monitor/{$}", h.LatestTasa)
+	mux.HandleFunc("GET /api/v1/tasas/preview", h.PreviewLote)
+	mux.HandleFunc("GET /api/v1/tasas/preview/{socio}", h.PreviewLote)
 	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote", h.SaveLote)
 	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote/{$}", h.SaveLote)
 	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote", h.PublishLote)
@@ -146,6 +153,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.ListPerfiles(w, r)
 	case path == "/api/v1/tasas/monitor":
 		h.LatestTasa(w, r)
+	case path == "/api/v1/tasas/preview" || strings.HasPrefix(path, "/api/v1/tasas/preview/"):
+		h.PreviewLote(w, r)
 	case path == "/api/v1/reportes/filtros":
 		h.ReportFilters(w, r)
 	default:
@@ -463,6 +472,31 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 
 // DeleteLote responde DELETE /api/v1/tasas/lote/{id}. Elimina el lote físico y
 // devuelve 404 si el identificador no existe.
+// PreviewLote responde GET /api/v1/tasas/preview/{socio} con el PNG generado
+// por el mismo motor oficial que usa la publicación masiva.
+func (h *Handler) PreviewLote(w http.ResponseWriter, r *http.Request) {
+	previewer, ok := h.publisher.(Previewer)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "preview_unavailable")
+		return
+	}
+	socio := strings.TrimSpace(r.PathValue("socio"))
+	if socio == "" {
+		socio = strings.TrimSpace(r.URL.Query().Get("socio"))
+	}
+	prueba, _ := strconv.ParseBool(r.URL.Query().Get("prueba"))
+	png, err := previewer.Preview(r.Context(), socio, prueba)
+	if err != nil {
+		h.log.Error("hooty.api.tasas_preview", "socio", socio, "prueba", prueba, "error", err)
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(png)
+}
+
 func (h *Handler) DeleteLote(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {

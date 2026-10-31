@@ -667,7 +667,8 @@ func (r *Repository) LatestLote(ctx context.Context) (publisher.Lote, error) {
 // JSON/booleanos del motor SQL.
 func (r *Repository) ActiveSocios(ctx context.Context) ([]publisher.Socio, error) {
 	rows, err := r.pool.Query(ctx, `
-SELECT COALESCE(nombre, ''), COALESCE(id_grupo, ''), COALESCE(mostrar::text, '{}')
+SELECT COALESCE(nombre, ''), COALESCE(id_grupo, ''), COALESCE(moneda_base, 'USDT'),
+       COALESCE(monedas::text, '{}'), COALESCE(mostrar::text, '{}')
 FROM perfil
 WHERE UPPER(BTRIM(COALESCE(nombre, ''))) NOT IN ('', 'GENERAL')
   AND BTRIM(COALESCE(id_grupo, '')) <> ''
@@ -680,14 +681,15 @@ ORDER BY nombre`)
 	socios := make([]publisher.Socio, 0, 32)
 	for rows.Next() {
 		var socio publisher.Socio
-		var mostrar string
-		if err := rows.Scan(&socio.Nombre, &socio.ChatID, &mostrar); err != nil {
+		var monedas, mostrar string
+		if err := rows.Scan(&socio.Nombre, &socio.ChatID, &socio.MonedaBase, &monedas, &mostrar); err != nil {
 			log.Printf("[ERROR] Fallo DB al escanear socio para publicar: %v", err)
 			return nil, fmt.Errorf("api: escanear socio activo: %w", err)
 		}
 		if !tasasActivas(mostrar) {
 			continue
 		}
+		socio.Monedas = json.RawMessage(monedas)
 		socios = append(socios, socio)
 	}
 	if err := rows.Err(); err != nil {

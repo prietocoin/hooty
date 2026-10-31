@@ -3,6 +3,7 @@ package publisher
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,8 +15,10 @@ import (
 
 // Socio es un destino de publicación con su chat_id de WhatsApp.
 type Socio struct {
-	Nombre string
-	ChatID string
+	Nombre     string
+	ChatID     string
+	MonedaBase string
+	Monedas    json.RawMessage
 }
 
 // Lote es la instantánea de tasas que se publica.
@@ -26,11 +29,14 @@ type Lote struct {
 
 // Cartelera es el contenido que se renderiza para un destinatario.
 type Cartelera struct {
-	Socio    string
-	Lote     string
-	Tasas    map[string]float64
-	Prueba   bool
-	Generada time.Time
+	Socio      string
+	ChatID     string
+	MonedaBase string
+	Monedas    json.RawMessage
+	Lote       string
+	Tasas      map[string]float64
+	Prueba     bool
+	Generada   time.Time
 }
 
 // Envio es una cartelera ya rasterizada por el cliente.
@@ -163,11 +169,14 @@ func (p *Publisher) Publish(ctx context.Context, isPrueba bool) (Result, error) 
 
 func (p *Publisher) enviar(ctx context.Context, socio Socio, lote Lote, prueba bool) Detalle {
 	png, err := p.renderer.Render(Cartelera{
-		Socio:    socio.Nombre,
-		Lote:     lote.ID,
-		Tasas:    lote.Tasas,
-		Prueba:   prueba,
-		Generada: p.now(),
+		Socio:      socio.Nombre,
+		ChatID:     socio.ChatID,
+		MonedaBase: socio.MonedaBase,
+		Monedas:    socio.Monedas,
+		Lote:       lote.ID,
+		Tasas:      lote.Tasas,
+		Prueba:     prueba,
+		Generada:   p.now(),
 	})
 	if err != nil {
 		p.log.Error("hooty.publish.render", "socio", socio.Nombre, "chat_id", socio.ChatID, "error", err)
@@ -238,6 +247,42 @@ func (p *Publisher) PublishImages(ctx context.Context, isPrueba bool, envios []E
 		return resultado, errors.New("publisher: fallaron todos los envíos")
 	}
 	return resultado, nil
+}
+
+// Preview renderiza una cartelera con el mismo generador oficial, sin enviarla.
+func (p *Publisher) Preview(ctx context.Context, socioNombre string, prueba bool) ([]byte, error) {
+	lote, err := p.source.LatestLote(ctx)
+	if err != nil {
+		return nil, err
+	}
+	destino := Socio{Nombre: "PRUEBA", MonedaBase: "USDT"}
+	if !prueba {
+		socios, err := p.source.ActiveSocios(ctx)
+		if err != nil {
+			return nil, err
+		}
+		encontrado := false
+		for _, socio := range socios {
+			if strings.EqualFold(strings.TrimSpace(socio.Nombre), strings.TrimSpace(socioNombre)) {
+				destino = socio
+				encontrado = true
+				break
+			}
+		}
+		if !encontrado && len(socios) > 0 {
+			destino = socios[0]
+		}
+	}
+	return p.renderer.Render(Cartelera{
+		Socio:      destino.Nombre,
+		ChatID:     destino.ChatID,
+		MonedaBase: destino.MonedaBase,
+		Monedas:    destino.Monedas,
+		Lote:       lote.ID,
+		Tasas:      lote.Tasas,
+		Prueba:     prueba,
+		Generada:   p.now(),
+	})
 }
 
 func (p *Publisher) enviarImagen(ctx context.Context, socio Socio, loteID string, png []byte, prueba bool) Detalle {

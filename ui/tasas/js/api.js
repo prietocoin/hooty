@@ -105,15 +105,30 @@ export const api = {
     });
   },
 
-  publicarLote(modoPruebaGlobal, carteleras = []) {
+  publicarLote(modoPruebaGlobal) {
     return solicitarJson('/publicar-lote', {
       method: WRITE_METHOD,
       body: JSON.stringify({
         is_prueba: Boolean(modoPruebaGlobal),
-        modo_prueba_global: Boolean(modoPruebaGlobal),
-        carteleras
+        modo_prueba_global: Boolean(modoPruebaGlobal)
       })
     });
+  },
+
+  async previewBlob(socio = '', prueba = false) {
+    const params = new URLSearchParams();
+    if (socio) params.set('socio', socio);
+    if (prueba) params.set('prueba', '1');
+    const ruta = socio ? `/preview/${encodeURIComponent(socio)}` : '/preview';
+    const consulta = params.toString();
+    const respuesta = await fetch(apiUrl(`${BASE}${ruta}${consulta ? `?${consulta}` : ''}`), {
+      headers: { Accept: 'image/png' },
+      cache: 'no-store'
+    });
+    if (!respuesta.ok) {
+      throw new ApiError('No se pudo generar la vista previa', respuesta.status, ruta);
+    }
+    return respuesta.blob();
   },
 
   notificarRemesas() {

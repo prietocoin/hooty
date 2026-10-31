@@ -532,6 +532,13 @@ func (f *fakePublisher) PublishImages(_ context.Context, isPrueba bool, envios [
 	return publisher.Result{IDTasa: "T999", Procesados: len(envios), Prueba: isPrueba}, nil
 }
 
+func (f *fakePublisher) Preview(context.Context, string, bool) ([]byte, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return []byte("\x89PNG\r\n\x1a\n"), nil
+}
+
 func TestTasasActivasInterpretaMostrar(t *testing.T) {
 	t.Parallel()
 
@@ -593,6 +600,22 @@ func TestPublicarLoteDespachaCartelerasDelCliente(t *testing.T) {
 	envio := despachador.images[0]
 	if envio.Socio != "ANA" || envio.ChatID != "ana@g.us" || len(envio.PNG) == 0 {
 		t.Fatalf("envío inesperado: %+v", envio)
+	}
+}
+
+func TestPreviewLoteUsaMotorOficial(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	NewHandler(testStore(), nil).WithPublisher(&fakePublisher{}).Register(mux)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/tasas/preview/ANA?prueba=1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Content-Type") != "image/png" || rec.Body.Len() == 0 {
+		t.Fatalf("preview inválida: tipo=%q bytes=%d", rec.Header().Get("Content-Type"), rec.Body.Len())
 	}
 }
 
