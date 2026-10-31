@@ -58,9 +58,10 @@ export function formatearResultadoSpread(valor) {
 /** Tasa resultante del spread, formateada con la regla estricta. */
 export { formatearTasaEstricta };
 
-function urlBandera(regla) {
-  const iso = String(regla?.iso || '').trim().toLowerCase();
-  return iso ? `/tasas/flags/${iso}.png` : '';
+function banderaEmoji(regla) {
+  const iso = String(regla?.iso || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(iso)) return '';
+  return String.fromCodePoint(...iso.split('').map((letra) => 127397 + letra.charCodeAt(0)));
 }
 
 function opcionesCatalogo(seleccionada, reglas) {
@@ -101,22 +102,24 @@ function renderColumnaOperacion({ regla, index, campo, tipo, base, etiqueta }) {
   const esDeposito = tipo === 'D';
   const porcentaje = esDeposito ? regla.deposito : regla.pago;
   const resultado = tasaResultante(base, porcentaje, tipo);
-  const claseCampo = esDeposito ? 'regla-field--dep' : 'regla-field--pago';
-  const claseResultado = esDeposito ? 'is-dep text-cyan-300' : 'is-pago text-rose-300';
-  const claseEtiqueta = esDeposito ? 'text-cyan-400' : 'text-rose-400';
+  const claseCelda = esDeposito ? 'regla-cell--dep' : 'regla-cell--pago';
+  const claseEtiqueta = esDeposito ? 'is-dep' : 'is-pago';
+  const claseResultado = esDeposito ? 'is-dep' : 'is-pago';
   const nombre = esDeposito ? 'depósito' : 'pago';
 
   return `
-    <div class="regla-field ${claseCampo} flex flex-col gap-1">
-      <span class="regla-field-label ${claseEtiqueta} text-[10px] font-bold uppercase tracking-wider">${etiqueta}</span>
-      <div class="regla-percent flex items-center justify-between bg-slate-900 border border-slate-700 rounded px-2 py-1">
+    <div class="regla-cell ${claseCelda}">
+      <div class="regla-cell-top">
+        <span class="regla-cell-label ${claseEtiqueta}">${etiqueta}</span>
+        <span class="regla-cell-tasa">Tasa</span>
+      </div>
+      <div class="regla-cell-bottom">
         <input type="number" step="any" inputmode="decimal"
                aria-label="Spread de ${nombre} de ${escapeHTML(regla.codigo)}"
                data-regla="${index}" data-campo="${campo}"
                value="${escapeHTML(porcentaje)}"
-               class="regla-percent-input w-6 bg-transparent text-xs text-white font-mono text-center focus:outline-none">
-        <span class="text-[10px] text-slate-500" aria-hidden="true">%</span>
-        <span class="regla-result ${claseResultado} ml-auto text-xs font-mono font-bold"
+               class="regla-percent-input">
+        <span class="regla-result ${claseResultado}"
               data-resultado="${index}-${campo}"
               title="Tasa resultante">${formatearResultadoSpread(resultado)}</span>
       </div>
@@ -125,36 +128,33 @@ function renderColumnaOperacion({ regla, index, campo, tipo, base, etiqueta }) {
 
 function renderRegla(regla, index, tasasBase) {
   const base = baseMoneda(regla, tasasBase);
-  const bandera = urlBandera(regla);
-  const alt = `Bandera ${escapeHTML(regla.codigo)}`;
+  const bandera = banderaEmoji(regla);
   const activo = regla.activo !== false;
   const valorBase = Number.isFinite(Number(base)) ? String(base) : '';
 
   return `
     <div class="regla-card rounded-xl border border-slate-800 bg-[#0b132b] p-3 mb-2.5 ${activo ? '' : 'is-off'}">
       <div class="regla-head flex items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
-        <div class="regla-id flex items-center gap-2 min-w-0">
-          <span class="text-base leading-none">
-            ${bandera ? `<img class="regla-flag" src="${bandera}" alt="${alt}" loading="lazy" onerror="this.style.display='none'">` : ''}
-          </span>
-          <span class="regla-name font-bold text-white text-sm truncate">${escapeHTML(regla.nombre)}</span>
-          <span class="regla-code text-xs font-semibold text-cyan-400 font-mono">${escapeHTML(regla.codigo)}</span>
+        <div class="regla-id">
+          <span class="regla-flag">${bandera}</span>
+          <span class="regla-name">${escapeHTML(regla.nombre)}</span>
+          <span class="regla-code">${escapeHTML(regla.codigo)}</span>
         </div>
-        <div class="regla-controls flex items-center gap-2 shrink-0">
+        <div class="regla-controls">
           ${renderDef(regla, index)}
           <button type="button"
                   data-accion="toggle-cartelera"
                   data-indice="${index}"
-                  class="regla-switch relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${activo ? 'is-on bg-emerald-500' : 'is-off bg-slate-700'}"
+                  class="regla-switch ${activo ? 'is-on' : 'is-off'}"
                   aria-pressed="${activo}"
                   title="Incluir ${escapeHTML(regla.codigo)} en cartelera"
                   aria-label="Incluir ${escapeHTML(regla.codigo)} en la cartelera">
-            <span class="regla-switch-thumb ${activo ? 'translate-x-4' : 'translate-x-0.5'} inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 mt-0.5 shadow"></span>
+            <span class="regla-switch-thumb"></span>
           </button>
           <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
-                  class="regla-del text-slate-500 hover:text-rose-400 pl-1"
+                  class="regla-del"
                   title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
             </svg>
@@ -163,16 +163,18 @@ function renderRegla(regla, index, tasasBase) {
       </div>
 
       <div class="regla-grid grid grid-cols-3 gap-2 pt-2">
-        <div class="regla-field flex flex-col gap-1">
-          <span class="regla-field-label text-[10px] font-bold text-slate-400 uppercase tracking-wider">Base</span>
+        <div class="regla-cell regla-cell--base">
+          <div class="regla-cell-top">
+            <span class="regla-cell-label is-base">BASE</span>
+          </div>
           <input type="number" step="any" inputmode="decimal"
                  aria-label="Tasa base de ${escapeHTML(regla.codigo)}"
                  data-regla="${index}" data-campo="base"
                  value="${escapeHTML(valorBase)}"
-                 class="regla-base-input w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono font-bold text-center focus:outline-none focus:border-cyan-500">
+                 class="regla-base-input">
         </div>
-        ${renderColumnaOperacion({ regla, index, campo: 'deposito', tipo: 'D', base, etiqueta: '↓ Depósito' })}
-        ${renderColumnaOperacion({ regla, index, campo: 'pago', tipo: 'P', base, etiqueta: '↑ Pago' })}
+        ${renderColumnaOperacion({ regla, index, campo: 'deposito', tipo: 'D', base, etiqueta: '↓D%' })}
+        ${renderColumnaOperacion({ regla, index, campo: 'pago', tipo: 'P', base, etiqueta: '↑P%' })}
       </div>
     </div>`;
 }
@@ -182,7 +184,7 @@ function renderRegla(regla, index, tasasBase) {
 export function renderReglasEditor(reglas = [], monedaParaAgregar = '', tasasBase = null) {
   const activas = reglas.filter((regla) => regla.activo !== false).length;
   const tarjetas = reglas.length
-    ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3">${reglas.map((regla, index) => renderRegla(regla, index, tasasBase)).join('')}</div>`
+    ? `<div class="reglas-lista">${reglas.map((regla, index) => renderRegla(regla, index, tasasBase)).join('')}</div>`
     : '';
   const vacio = reglas.length === 0
     ? '<div class="text-center py-6 border border-dashed border-slate-800 rounded-xl text-slate-500 text-xs">Sin reglas configuradas.</div>'

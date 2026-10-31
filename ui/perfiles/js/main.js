@@ -1,6 +1,6 @@
 import { api } from './api.js?v=20261031_03';
 import { state } from './store.js?v=20261024_99_FIX_TASAS';
-import { crearEditor } from './controllers/editor.js?v=20261031_08';
+import { crearEditor } from './controllers/editor.js?v=20261031_09';
 import { crearDirectorio } from './controllers/directorio.js?v=20261031_02';
 import { crearAcciones } from './controllers/acciones.js?v=20261031_02';
 
@@ -126,7 +126,7 @@ const acciones = crearAcciones({
 
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  const script = new URL('../sw.js?v=20261031_04', import.meta.url);
+  const script = new URL('../sw.js?v=20261031_05', import.meta.url);
   const scope = new URL('../', import.meta.url).pathname;
   navigator.serviceWorker
     .register(script, { scope, updateViaCache: 'none' })

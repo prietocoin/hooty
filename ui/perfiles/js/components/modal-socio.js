@@ -2,7 +2,7 @@ import { MONEDAS_BASE } from '../catalog.js';
 import { esHerencia } from '../domain.js?v=20261031_04';
 import { escapeHTML } from '../../../shared/js/dom.js';
 import { renderReglasHerencia } from './reglas-herencia.js';
-import { renderReglasEditor } from './reglas-editor.js?v=20261031_06';
+import { renderReglasEditor } from './reglas-editor.js?v=20261031_07';
 
 function opcionesBase(seleccionada) {
   return MONEDAS_BASE.map((opcion) => {
@@ -70,8 +70,9 @@ export function renderModalSocio({ socio = {}, reglas = [], monedaParaAgregar = 
 
         <header class="glauk-modal__header">
           <h3 id="perfiles-modal-titulo" class="min-w-0">
-            <span class="block truncate">Configuración de Socio</span>
-            <span id="perfiles-modal-nombre" class="block truncate text-cyan-400 text-[12px]">${nombre || 'Nuevo Socio'}</span>
+            <span class="perfiles-modal-dot" aria-hidden="true"></span>
+            <span class="perfiles-modal-kicker">Configuración Socio:</span>
+            <span id="perfiles-modal-nombre" class="perfiles-modal-socio">${nombre || 'Nuevo Socio'}</span>
           </h3>
           <button type="button" data-accion="cerrar" class="glauk-modal__close" aria-label="Cerrar configuración">✕</button>
         </header>

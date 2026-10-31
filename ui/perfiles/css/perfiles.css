@@ -174,13 +174,77 @@ html {
 }
 
 /* --------------------------------------------------------------------------
-   Tarjetas de moneda ultra-compactas (2 renglones, mobile-first)
+   Header del modal de socio
    -------------------------------------------------------------------------- */
-.regla-card {
+#perfiles-modal-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.perfiles-modal-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, .6);
+}
+
+.perfiles-modal-kicker {
+  flex: 0 0 auto;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.perfiles-modal-socio {
+  min-width: 0;
+  overflow: hidden;
+  color: #34d399;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Tarjetas de moneda del modal (2 renglones, mobile-first)
+   -------------------------------------------------------------------------- */
+/* El CSS compartido fuerza 44px en inputs/botones del modal. Las tarjetas
+   compactas necesitan su propia densidad; se anula solo dentro de .regla-card. */
+.glauk-modal__body .regla-card button {
+  min-height: 0 !important;
+}
+
+.glauk-modal__body .regla-card [data-accion="eliminar-moneda"] {
+  min-width: 0 !important;
+}
+
+.glauk-modal__body .regla-base-input,
+.glauk-modal__body .regla-percent-input {
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+.reglas-lista {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
+}
+
+.regla-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
   border: 1px solid #1e293b;
   border-radius: 12px;
   background: #0b132b;
@@ -188,7 +252,7 @@ html {
 }
 
 .regla-card:hover {
-  border-color: rgba(34, 211, 238, .32);
+  border-color: rgba(34, 211, 238, .3);
 }
 
 .regla-card.is-off {
@@ -199,7 +263,7 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(30, 41, 59, .8);
@@ -209,24 +273,22 @@ html {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
 .regla-flag {
   flex: 0 0 auto;
-  width: 20px;
-  height: 14px;
-  border-radius: 2px;
-  object-fit: cover;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .regla-name {
   min-width: 0;
   overflow: hidden;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -235,22 +297,27 @@ html {
 
 .regla-code {
   flex: 0 0 auto;
-  color: #22d3ee;
+  padding: 2px 6px;
+  border: 1px solid rgba(6, 182, 212, .35);
+  border-radius: 4px;
+  background: rgba(6, 182, 212, .12);
+  color: #67e8f9;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .02em;
 }
 
 .regla-controls {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* Selector segmentado D / P / A */
 .regla-def {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   padding: 2px;
   border: 1px solid rgba(51, 65, 85, .6);
@@ -259,16 +326,17 @@ html {
 }
 
 .regla-def button {
-  padding: 2px 8px;
+  min-width: 24px;
+  padding: 3px 7px;
   border: 0;
   border-radius: 4px;
   background: transparent;
   color: #94a3b8;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.25;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
-  transition: all .15s ease;
+  transition: background .15s ease, color .15s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -287,7 +355,6 @@ html {
 /* Switch de cartelera */
 .regla-switch {
   position: relative;
-  display: inline-flex;
   flex: 0 0 auto;
   width: 36px;
   height: 20px;
@@ -296,17 +363,17 @@ html {
   border-radius: 999px;
   background: #334155;
   cursor: pointer;
-  transition: background-color .2s ease;
+  transition: background .2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .regla-switch.is-on {
-  background: #10b981;
+  background: #22c55e;
 }
 
 .regla-switch-thumb {
   position: absolute;
-  top: 1px;
+  top: 2px;
   left: 2px;
   width: 16px;
   height: 16px;
@@ -331,9 +398,9 @@ html {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 3px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   color: #64748b;
   cursor: pointer;
@@ -347,102 +414,108 @@ html {
 }
 
 .regla-del svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
-/* Renglón 2: base + depósito + pago */
+/* Renglón 2: BASE / ↓D% / ↑P% */
 .regla-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding-top: 8px;
+  gap: 6px;
 }
 
-.regla-field {
+.regla-cell {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  background: #070e23;
+}
+
+.regla-cell--base {
+  border-color: rgba(51, 65, 85, .9);
+  background: rgba(15, 23, 42, .5);
+}
+
+.regla-cell--dep {
+  border-color: rgba(8, 145, 178, .5);
+  background: rgba(8, 51, 68, .22);
+}
+
+.regla-cell--pago {
+  border-color: rgba(190, 18, 60, .5);
+  background: rgba(76, 5, 25, .22);
+}
+
+.regla-cell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 4px;
   min-width: 0;
 }
 
-.regla-field-label {
-  color: #94a3b8;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .05em;
+.regla-cell-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.regla-field--dep .regla-field-label { color: #22d3ee; }
-.regla-field--pago .regla-field-label { color: #fb7185; }
+.regla-cell-label.is-base { color: #94a3b8; }
+.regla-cell-label.is-dep { color: #22d3ee; }
+.regla-cell-label.is-pago { color: #fb7185; }
 
-.regla-base-input {
-  width: 100%;
-  min-width: 0;
-  padding: 4px 8px;
-  border: 1px solid #334155;
-  border-radius: 4px;
-  background: #0f172a;
-  color: #ffffff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
-  outline: none;
+.regla-cell-tasa {
+  color: #64748b;
+  font-size: 8px;
+  line-height: 1;
 }
 
-.regla-base-input:focus { border-color: #06b6d4; }
-
-.regla-percent {
+.regla-cell-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 4px;
   min-width: 0;
-  padding: 4px 8px;
-  border: 1px solid #334155;
-  border-radius: 4px;
-  background: #0f172a;
 }
 
-.regla-field--dep .regla-percent:focus-within { border-color: #06b6d4; }
-.regla-field--pago .regla-percent:focus-within { border-color: #f43f5e; }
-
+.regla-base-input,
 .regla-percent-input {
-  width: 24px;
   min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
   color: #ffffff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.15;
   outline: none;
 }
 
-.regla-percent span {
-  color: #64748b;
-  font-size: 10px;
-  line-height: 1;
-  pointer-events: none;
-}
+.regla-base-input { width: 100%; text-align: left; }
+.regla-percent-input { width: 28px; text-align: left; }
 
 .regla-result {
   margin-left: auto;
   overflow: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .regla-result.is-dep { color: #67e8f9; }
-.regla-result.is-pago { color: #fda4af; }
+.regla-result.is-pago { color: #fb7185; }
 
 /* Botón principal del modal: gradiente corporativo (Tailwind no lo compila). */
 .perfiles-save-btn {
@@ -457,18 +530,28 @@ html {
 
 @media (max-width: 420px) {
   .regla-card {
-    padding: 10px;
+    padding: 9px 10px;
   }
 
   .regla-controls {
-    gap: 6px;
+    gap: 4px;
   }
 
   .regla-def button {
-    padding: 2px 6px;
+    min-width: 22px;
+    padding: 3px 6px;
+  }
+
+  .regla-cell {
+    padding: 4px 6px;
+  }
+
+  .regla-base-input,
+  .regla-percent-input {
+    font-size: 13px;
   }
 
   .regla-result {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
