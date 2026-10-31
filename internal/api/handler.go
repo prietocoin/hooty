@@ -31,6 +31,7 @@ type Store interface {
 	ApagarPerfiles(ctx context.Context) error
 	MemorizarPlantilla(ctx context.Context) error
 	RestaurarPlantilla(ctx context.Context) error
+	NotifyRates(ctx context.Context, idTasa string) (string, error)
 	LatestTasa(ctx context.Context) (Tasa, error)
 	SaveLote(ctx context.Context, tasas map[string]any) (string, error)
 	PublishLote(ctx context.Context) (string, int, error)
@@ -109,6 +110,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/perfiles/apagar-todos", h.ApagarPerfiles)
 	mux.HandleFunc("POST /api/v1/perfiles/plantilla/memorizar", h.MemorizarPlantilla)
 	mux.HandleFunc("POST /api/v1/perfiles/plantilla/restaurar", h.RestaurarPlantilla)
+	mux.HandleFunc("POST /api/v1/notificaciones/tasas", h.NotifyRates)
+	mux.HandleFunc("POST /api/v1/tasas/notificar-remesas", h.NotifyRates)
 	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado", h.PatchPerfilEstado)
 	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado/{$}", h.PatchPerfilEstado)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
@@ -155,6 +158,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.MemorizarPlantilla(w, r)
 	case r.Method == http.MethodPost && path == "/api/v1/perfiles/plantilla/restaurar":
 		h.RestaurarPlantilla(w, r)
+	case r.Method == http.MethodPost && (path == "/api/v1/notificaciones/tasas" || path == "/api/v1/tasas/notificar-remesas"):
+		h.NotifyRates(w, r)
 	case r.Method == http.MethodPost:
 		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -449,6 +454,27 @@ func (h *Handler) RestaurarPlantilla(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Plantilla restaurada."})
+}
+
+// NotifyRates inserta una fila en notificaciones_tasas para disparar el webhook
+// de n8n. Si no llega id_tasa, usa el lote vigente.
+func (h *Handler) NotifyRates(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDTasa string `json:"id_tasa"`
+	}
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_notification_payload")
+			return
+		}
+	}
+	id, err := h.store.NotifyRates(r.Context(), strings.TrimSpace(body.IDTasa))
+	if err != nil {
+		h.log.Error("hooty.api.notificar_tasas", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "id_tasa": id})
 }
 
 func (h *Handler) LatestTasa(w http.ResponseWriter, r *http.Request) {

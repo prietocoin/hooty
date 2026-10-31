@@ -1,5 +1,5 @@
 import { qs } from '../../../shared/js/dom.js';
-import { api } from '../api.js?v=20261031_01';
+import { api } from '../api.js?v=20261031_03';
 
 export function crearAcciones({
   recargar = async () => {},
@@ -39,10 +39,37 @@ export function crearAcciones({
     }
   }
 
+  async function notificarFundda() {
+    try {
+      await api.notificarTasas();
+      mostrarToast('✅ Trigger de tasas enviado a n8n');
+      await recargar();
+    } catch (error) {
+      mostrarToast('❌ No se pudo disparar el trigger de tasas', true);
+    }
+  }
+
+  let temporizadorToast = null;
+  function mostrarToast(mensaje, esError = false) {
+    let toast = document.getElementById('perfiles-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'perfiles-toast';
+      toast.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:10000;padding:10px 16px;border-radius:12px;font-size:12px;font-weight:700;color:#f8fafc;box-shadow:0 10px 30px rgba(0,0,0,.35);transition:opacity .2s;';
+      document.body.append(toast);
+    }
+    toast.textContent = mensaje;
+    toast.style.background = esError ? 'rgba(127,29,29,.95)' : 'rgba(6,78,59,.95)';
+    toast.style.border = esError ? '1px solid rgba(248,113,113,.5)' : '1px solid rgba(52,211,153,.5)';
+    toast.style.opacity = '1';
+    if (temporizadorToast) clearTimeout(temporizadorToast);
+    temporizadorToast = setTimeout(() => { toast.style.opacity = '0'; }, 2600);
+  }
+
   function mount() {
     if (montado) return;
     montado = true;
-    qs('#btn-refrescar')?.addEventListener('click', () => { void recargar(); });
+    qs('#btn-refrescar')?.addEventListener('click', () => { void notificarFundda(); });
     qs('#btn-apagar-todos')?.addEventListener('click', () => { void apagarTodos(); });
     qs('#btn-memorizar')?.addEventListener('click', () => { void memorizarPlantilla(); });
     qs('#btn-restaurar')?.addEventListener('click', () => { void restaurarPlantilla(); });

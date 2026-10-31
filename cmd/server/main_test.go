@@ -66,6 +66,8 @@ func (routeStore) MemorizarPlantilla(context.Context) error { return nil }
 
 func (routeStore) RestaurarPlantilla(context.Context) error { return nil }
 
+func (routeStore) NotifyRates(context.Context, string) (string, error) { return "T999", nil }
+
 func (routeStore) LatestTasa(context.Context) (api.Tasa, error) {
 	return api.Tasa{IDTasa: "T086", Tasas: json.RawMessage(`{"USD":1}`)}, nil
 }

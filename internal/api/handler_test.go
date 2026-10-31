@@ -26,6 +26,7 @@ type fakeStore struct {
 	perfilEstadoNombre string
 	perfilEstadoActivo bool
 	savedPerfil        PerfilWrite
+	notifiedID         string
 	listErr            error
 	getErr             error
 	perfilErr          error
@@ -80,6 +81,14 @@ func (f *fakeStore) ApagarPerfiles(context.Context) error { return f.perfilErr }
 func (f *fakeStore) MemorizarPlantilla(context.Context) error { return f.perfilErr }
 
 func (f *fakeStore) RestaurarPlantilla(context.Context) error { return f.perfilErr }
+
+func (f *fakeStore) NotifyRates(_ context.Context, idTasa string) (string, error) {
+	f.notifiedID = idTasa
+	if f.perfilErr != nil {
+		return "", f.perfilErr
+	}
+	return "T999", nil
+}
 
 func (f *fakeStore) LatestTasa(_ context.Context) (Tasa, error) {
 	return f.tasa, f.tasaErr
@@ -637,6 +646,24 @@ func TestGuardarPerfilYPlantillaAceptanPOST(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("POST %s status = %d, body=%s", ruta, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+func TestNotificarTasasInsertaEvento(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	NewHandler(store, nil).Register(mux)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/notificaciones/tasas",
+		strings.NewReader(`{"id_tasa":"T123"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("notificar status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if store.notifiedID != "T123" {
+		t.Fatalf("id notificado = %q", store.notifiedID)
 	}
 }
 

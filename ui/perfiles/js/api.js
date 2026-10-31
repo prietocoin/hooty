@@ -43,7 +43,8 @@ export const disparar = (nombre, prueba) => {
 export const apagarTodos = () => post(`${BASE}/apagar-todos`);
 export const memorizar = () => post(`${BASE}/plantilla/memorizar`);
 export const restaurar = () => post(`${BASE}/plantilla/restaurar`);
+export const notificarTasas = (idTasa = '') => post('/api/v1/notificaciones/tasas', idTasa ? { id_tasa: idTasa } : {});
 
 export const api = {
-  listar, guardar, toggle, eliminar, apagarTodos, memorizar, restaurar, tasasUltimas, previewBlob, disparar
+  listar, guardar, toggle, eliminar, apagarTodos, memorizar, restaurar, tasasUltimas, previewBlob, disparar, notificarTasas
 };

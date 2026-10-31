@@ -738,6 +738,28 @@ func objetoJSON(raw json.RawMessage, fallback string) string {
 	return texto
 }
 
+// NotifyRates deja una fila en notificaciones_tasas, que es el evento que n8n
+// escucha. Si no se indica lote, notifica el vigente.
+func (r *Repository) NotifyRates(ctx context.Context, idTasa string) (string, error) {
+	id := strings.TrimSpace(idTasa)
+	if id == "" {
+		tasa, err := r.LatestTasa(ctx)
+		if err != nil {
+			log.Printf("[ERROR] Fallo DB al resolver lote para notificar: %v", err)
+			return "", err
+		}
+		id = strings.TrimSpace(tasa.IDTasa)
+	}
+	if id == "" {
+		id = "T000"
+	}
+	if _, err := r.pool.Exec(ctx, `INSERT INTO notificaciones_tasas (id_tasa, creado_en) VALUES ($1, NOW())`, id); err != nil {
+		log.Printf("[ERROR] Fallo DB al insertar notificación de tasas %q: %v", id, err)
+		return "", fmt.Errorf("api: notificar tasas %q: %w", id, err)
+	}
+	return id, nil
+}
+
 // SocioByName implementa publisher.SocioFinder para previews y envíos
 // individuales, incluso si el socio no está en la lista ON.
 func (r *Repository) SocioByName(ctx context.Context, nombre string) (publisher.Socio, error) {
