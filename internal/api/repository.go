@@ -673,7 +673,7 @@ ON CONFLICT ((UPPER(BTRIM(nombre)))) DO UPDATE SET
   monedas = EXCLUDED.monedas,
   herencia = EXCLUDED.herencia`,
 		strings.TrimSpace(perfil.IDGrupo), perfil.Nombre, rol, base,
-		perfil.SaldoInicial, mostrar, monedas, perfil.Herencia)
+		float64(perfil.SaldoInicial), mostrar, monedas, perfil.Herencia)
 	if err != nil {
 		log.Printf("[ERROR] Fallo DB al guardar socio %q: %v", perfil.Nombre, err)
 		return fmt.Errorf("api: guardar socio %q: %w", perfil.Nombre, err)

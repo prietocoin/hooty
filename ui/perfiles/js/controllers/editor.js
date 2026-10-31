@@ -117,7 +117,9 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
       const campo = control.dataset.campo;
       if (campo === 'herencia') {
         socio.herencia = control.value === 'true';
-      } else if (campo === 'nombre' || campo === 'moneda_base' || campo === 'saldo_inicial' || campo === 'id_grupo') {
+      } else if (campo === 'saldo_inicial') {
+        socio.saldo_inicial = Number(control.value) || 0;
+      } else if (campo === 'nombre' || campo === 'moneda_base' || campo === 'id_grupo') {
         socio[campo] = control.value;
       }
     });

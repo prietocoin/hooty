@@ -624,14 +624,14 @@ func TestGuardarPerfilYPlantillaAceptanPOST(t *testing.T) {
 	mux := http.NewServeMux()
 	NewHandler(store, nil).Register(mux)
 
-	body := `{"nombre":"NELSY","rol":"SOCIO","moneda_base":"USDT","saldo_inicial":10,"mostrar":{"tasas":true},"monedas":{}}`
+	body := `{"nombre":"NELSY","rol":"SOCIO","moneda_base":"USDT","saldo_inicial":"10.50","mostrar":{"tasas":true},"monedas":{}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/perfiles/guardar", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("POST guardar status = %d, body=%s", rec.Code, rec.Body.String())
 	}
-	if store.savedPerfil.Nombre != "NELSY" {
+	if store.savedPerfil.Nombre != "NELSY" || float64(store.savedPerfil.SaldoInicial) != 10.5 {
 		t.Fatalf("perfil no guardado: %+v", store.savedPerfil)
 	}
 

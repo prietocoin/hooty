@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -83,10 +84,27 @@ type PerfilWrite struct {
 	IDGrupo      string          `json:"id_grupo"`
 	Rol          string          `json:"rol"`
 	MonedaBase   string          `json:"moneda_base"`
-	SaldoInicial float64         `json:"saldo_inicial"`
+	SaldoInicial NumeroFlexible  `json:"saldo_inicial"`
 	Mostrar      json.RawMessage `json:"mostrar"`
 	Monedas      json.RawMessage `json:"monedas"`
 	Herencia     bool            `json:"herencia"`
+}
+
+// NumeroFlexible acepta números o cadenas numéricas del formulario.
+type NumeroFlexible float64
+
+func (n *NumeroFlexible) UnmarshalJSON(data []byte) error {
+	raw := strings.Trim(strings.TrimSpace(string(data)), `"`)
+	if raw == "" || raw == "null" {
+		*n = 0
+		return nil
+	}
+	value, err := strconv.ParseFloat(strings.ReplaceAll(raw, ",", "."), 64)
+	if err != nil {
+		return err
+	}
+	*n = NumeroFlexible(value)
+	return nil
 }
 
 // Tasa es la fila vigente de la vista tasa.
