@@ -2,13 +2,13 @@ package cartelera
 
 import "math"
 
-// Medidas de la cartelera. Son las de la plantilla original: el lienzo mide 1080
-// de ancho y la altura crece con cada fila de dos tarjetas.
+// Medidas de la cartelera. El lienzo se compactó a 640 px para que la fila
+// horizontal no deje un hueco muerto en el centro; la altura crece por cada fila.
 const (
-	anchoLienzo  = 1080
+	anchoLienzo  = 640
 	margen       = 40.0
 	altoTarjeta  = 76.0
-	anchoTarjeta = 1000.0
+	anchoTarjeta = 560.0
 	yTarjetas    = 130.0
 	baseAlto     = 260.0
 	pasoFila     = 88.0
