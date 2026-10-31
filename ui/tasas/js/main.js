@@ -1,6 +1,6 @@
 import { initPWA } from './pwa.js';
 import { cerrarModal } from './ui/modal.js';
-import { initMonitor } from './views/monitor.js?v=20261031_02';
+import { initMonitor } from './views/monitor.js?v=20261031_03';
 
 const monitor = initMonitor();
 

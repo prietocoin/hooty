@@ -6,6 +6,20 @@ import { abrirModal, cerrarModal } from '../ui/modal.js';
 import { showToast } from '../ui/toast.js';
 import { renderMonitorGrid } from '../components/monitor-grid.js?v=20261030_02';
 
+function alHacer(selector, evento, manejador) {
+  const elemento = qs(selector);
+  elemento?.addEventListener(evento, manejador);
+  return elemento;
+}
+
+function mostrarEstadoGrid(grid, mensaje, esError = false) {
+  if (!grid) return;
+  const aviso = document.createElement('p');
+  aviso.className = esError ? 'monitor-state is-error' : 'monitor-state';
+  aviso.textContent = mensaje;
+  grid.replaceChildren(aviso);
+}
+
 export function initMonitor() {
   const etiquetaLote = qs('#lblLoteActual');
   const grid = qs('#gridMonitor');
