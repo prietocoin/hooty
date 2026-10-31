@@ -292,6 +292,13 @@ export async function guardarCambiosComprobante(hashLargo, payload = {}) {
     tasa_2: numero(payload.tasa_2)
   };
 
+  // tipo_op es persistente y opcional: solo se reenvía si el consumidor lo
+  // entrega con una letra válida, para no pisar el valor guardado.
+  const tipoOp = texto(payload.tipo_op).toUpperCase().split('-')[0].trim();
+  if (tipoOp === 'D' || tipoOp === 'P' || tipoOp === 'A') {
+    body.tipo_op = tipoOp;
+  }
+
   // ME es estadístico, no editable. Solo se reenvía si un consumidor lo
   // proporciona explícitamente con un valor finito; si se omite, el backend
   // conserva el me1/me2 originales de la fila (ComprobantePatch usa punteros).

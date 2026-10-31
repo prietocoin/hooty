@@ -160,7 +160,7 @@ func testStore() *fakeStore {
 	}
 }
 
-func newTestHandler(store *fakeStore) *Handler {
+func newTestHandler(store Store) *Handler {
 	return NewHandler(store, nil)
 }
 
@@ -336,6 +336,41 @@ func TestUpdateComprobanteAceptaPUT(t *testing.T) {
 	}
 	if dto.HashLargo != "8a3e" {
 		t.Fatalf("hash = %q", dto.HashLargo)
+	}
+}
+
+// recordingStore captura el patch que el handler entrega al repositorio.
+type recordingStore struct {
+	fakeStore
+	patch ComprobantePatch
+}
+
+func (r *recordingStore) UpdateComprobante(ctx context.Context, hash string, patch ComprobantePatch) (ComprobanteRow, error) {
+	r.patch = patch
+	return r.fakeStore.UpdateComprobante(ctx, hash, patch)
+}
+
+func TestUpdateComprobantePropagaTipoOp(t *testing.T) {
+	t.Parallel()
+
+	base := testStore()
+	store := &recordingStore{fakeStore: *base}
+	mux := http.NewServeMux()
+	newTestHandler(store).Register(mux)
+
+	body := `{"tipo_op":"A"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/comprobantes/8a3e", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if store.patch.TipoOp == nil {
+		t.Fatal("el handler no enlazó tipo_op en ComprobantePatch")
+	}
+	if got := *store.patch.TipoOp; got != "A" {
+		t.Fatalf("tipo_op enlazado = %q, se esperaba A", got)
 	}
 }
 

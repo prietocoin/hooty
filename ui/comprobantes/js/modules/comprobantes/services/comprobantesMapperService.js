@@ -158,9 +158,12 @@ export function prepararEdicionComprobante(item = {}, loteActivo = 'T070') {
   const me2 = numero(c.me2 ?? item.me2 ?? c.m2_socio ?? item.m2_socio ?? monto2, 0);
 
   // 6. NATURALEZA: la etiqueta del backend manda. No se reconstruye la jerarquía.
+  // El tipo persistido en comprobantes.tipo_op tiene prioridad sobre el tipo
+  // derivado del perfil (tipo_op1/tipo_op2); si no existe, se usa el derivado.
+  const tipoPersistido = c.tipo_op ?? item.tipo_op;
   const tipo1 = String(tipoCrudo(c, item)).trim();
   const tipo2 = String(c.tipo_op2 || item.tipo_op2 || tipo1).trim();
-  const letra = letraTipo(tipo1);
+  const letra = letraTipo(tipoPersistido || tipo1);
 
   // 7. IMAGEN
   const rawImg = c.url_imagen || item.url_imagen ||
