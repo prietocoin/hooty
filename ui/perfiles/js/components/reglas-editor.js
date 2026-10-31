@@ -95,7 +95,7 @@ function renderRegla(regla, index, tasasBase) {
   const alt = `Bandera ${escapeHTML(regla.codigo)}`;
 
   return `
-    <div class="regla-card">
+    <div class="regla-card ${regla.activo === false ? 'is-off' : ''}">
       <div class="regla-head">
         <div class="regla-id">
           ${bandera ? `<img class="regla-flag" src="${bandera}" alt="${alt}" loading="lazy" onerror="this.style.display='none'">` : ''}
@@ -105,8 +105,18 @@ function renderRegla(regla, index, tasasBase) {
         <div class="regla-head-actions">
           <span class="regla-base" title="Tasa base del lote activo">${formatearTasaEstricta(base)}</span>
           ${renderDef(regla, index)}
-          <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
-                  class="regla-del" title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">🗑️</button>
+          <div class="regla-head-stack">
+            <label class="regla-toggle" title="Incluir ${escapeHTML(regla.codigo)} en cartelera">
+              <input type="checkbox"
+                     data-accion="toggle-cartelera"
+                     data-indice="${index}"
+                     ${regla.activo !== false ? 'checked' : ''}
+                     aria-label="Incluir ${escapeHTML(regla.codigo)} en la cartelera">
+              <span class="regla-toggle-track" aria-hidden="true"><span class="regla-toggle-thumb"></span></span>
+            </label>
+            <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
+                    class="regla-del" title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">🗑️</button>
+          </div>
         </div>
       </div>
 
@@ -120,6 +130,7 @@ function renderRegla(regla, index, tasasBase) {
 // Vista editable: selector de catálogo, tarjetas por moneda y empty state.
 // Sin scroll interno: el único scroll es el body del modal.
 export function renderReglasEditor(reglas = [], monedaParaAgregar = '', tasasBase = null) {
+  const activas = reglas.filter((regla) => regla.activo !== false).length;
   const tarjetas = reglas.length
     ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">${reglas.map((regla, index) => renderRegla(regla, index, tasasBase)).join('')}</div>`
     : '';
@@ -132,7 +143,7 @@ export function renderReglasEditor(reglas = [], monedaParaAgregar = '', tasasBas
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h3 class="text-xs font-bold text-slate-200 tracking-wider uppercase flex items-center gap-2">
           <span>Reglas Individuales (%)</span>
-          <span class="text-[10px] px-2 py-0.5 rounded border bg-cyan-500/10 text-cyan-300 border-cyan-500/20">${reglas.length} activas</span>
+          <span class="text-[10px] px-2 py-0.5 rounded border bg-cyan-500/10 text-cyan-300 border-cyan-500/20">${activas} activas</span>
         </h3>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">

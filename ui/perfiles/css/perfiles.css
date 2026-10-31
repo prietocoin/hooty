@@ -243,6 +243,73 @@ html {
   margin-left: auto;
 }
 
+.regla-head-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.regla-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.regla-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.regla-toggle-track {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #334155;
+  border: 1px solid rgba(148, 163, 184, .35);
+  transition: background .2s ease, border-color .2s ease;
+}
+
+.regla-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+  transition: transform .2s ease;
+}
+
+.regla-toggle input:checked + .regla-toggle-track {
+  background: #10b981;
+  border-color: rgba(16, 185, 129, .65);
+}
+
+.regla-toggle input:checked + .regla-toggle-track .regla-toggle-thumb {
+  transform: translateX(20px);
+}
+
+.regla-toggle input:focus-visible + .regla-toggle-track {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+.regla-card.is-off {
+  opacity: .5;
+}
+
 .regla-base {
   padding: 2px 7px;
   border: 1px solid rgba(34, 211, 238, .35);

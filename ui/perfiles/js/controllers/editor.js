@@ -4,10 +4,10 @@ import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import {
   esHerencia, nuevaRegla, payloadGuardar, reglasSegunModo
 } from '../domain.js';
-import { renderModalSocio } from '../components/modal-socio.js?v=20261024_99_FIX_TASAS';
+import { renderModalSocio } from '../components/modal-socio.js?v=20261031_01';
 import {
   baseMoneda, renderReglasEditor, tasaResultante
-} from '../components/reglas-editor.js?v=20261024_99_FIX_TASAS';
+} from '../components/reglas-editor.js?v=20261031_01';
 import { formatearTasaEstricta } from '../utils/tasas.js?v=20261024_99_FIX_TASAS';
 import { renderReglasHerencia } from '../components/reglas-herencia.js';
 import { notificarSociosActualizados } from '../../../shared/js/sync.js';
@@ -211,6 +211,15 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
   function onChange(event) {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    if (target.dataset.accion === 'toggle-cartelera') {
+      const indice = Number(target.dataset.indice);
+      const regla = state.reglas[indice];
+      if (!regla) return;
+      regla.activo = target.checked;
+      const tarjeta = target.closest('.regla-card');
+      if (tarjeta) tarjeta.classList.toggle('is-off', !target.checked);
+      return;
+    }
     const campo = target.dataset.campo;
     if (campo === 'herencia') {
       state.socioEdicion.herencia = target.value === 'true';
