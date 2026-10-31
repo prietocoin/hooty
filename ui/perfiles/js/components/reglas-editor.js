@@ -15,8 +15,15 @@ export function truncar2(valor) {
   return signo * truncado;
 }
 
-/** Tasa base de la divisa en el lote activo; cae al catálogo si no existe. */
+/**
+ * Tasa base de la divisa. Un valor editado a mano (base_manual) manda; si no,
+ * se usa el lote activo y el catálogo queda solo como respaldo.
+ */
 export function baseMoneda(regla, tasasBase) {
+  if (regla?.base_manual) {
+    const manual = Number(regla?.base);
+    if (Number.isFinite(manual) && manual > 0) return manual;
+  }
   const delLote = Number(tasasBase?.tasas?.[regla?.codigo]);
   if (Number.isFinite(delLote) && delLote > 0) return delLote;
   const delCatalogo = Number(regla?.base ?? CATALOGO_MONEDAS[regla?.codigo]?.base);
@@ -27,12 +34,25 @@ export function baseMoneda(regla, tasasBase) {
  * Tasa resultante del spread. Réplica exacta del Core:
  *   D -> base * (1 + deposito/100)
  *   P -> base * (1 - pago/100)
- * con truncamiento atómico a 2 decimales.
+ * Devuelve el producto crudo; el truncamiento se aplica al formatear.
  */
 export function tasaResultante(base, porcentaje, tipo) {
   const pct = Math.abs(Number(porcentaje) || 0) / 100;
   const factor = String(tipo).toUpperCase() === 'P' ? 1 - pct : 1 + pct;
   return (Number(base) || 0) * factor;
+}
+
+/**
+ * Formato de la tasa resultante del spread:
+ *   >= 100 -> entero truncado
+ *   < 100  -> dos decimales truncados
+ * Nunca redondea a múltiplos.
+ */
+export function formatearResultadoSpread(valor) {
+  const num = Number(valor);
+  if (!Number.isFinite(num)) return '0.00';
+  if (Math.abs(num) >= 100) return String(Math.trunc(num));
+  return truncar2(num).toFixed(2);
 }
 
 /** Tasa resultante del spread, formateada con la regla estricta. */
@@ -52,46 +72,52 @@ function opcionesCatalogo(seleccionada, reglas) {
   }).join('');
 }
 
+const TIPOS_OPERACION = ['D', 'P', 'A'];
+const CLASES_TIPO_ACTIVO = {
+  D: 'bg-cyan-500 text-slate-950 font-bold',
+  P: 'bg-rose-500 text-white font-bold',
+  A: 'bg-amber-500 text-slate-950 font-bold'
+};
+
 function renderDef(regla, index) {
-  const modo = regla.modo || 'DEF';
-  const boton = (valor) => `
-    <button type="button" data-accion="modo" data-indice="${index}" data-modo="${valor}"
-            class="${modo === valor ? 'is-active' : ''}"
-            aria-pressed="${modo === valor}">${valor}</button>`;
+  const modoRaw = String(regla.modo || 'D').toUpperCase();
+  const modo = TIPOS_OPERACION.includes(modoRaw) ? modoRaw : 'D';
+  const boton = (valor) => {
+    const clases = modo === valor
+      ? `is-active ${CLASES_TIPO_ACTIVO[valor]}`
+      : 'text-slate-400';
+    return `
+      <button type="button" data-accion="modo" data-indice="${index}" data-modo="${valor}"
+              class="${clases}"
+              aria-pressed="${modo === valor}">${valor}</button>`;
+  };
   return `
-    <div class="regla-def" role="group" aria-label="Naturaleza por defecto de ${escapeHTML(regla.codigo)}">
-      ${boton('DEF')}${boton('D')}${boton('P')}
+    <div class="regla-def" role="group" aria-label="Tipo de operación de ${escapeHTML(regla.codigo)}">
+      ${TIPOS_OPERACION.map(boton).join('')}
     </div>`;
 }
 
-function renderOperacion({ regla, index, campo, tipo, base, flecha }) {
+function renderColumnaOperacion({ regla, index, campo, tipo, base, etiqueta }) {
   const esDeposito = tipo === 'D';
-  const polar = esDeposito ? regla.polar_D : regla.polar_P;
-  const positivo = polar === '+';
   const porcentaje = esDeposito ? regla.deposito : regla.pago;
   const resultado = tasaResultante(base, porcentaje, tipo);
-  const titulo = positivo ? '+ Suma' : '- Resta';
+  const claseCampo = esDeposito ? 'regla-field--dep' : 'regla-field--pago';
+  const claseResultado = esDeposito ? 'is-dep' : 'is-pago';
+  const nombre = esDeposito ? 'depósito' : 'pago';
 
   return `
-    <div class="regla-op ${esDeposito ? 'is-dep' : 'is-pago'}">
-      <div class="regla-op-head">
-        <span class="regla-arrow" aria-hidden="true">${flecha}</span>
-        <span>${esDeposito ? 'DEPÓSITO (D) %' : 'PAGO (P) %'}</span>
-      </div>
-      <div class="regla-op-row">
+    <div class="regla-field ${claseCampo}">
+      <span class="regla-field-label">${etiqueta}</span>
+      <div class="regla-percent">
         <input type="number" step="0.01" inputmode="decimal"
-               aria-label="${esDeposito ? 'Spread de depósito' : 'Spread de pago'} de ${escapeHTML(regla.codigo)}"
+               aria-label="Spread de ${nombre} de ${escapeHTML(regla.codigo)}"
                data-regla="${index}" data-campo="${campo}"
-               value="${escapeHTML(porcentaje)}">
-        <span class="regla-result" data-resultado="${index}-${campo}" title="Tasa resultante">${formatearTasaEstricta(resultado)}</span>
-        <button type="button"
-                data-accion="${esDeposito ? 'toggle-dep' : 'toggle-pago'}"
-                data-indice="${index}"
-                data-signo="${escapeHTML(polar)}"
-                class="regla-sign ${positivo ? 'is-pos' : 'is-neg'}"
-                title="${titulo}"
-                aria-label="${titulo}">${positivo ? '+' : '-'}</button>
+               value="${escapeHTML(porcentaje)}"
+               class="regla-percent-input">
+        <span aria-hidden="true">%</span>
       </div>
+      <span class="regla-result ${claseResultado}" data-resultado="${index}-${campo}"
+            title="Tasa resultante">${formatearResultadoSpread(resultado)}</span>
     </div>`;
 }
 
@@ -100,35 +126,49 @@ function renderRegla(regla, index, tasasBase) {
   const bandera = urlBandera(regla);
   const alt = `Bandera ${escapeHTML(regla.codigo)}`;
   const activo = regla.activo !== false;
+  const valorBase = Number.isFinite(Number(base)) ? String(base) : '';
 
   return `
     <div class="regla-card ${activo ? '' : 'is-off'}">
       <div class="regla-head">
         <div class="regla-id">
           ${bandera ? `<img class="regla-flag" src="${bandera}" alt="${alt}" loading="lazy" onerror="this.style.display='none'">` : ''}
-          <span class="regla-name">${escapeHTML(regla.nombre)} <span class="regla-code">(${escapeHTML(regla.codigo)})</span></span>
+          <span class="regla-name">${escapeHTML(regla.nombre)} <span class="regla-code">${escapeHTML(regla.codigo)}</span></span>
         </div>
-        <button type="button"
-                data-accion="toggle-cartelera"
-                data-indice="${index}"
-                class="regla-switch ${activo ? 'is-on' : 'is-off'}"
-                aria-pressed="${activo}"
-                title="Incluir ${escapeHTML(regla.codigo)} en cartelera"
-                aria-label="Incluir ${escapeHTML(regla.codigo)} en la cartelera">
-          <span class="regla-switch-thumb"></span>
-        </button>
+        <div class="regla-controls">
+          ${renderDef(regla, index)}
+          <button type="button"
+                  data-accion="toggle-cartelera"
+                  data-indice="${index}"
+                  class="regla-switch ${activo ? 'is-on' : 'is-off'}"
+                  aria-pressed="${activo}"
+                  title="Incluir ${escapeHTML(regla.codigo)} en cartelera"
+                  aria-label="Incluir ${escapeHTML(regla.codigo)} en la cartelera">
+            <span class="regla-switch-thumb"></span>
+          </button>
+          <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
+                  class="regla-del text-slate-500 hover:text-rose-400"
+                  title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v5M14 11v5"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div class="regla-actions-row">
-        <span class="regla-base" title="Tasa base del lote activo">${formatearTasaEstricta(base)}</span>
-        ${renderDef(regla, index)}
-        <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
-                class="regla-del" title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">🗑️</button>
-      </div>
-
-      <div class="regla-ops">
-        ${renderOperacion({ regla, index, campo: 'deposito', tipo: 'D', base, flecha: '↓' })}
-        ${renderOperacion({ regla, index, campo: 'pago', tipo: 'P', base, flecha: '↑' })}
+      <div class="regla-grid">
+        <label class="regla-field">
+          <span class="regla-field-label">Base</span>
+          <input type="number" step="0.01" inputmode="decimal"
+                 aria-label="Tasa base de ${escapeHTML(regla.codigo)}"
+                 data-regla="${index}" data-campo="base"
+                 value="${escapeHTML(valorBase)}"
+                 class="regla-base-input">
+        </label>
+        ${renderColumnaOperacion({ regla, index, campo: 'deposito', tipo: 'D', base, etiqueta: '↓ DEP' })}
+        ${renderColumnaOperacion({ regla, index, campo: 'pago', tipo: 'P', base, etiqueta: '↑ PAG' })}
       </div>
     </div>`;
 }
@@ -138,7 +178,7 @@ function renderRegla(regla, index, tasasBase) {
 export function renderReglasEditor(reglas = [], monedaParaAgregar = '', tasasBase = null) {
   const activas = reglas.filter((regla) => regla.activo !== false).length;
   const tarjetas = reglas.length
-    ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">${reglas.map((regla, index) => renderRegla(regla, index, tasasBase)).join('')}</div>`
+    ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3">${reglas.map((regla, index) => renderRegla(regla, index, tasasBase)).join('')}</div>`
     : '';
   const vacio = reglas.length === 0
     ? '<div class="text-center py-6 border border-dashed border-slate-800 rounded-xl text-slate-500 text-xs">Sin reglas configuradas.</div>'

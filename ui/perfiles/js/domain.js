@@ -46,6 +46,12 @@ function numeroDeMoneda(valor) {
   return Number.isFinite(numero) ? numero : 0;
 }
 
+// Reduce cualquier valor histórico (DEF, vacío, minúsculas) al contrato D/P/A.
+function tipoOpCanonico(valor) {
+  const tipo = String(valor ?? '').trim().toUpperCase();
+  return tipo === 'A' || tipo === 'P' ? tipo : 'D';
+}
+
 function porcentajeDe(regla) {
   return regla?.porcentaje && typeof regla.porcentaje === 'object' ? regla.porcentaje : {};
 }
@@ -57,13 +63,17 @@ export function reglasDeMonedas(raw) {
     const porcentaje = porcentajeDe(regla);
     const meta = metaMoneda(codigo);
     const tipo = tipoDeMoneda(regla);
-    const modoRaw = String(regla.modo || '').toUpperCase();
-    const modo = modoRaw === 'D' || modoRaw === 'P' ? modoRaw : (tipo === 'P' ? 'P' : 'DEF');
+    const modoRaw = String(regla.modo ?? regla.tipo_op ?? '').toUpperCase();
+    const modo = modoRaw === 'A' || modoRaw === 'P' || modoRaw === 'D'
+      ? modoRaw
+      : (tipo === 'P' ? 'P' : 'D');
+    const baseGuardada = numeroDeMoneda(regla.base);
     return {
       codigo,
       nombre: meta.nombre || codigo,
       iso: isoMoneda(codigo, meta),
-      base: meta.base || '',
+      base: baseGuardada > 0 ? baseGuardada : (meta.base || ''),
+      base_manual: regla.base_manual === true,
       activo: regla.activo !== false,
       tipo,
       modo,
@@ -96,9 +106,10 @@ export function nuevaRegla(codigo) {
     nombre: meta.nombre || codigo,
     iso: isoMoneda(codigo, meta),
     base: meta.base || '',
+    base_manual: false,
     activo: true,
     tipo: 'D',
-    modo: 'DEF',
+    modo: 'D',
     deposito: 0,
     polar_D: '+',
     pago: 0,
@@ -112,17 +123,23 @@ export function nuevaRegla(codigo) {
 export function construirMonedas(reglas = []) {
   const monedas = {};
   for (const regla of reglas) {
-    const modoRaw = String(regla.modo || '').toUpperCase();
-    const modo = modoRaw === 'D' || modoRaw === 'P' ? modoRaw : (tipoDeMoneda(regla) === 'P' ? 'P' : 'DEF');
+    const modoRaw = String(regla.modo ?? regla.tipo_op ?? '').toUpperCase();
+    const modo = modoRaw === 'A' || modoRaw === 'P' || modoRaw === 'D'
+      ? modoRaw
+      : (tipoDeMoneda(regla) === 'P' ? 'P' : 'D');
     const tipo = modo === 'P' ? 'P' : 'D';
     const polar_D = signoDeMoneda(regla.polar_D, '+');
     const polar_P = signoDeMoneda(regla.polar_P, '-');
     const deposito = numeroDeMoneda(regla.deposito);
     const pago = numeroDeMoneda(regla.pago);
+    const base = numeroDeMoneda(regla.base);
     monedas[regla.codigo] = {
       activo: regla.activo !== false,
       tipo,
+      tipo_op: modo,
       modo,
+      base,
+      base_manual: regla.base_manual === true,
       polar_D,
       polar_P,
       porcentaje: { deposito, pago },
@@ -141,6 +158,7 @@ export function payloadGuardar(socio, reglas) {
   const herencia = esHerencia(socio?.herencia);
   return {
     ...socio,
+    tipo_op: tipoOpCanonico(socio?.tipo_op),
     herencia,
     monedas: herencia ? parseMonedas(socio?.monedas) : construirMonedas(reglas)
   };

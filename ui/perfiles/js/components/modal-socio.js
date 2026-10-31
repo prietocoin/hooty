@@ -1,8 +1,8 @@
 import { MONEDAS_BASE } from '../catalog.js';
-import { esHerencia } from '../domain.js?v=20261031_02';
+import { esHerencia } from '../domain.js?v=20261031_03';
 import { escapeHTML } from '../../../shared/js/dom.js';
 import { renderReglasHerencia } from './reglas-herencia.js';
-import { renderReglasEditor } from './reglas-editor.js?v=20261031_04';
+import { renderReglasEditor } from './reglas-editor.js?v=20261031_05';
 
 function opcionesBase(seleccionada) {
   return MONEDAS_BASE.map((opcion) => {
@@ -45,7 +45,7 @@ function footer(herencia) {
   }
   return `<footer class="glauk-modal__footer">
       <button type="button" data-accion="cerrar" class="min-h-11 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">Cancelar</button>
-      <button type="button" data-accion="guardar" class="min-h-11 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-lg">💾 Guardar Cambios</button>
+      <button type="button" data-accion="guardar" class="perfiles-save-btn min-h-11 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 text-xs font-bold transition shadow-lg">💾 Guardar Cambios</button>
     </footer>`;
 }
 

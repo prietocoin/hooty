@@ -3,12 +3,11 @@ import { api } from '../api.js?v=20261031_01';
 import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import {
   esHerencia, nuevaRegla, payloadGuardar, reglasSegunModo
-} from '../domain.js?v=20261031_02';
-import { renderModalSocio } from '../components/modal-socio.js?v=20261031_04';
+} from '../domain.js?v=20261031_03';
+import { renderModalSocio } from '../components/modal-socio.js?v=20261031_05';
 import {
-  baseMoneda, renderReglasEditor, tasaResultante
-} from '../components/reglas-editor.js?v=20261031_04';
-import { formatearTasaEstricta } from '../utils/tasas.js?v=20261031_04';
+  baseMoneda, formatearResultadoSpread, renderReglasEditor, tasaResultante
+} from '../components/reglas-editor.js?v=20261031_05';
 import { renderReglasHerencia } from '../components/reglas-herencia.js?v=20261031_04';
 import { notificarSociosActualizados } from '../../../shared/js/sync.js';
 
@@ -35,7 +34,7 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
     if (!host) return;
     host.innerHTML = esHerencia(state.socioEdicion.herencia)
       ? renderReglasHerencia(state.reglas)
-      : renderReglasEditor(state.reglas, state.monedaParaAgregar);
+      : renderReglasEditor(state.reglas, state.monedaParaAgregar, state.tasasBase);
   }
 
   function actualizarTitulo(nombre) {
@@ -136,6 +135,8 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
       if (!regla) return;
       if (control.dataset.campo === 'tipo') {
         regla.tipo = control.value === 'P' ? 'P' : 'D';
+      } else if (control.dataset.campo === 'base') {
+        regla.base = control.value;
       } else if (control.dataset.campo === 'deposito' || control.dataset.campo === 'pago') {
         regla[control.dataset.campo] = control.value;
       }
@@ -193,6 +194,23 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
     }
     const indice = target.dataset.regla;
     const campo = target.dataset.campo;
+    if (indice !== undefined && campo === 'base') {
+      const i = Number(indice);
+      const regla = state.reglas[i];
+      if (!regla) return;
+      regla.base = target.value;
+      regla.base_manual = true;
+      const base = Number(target.value) || 0;
+      [['deposito', 'D'], ['pago', 'P']].forEach(([clave, tipo]) => {
+        const salida = qs(`[data-resultado="${i}-${clave}"]`, root);
+        if (salida) {
+          salida.textContent = formatearResultadoSpread(
+            tasaResultante(base, regla[clave], tipo)
+          );
+        }
+      });
+      return;
+    }
     if (indice !== undefined && (campo === 'deposito' || campo === 'pago')) {
       const i = Number(indice);
       const regla = state.reglas[i];
@@ -201,7 +219,7 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
       const tipo = campo === 'deposito' ? 'D' : 'P';
       const resultado = tasaResultante(baseMoneda(regla, state.tasasBase), target.value, tipo);
       const salida = qs(`[data-resultado="${i}-${campo}"]`, root);
-      if (salida) salida.textContent = formatearTasaEstricta(resultado);
+      if (salida) salida.textContent = formatearResultadoSpread(resultado);
       return;
     }
     if (campo === 'nombre' || campo === 'saldo_inicial' || campo === 'id_grupo') {
@@ -260,7 +278,8 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
       }
       case 'modo':
         if (state.reglas[indice]) {
-          const modo = boton.dataset.modo === 'P' ? 'P' : (boton.dataset.modo === 'D' ? 'D' : 'DEF');
+          const modoRaw = String(boton.dataset.modo || '').toUpperCase();
+          const modo = modoRaw === 'A' || modoRaw === 'P' ? modoRaw : 'D';
           state.reglas[indice].modo = modo;
           state.reglas[indice].tipo = modo === 'P' ? 'P' : 'D';
           renderReglas();
