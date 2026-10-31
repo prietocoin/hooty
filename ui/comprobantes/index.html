@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261031_07"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261031_08"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -316,8 +316,8 @@
     <h3 class="text-xs md:text-base font-black text-white mt-0.5 truncate" x-text="obtenerSujetoAuditado(filtroSocio)"></h3>
   </div>
   <button type="button"
-          @click="filtroSocio ? abrirReporteSocio(filtroSocio) : abrirFiltros()"
-          :title="filtroSocio ? 'Generar reporte de ' + filtroSocio : 'Selecciona un socio para generar el reporte'"
+          @click="abrirReporteActual()"
+          :title="filtroSocio ? 'Generar reporte de ' + filtroSocio : 'Generar reporte de todos los socios'"
           class="shrink-0 px-2.5 py-2 md:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] md:text-xs font-black shadow-lg shadow-emerald-900/30 transition-all active:scale-95 flex items-center gap-1.5">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/>
@@ -1540,7 +1540,7 @@
       <div class="flex items-center gap-2 min-w-0">
         <h3 id="glauk-reporte-title" class="shrink-0 font-black tracking-tight">Reporte de Estado de Cuenta</h3>
         <span class="px-2 py-0.5 bg-purple-950/80 border border-purple-500/40 text-purple-300 rounded-lg text-[10px] font-bold font-mono truncate"
-              x-text="(reporteSocio || 'Sin socio') + ' · ' + reporteItems.length + ' ítems'"></span>
+              x-text="(reporteSocio || 'TODOS LOS SOCIOS') + ' · ' + reporteItems.length + ' ítems'"></span>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         <button type="button"

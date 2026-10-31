@@ -224,9 +224,16 @@ export function createComprobantesReporteState() {
         item?.moneda_recibo || item?.moneda || 'USDT').toUpperCase();
     },
 
+    async abrirReporteActual() {
+      return this.abrirReporte(this.filtroSocio || '');
+    },
+
     async abrirReporteSocio(nombre = '') {
+      return this.abrirReporte(nombre);
+    },
+
+    async abrirReporte(nombre = '') {
       const socio = String(nombre || '').trim();
-      if (!socio) return;
 
       this.reporteSocio = socio;
       this.reporteFechaInicio = this.filtroFechaInicio || inicioMes;
@@ -237,7 +244,7 @@ export function createComprobantesReporteState() {
       // leerse desde el saldo anterior hasta el cierre, sin heredar el orden
       // (posiblemente descendente) del listado del Dashboard.
       this.reporteOrden = 'fecha_asc';
-      this.reporteSaldoAnterior = obtenerSaldoAnteriorSocio(this.directorio, socio);
+      this.reporteSaldoAnterior = socio ? obtenerSaldoAnteriorSocio(this.directorio, socio) : 0;
       this.reporteItemsBase = [];
       this.reportePaginaActual = 1;
       this.modalReporteAbierto = true;
@@ -281,10 +288,7 @@ export function createComprobantesReporteState() {
 
     async cargarReporteSocio() {
       const socio = String(this.reporteSocio || '').trim();
-      if (!socio) {
-        this.reporteItemsBase = [];
-        return;
-      }
+      const global = !socio;
 
       const token = ++this.reporteSolicitudActual;
       this.reporteCargando = true;
@@ -313,7 +317,7 @@ export function createComprobantesReporteState() {
           // Caracas. Solo se listan las que pertenecen al rango auditado.
           .filter(item => dentroRangoCaracas(item, this.reporteFechaInicio, this.reporteFechaFin));
         this.normalizarRangoHashReporte();
-        this.reporteSaldoAnterior = obtenerSaldoAnteriorSocio(this.directorio, socio);
+        this.reporteSaldoAnterior = global ? 0 : obtenerSaldoAnteriorSocio(this.directorio, socio);
         this.reportePaginaActual = Math.min(
           Math.max(1, this.reportePaginaActual),
           this.reporteTotalPaginas
