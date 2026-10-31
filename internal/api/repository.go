@@ -16,6 +16,7 @@ import (
 	"hooty/internal/clock"
 	"hooty/internal/dbschema"
 	"hooty/internal/domain"
+	"hooty/internal/publisher"
 )
 
 // ErrNotFound indica que la fila solicitada no existe.
@@ -638,6 +639,62 @@ func (r *Repository) DeleteLote(ctx context.Context, id string) (bool, error) {
 		return false, fmt.Errorf("api: borrar lote %q: %w", id, err)
 	}
 	return tag.RowsAffected() > 0, nil
+}
+
+// LatestLote implementa publisher.Source con las tasas del lote vigente.
+func (r *Repository) LatestLote(ctx context.Context) (publisher.Lote, error) {
+	tasa, err := r.LatestTasa(ctx)
+	if err != nil {
+		return publisher.Lote{}, err
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(tasa.Tasas, &decoded); err != nil {
+		return publisher.Lote{}, fmt.Errorf("api: decodificar tasas del lote: %w", err)
+	}
+	tasas := make(map[string]float64, len(decoded))
+	for code, value := range decoded {
+		rate, ok := numericRate(value)
+		if !ok || rate <= 0 {
+			continue
+		}
+		tasas[domain.NormalizeCurrency(code, "")] = rate
+	}
+	if len(tasas) == 0 {
+		return publisher.Lote{}, domain.Validationf("el lote vigente no tiene tasas para publicar")
+	}
+	return publisher.Lote{ID: tasa.IDTasa, Tasas: tasas}, nil
+}
+
+// ActiveSocios implementa publisher.Source: solo socios reales con la
+// cartelera encendida (mostrar.tasas) y un chat_id utilizable.
+func (r *Repository) ActiveSocios(ctx context.Context) ([]publisher.Socio, error) {
+	rows, err := r.pool.Query(ctx, `
+SELECT COALESCE(nombre, ''), COALESCE(id_grupo, '')
+FROM perfil
+WHERE UPPER(BTRIM(COALESCE(nombre, ''))) NOT IN ('', 'GENERAL')
+  AND BTRIM(COALESCE(id_grupo, '')) <> ''
+  AND CASE
+      WHEN LOWER(COALESCE(mostrar->>'tasas', '')) IN ('true', 'false')
+        THEN (mostrar->>'tasas')::boolean
+      ELSE TRUE
+  END
+ORDER BY nombre`)
+	if err != nil {
+		return nil, fmt.Errorf("api: listar socios activos: %w", err)
+	}
+	defer rows.Close()
+	socios := make([]publisher.Socio, 0, 32)
+	for rows.Next() {
+		var socio publisher.Socio
+		if err := rows.Scan(&socio.Nombre, &socio.ChatID); err != nil {
+			return nil, fmt.Errorf("api: escanear socio activo: %w", err)
+		}
+		socios = append(socios, socio)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("api: recorrer socios activos: %w", err)
+	}
+	return socios, nil
 }
 
 // LatestTasa devuelve el último registro de la vista tasa.

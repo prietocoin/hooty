@@ -24,6 +24,7 @@ import (
 	"hooty/internal/ingest/gemini"
 	"hooty/internal/ingest/postgres"
 	"hooty/internal/ingest/r2"
+	"hooty/internal/publisher"
 	"hooty/internal/sweeper"
 )
 
@@ -117,7 +118,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	readAPI := api.NewHandler(readRepository, logger, liquidator)
+	sender, err := publisher.NewEvolutionSender(cfg.EvolutionURL, cfg.EvolutionAPIKey,
+		cfg.EvolutionInst, cfg.EvolutionTimeout)
+	if err != nil {
+		return err
+	}
+	ratePublisher := publisher.New(readRepository, sender, publisher.NewCarteleraRenderer(),
+		cfg.TestGroup, logger)
+	readAPI := api.NewHandler(readRepository, logger, liquidator).WithPublisher(ratePublisher)
 
 	webhook := ingest.NewHTTPHandler(service, ingest.HTTPOptions{
 		Token:           cfg.WebhookToken,

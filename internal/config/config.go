@@ -31,6 +31,7 @@ type Config struct {
 	EvolutionAPIKey  string
 	EvolutionInst    string
 	EvolutionTimeout time.Duration
+	TestGroup        string
 
 	GeminiKeys    []string
 	GeminiModel   string
@@ -72,6 +73,7 @@ func Load() (Config, error) {
 		EvolutionAPIKey:  strings.TrimSpace(os.Getenv("EVOLUTION_API_KEY")),
 		EvolutionInst:    env("EVOLUTION_INSTANCE", "hooty"),
 		EvolutionTimeout: envDuration("EVOLUTION_TIMEOUT", 30*time.Second),
+		TestGroup:        env("EVOLUTION_TEST_GROUP", env("HOOTY_TEST_GROUP", "")),
 
 		GeminiKeys:    splitCSV(os.Getenv("GEMINI_KEYS")),
 		GeminiModel:   env("GEMINI_MODEL", "gemini-2.0-flash"),

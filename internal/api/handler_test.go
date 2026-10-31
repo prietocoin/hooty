@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"hooty/internal/ingest"
+	"hooty/internal/publisher"
 )
 
 type fakeStore struct {
@@ -502,6 +503,40 @@ func TestTasasGuardarYPublicarUsanPUT(t *testing.T) {
 	}
 	if publicado.IDTasa != "T999" || publicado.Procesados != 2 {
 		t.Fatalf("publicación inesperada: %+v", publicado)
+	}
+}
+
+type fakePublisher struct {
+	prueba bool
+	calls  int
+	err    error
+}
+
+func (f *fakePublisher) Publish(_ context.Context, isPrueba bool) (publisher.Result, error) {
+	f.prueba = isPrueba
+	f.calls++
+	if f.err != nil {
+		return publisher.Result{}, f.err
+	}
+	return publisher.Result{IDTasa: "T999", Procesados: 1, Prueba: isPrueba}, nil
+}
+
+func TestPublicarLoteLeeIsPruebaYDespacha(t *testing.T) {
+	t.Parallel()
+
+	despachador := &fakePublisher{}
+	mux := http.NewServeMux()
+	NewHandler(testStore(), nil).WithPublisher(despachador).Register(mux)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/tasas/publicar-lote",
+		strings.NewReader(`{"is_prueba":true,"modo_prueba_global":false}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("publicar status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if despachador.calls != 1 || !despachador.prueba {
+		t.Fatalf("is_prueba no llegó al despachador: %+v", despachador)
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 
 	"hooty/internal/domain"
 	"hooty/internal/ingest"
+	"hooty/internal/publisher"
 )
 
 // Store es la superficie de lectura que consumen los handlers.
@@ -36,6 +37,12 @@ type Handler struct {
 	store     Store
 	log       *slog.Logger
 	simulator Simulator
+	publisher RatePublisher
+}
+
+// RatePublisher despacha las carteleras del lote vigente.
+type RatePublisher interface {
+	Publish(ctx context.Context, isPrueba bool) (publisher.Result, error)
 }
 
 // Simulator expone el motor de liquidación canónico para el modal de edición.
@@ -53,6 +60,13 @@ func NewHandler(store Store, logger *slog.Logger, simuladores ...Simulator) *Han
 		handler.simulator = simuladores[0]
 	}
 	return handler
+}
+
+// WithPublisher conecta el motor de despacho real. Sin él, PublishLote conserva
+// el modo de compatibilidad que solo cuenta socios.
+func (h *Handler) WithPublisher(p RatePublisher) *Handler {
+	h.publisher = p
+	return h
 }
 
 // Register monta las rutas completas con método en el ServeMux principal.
@@ -358,11 +372,12 @@ func (h *Handler) SaveLote(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"id_tasa": id})
 }
 
-// PublishLote responde PUT /api/v1/tasas/publicar-lote. Confirma el lote
-// vigente y cuenta los socios con cartelera activa.
+// PublishLote responde PUT /api/v1/tasas/publicar-lote. Lee is_prueba (o el
+// alias modo_prueba_global) y delega el despacho real en el publisher.
 func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ModoPruebaGlobal bool `json:"modo_prueba_global"`
+		IsPrueba         *bool `json:"is_prueba"`
+		ModoPruebaGlobal *bool `json:"modo_prueba_global"`
 	}
 	if r.Body != nil && r.ContentLength != 0 {
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
@@ -371,6 +386,24 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	isPrueba := false
+	if body.IsPrueba != nil {
+		isPrueba = *body.IsPrueba
+	} else if body.ModoPruebaGlobal != nil {
+		isPrueba = *body.ModoPruebaGlobal
+	}
+
+	if h.publisher != nil {
+		resultado, err := h.publisher.Publish(r.Context(), isPrueba)
+		if err != nil {
+			h.log.Error("hooty.api.tasas_publicar", "prueba", isPrueba, "error", err)
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, resultado)
+		return
+	}
+
 	id, procesados, err := h.store.PublishLote(r.Context())
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, http.StatusBadRequest, "no hay lote vigente")
@@ -384,7 +417,7 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id_tasa":    id,
 		"procesados": procesados,
-		"prueba":     body.ModoPruebaGlobal,
+		"prueba":     isPrueba,
 	})
 }
 
