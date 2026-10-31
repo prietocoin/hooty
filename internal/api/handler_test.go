@@ -539,6 +539,15 @@ func (f *fakePublisher) Preview(context.Context, string, bool) ([]byte, error) {
 	return []byte("\x89PNG\r\n\x1a\n"), nil
 }
 
+func (f *fakePublisher) PublishSocio(_ context.Context, socio string, isPrueba bool) (publisher.Result, error) {
+	f.prueba = isPrueba
+	f.calls++
+	if f.err != nil {
+		return publisher.Result{}, f.err
+	}
+	return publisher.Result{IDTasa: "T999", Procesados: 1, Prueba: isPrueba, Detalle: []publisher.Detalle{{Socio: socio, Status: "ok"}}}, nil
+}
+
 func TestTasasActivasInterpretaMostrar(t *testing.T) {
 	t.Parallel()
 
@@ -600,6 +609,24 @@ func TestPublicarLoteDespachaCartelerasDelCliente(t *testing.T) {
 	envio := despachador.images[0]
 	if envio.Socio != "ANA" || envio.ChatID != "ana@g.us" || len(envio.PNG) == 0 {
 		t.Fatalf("envío inesperado: %+v", envio)
+	}
+}
+
+func TestDispararSocioUsaPUTYRespetaPrueba(t *testing.T) {
+	t.Parallel()
+
+	despachador := &fakePublisher{}
+	mux := http.NewServeMux()
+	NewHandler(testStore(), nil).WithPublisher(despachador).Register(mux)
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/tasas/disparar",
+		strings.NewReader(`{"socio":"ANA","is_prueba":true}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disparar status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if !despachador.prueba || despachador.calls != 1 {
+		t.Fatalf("modo prueba no propagado: %+v", despachador)
 	}
 }
 

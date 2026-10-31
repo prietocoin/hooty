@@ -635,6 +635,31 @@ func (r *Repository) DeleteLote(ctx context.Context, id string) (bool, error) {
 	return tag.RowsAffected() > 0, nil
 }
 
+// SocioByName implementa publisher.SocioFinder para previews y envíos
+// individuales, incluso si el socio no está en la lista ON.
+func (r *Repository) SocioByName(ctx context.Context, nombre string) (publisher.Socio, error) {
+	var socio publisher.Socio
+	var monedas string
+	err := r.pool.QueryRow(ctx, `
+SELECT COALESCE(nombre, ''), COALESCE(id_grupo, ''), COALESCE(moneda_base, 'USDT'),
+       COALESCE(monedas::text, '{}')
+FROM perfil
+WHERE LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))
+   OR LOWER(BTRIM(COALESCE(id_grupo, ''))) = LOWER(BTRIM($1))
+ORDER BY nombre
+LIMIT 1`, strings.TrimSpace(nombre)).
+		Scan(&socio.Nombre, &socio.ChatID, &socio.MonedaBase, &monedas)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return publisher.Socio{}, ErrNotFound
+	}
+	if err != nil {
+		log.Printf("[ERROR] Fallo DB al buscar socio %q para cartelera: %v", nombre, err)
+		return publisher.Socio{}, fmt.Errorf("api: buscar socio %q: %w", nombre, err)
+	}
+	socio.Monedas = json.RawMessage(monedas)
+	return socio, nil
+}
+
 // LatestLote implementa publisher.Source con las tasas del lote vigente.
 func (r *Repository) LatestLote(ctx context.Context) (publisher.Lote, error) {
 	tasa, err := r.LatestTasa(ctx)

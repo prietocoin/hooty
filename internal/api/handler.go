@@ -56,6 +56,11 @@ type Previewer interface {
 	Preview(ctx context.Context, socio string, prueba bool) ([]byte, error)
 }
 
+// SinglePublisher despacha la cartelera de un socio puntual.
+type SinglePublisher interface {
+	PublishSocio(ctx context.Context, socio string, isPrueba bool) (publisher.Result, error)
+}
+
 // Simulator expone el motor de liquidación canónico para el modal de edición.
 type Simulator interface {
 	Simular(ctx context.Context, input ingest.SimulacionInput) (ingest.SimulacionResult, error)
@@ -103,6 +108,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote/{$}", h.SaveLote)
 	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote", h.PublishLote)
 	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote/{$}", h.PublishLote)
+	mux.HandleFunc("PUT /api/v1/tasas/disparar", h.PublishSocio)
+	mux.HandleFunc("PUT /api/v1/tasas/disparar/{$}", h.PublishSocio)
 	mux.HandleFunc("DELETE /api/v1/tasas/lote/{id}", h.DeleteLote)
 	mux.HandleFunc("DELETE /api/v1/tasas/lote/{id}/{$}", h.DeleteLote)
 	mux.HandleFunc("GET /api/v1/reportes/filtros", h.ReportFilters)
@@ -137,6 +144,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.SaveLote(w, r)
 	case r.Method == http.MethodPut && path == "/api/v1/tasas/publicar-lote":
 		h.PublishLote(w, r)
+	case r.Method == http.MethodPut && path == "/api/v1/tasas/disparar":
+		h.PublishSocio(w, r)
 	case r.Method == http.MethodPut:
 		w.Header().Set("Allow", "GET, PUT, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -472,6 +481,44 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 
 // DeleteLote responde DELETE /api/v1/tasas/lote/{id}. Elimina el lote físico y
 // devuelve 404 si el identificador no existe.
+// PublishSocio responde PUT /api/v1/tasas/disparar. Renderiza y envía la
+// cartelera del socio indicado; el modo prueba solo cambia el destino.
+func (h *Handler) PublishSocio(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Socio            string `json:"socio"`
+		IsPrueba         *bool  `json:"is_prueba"`
+		ModoPrueba       *bool  `json:"modo_prueba"`
+		ModoPruebaGlobal *bool  `json:"modo_prueba_global"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_publish_payload")
+		return
+	}
+	if strings.TrimSpace(body.Socio) == "" {
+		writeError(w, http.StatusBadRequest, "socio es obligatorio")
+		return
+	}
+	isPrueba := false
+	for _, flag := range []*bool{body.IsPrueba, body.ModoPrueba, body.ModoPruebaGlobal} {
+		if flag != nil {
+			isPrueba = *flag
+			break
+		}
+	}
+	despachador, ok := h.publisher.(SinglePublisher)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "publisher_unavailable")
+		return
+	}
+	resultado, err := despachador.PublishSocio(r.Context(), body.Socio, isPrueba)
+	if err != nil {
+		h.log.Error("hooty.api.tasas_disparar", "socio", body.Socio, "prueba", isPrueba, "error", err)
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, resultado)
+}
+
 // PreviewLote responde GET /api/v1/tasas/preview/{socio} con el PNG generado
 // por el mismo motor oficial que usa la publicación masiva.
 func (h *Handler) PreviewLote(w http.ResponseWriter, r *http.Request) {

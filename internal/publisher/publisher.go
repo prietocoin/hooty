@@ -52,6 +52,11 @@ type Source interface {
 	ActiveSocios(ctx context.Context) ([]Socio, error)
 }
 
+// SocioFinder permite resolver un socio puntual aunque no esté en la lista ON.
+type SocioFinder interface {
+	SocioByName(ctx context.Context, nombre string) (Socio, error)
+}
+
 // Sender entrega una imagen a un chat_id concreto.
 type Sender interface {
 	Send(ctx context.Context, chatID string, png []byte, caption string) error
@@ -118,13 +123,29 @@ func (p *Publisher) Publish(ctx context.Context, isPrueba bool) (Result, error) 
 		if p.testChatID == "" {
 			return resultado, errors.New("publisher: falta configurar EVOLUTION_TEST_GROUP para publicar en prueba")
 		}
-		detalle := p.enviar(ctx, Socio{Nombre: "PRUEBA", ChatID: p.testChatID}, lote, true)
-		resultado.Detalle = []Detalle{detalle}
-		if detalle.Status == "ok" {
-			resultado.Procesados = 1
-		} else {
-			resultado.Fallidos = 1
-			return resultado, fmt.Errorf("publisher: falló el envío de prueba: %s", detalle.Error)
+		socios, err := p.source.ActiveSocios(ctx)
+		if err != nil {
+			return resultado, err
+		}
+		if len(socios) == 0 {
+			return resultado, errors.New("publisher: no hay socios activos ON para publicar")
+		}
+		for _, socio := range socios {
+			destino := socio
+			destino.ChatID = p.testChatID
+			detalle := p.enviar(ctx, destino, lote, true)
+			resultado.Detalle = append(resultado.Detalle, detalle)
+			if detalle.Status == "ok" {
+				resultado.Procesados++
+			} else {
+				resultado.Fallidos++
+			}
+		}
+		sort.Slice(resultado.Detalle, func(i, j int) bool {
+			return resultado.Detalle[i].Socio < resultado.Detalle[j].Socio
+		})
+		if resultado.Procesados == 0 {
+			return resultado, errors.New("publisher: fallaron todos los envíos de prueba")
 		}
 		return resultado, nil
 	}
@@ -198,19 +219,33 @@ func (p *Publisher) PublishImages(ctx context.Context, isPrueba bool, envios []E
 		if p.testChatID == "" {
 			return resultado, errors.New("publisher: falta configurar EVOLUTION_TEST_GROUP para publicar en prueba")
 		}
-		destino := Socio{Nombre: "PRUEBA", ChatID: p.testChatID}
-		var detalle Detalle
-		if len(envios) > 0 && len(envios[0].PNG) > 0 {
-			detalle = p.enviarImagen(ctx, destino, lote.ID, envios[0].PNG, true)
-		} else {
-			detalle = p.enviar(ctx, destino, lote, true)
+		if len(envios) == 0 {
+			return p.Publish(ctx, true)
 		}
-		resultado.Detalle = []Detalle{detalle}
-		if detalle.Status == "ok" {
-			resultado.Procesados = 1
-		} else {
-			resultado.Fallidos = 1
-			return resultado, fmt.Errorf("publisher: falló el envío de prueba: %s", detalle.Error)
+		for _, envio := range envios {
+			destino := Socio{Nombre: envio.Socio, ChatID: p.testChatID}
+			if socio, err := p.resolverSocio(ctx, envio.Socio); err == nil {
+				destino = socio
+				destino.ChatID = p.testChatID
+			}
+			var detalle Detalle
+			if len(envio.PNG) > 0 {
+				detalle = p.enviarImagen(ctx, destino, lote.ID, envio.PNG, true)
+			} else {
+				detalle = p.enviar(ctx, destino, lote, true)
+			}
+			resultado.Detalle = append(resultado.Detalle, detalle)
+			if detalle.Status == "ok" {
+				resultado.Procesados++
+			} else {
+				resultado.Fallidos++
+			}
+		}
+		sort.Slice(resultado.Detalle, func(i, j int) bool {
+			return resultado.Detalle[i].Socio < resultado.Detalle[j].Socio
+		})
+		if resultado.Procesados == 0 {
+			return resultado, errors.New("publisher: fallaron todos los envíos de prueba")
 		}
 		return resultado, nil
 	}
@@ -250,28 +285,15 @@ func (p *Publisher) PublishImages(ctx context.Context, isPrueba bool, envios []E
 }
 
 // Preview renderiza una cartelera con el mismo generador oficial, sin enviarla.
-func (p *Publisher) Preview(ctx context.Context, socioNombre string, prueba bool) ([]byte, error) {
+// El modo prueba no altera el contenido: solo cambia el destino al publicar.
+func (p *Publisher) Preview(ctx context.Context, socioNombre string, _ bool) ([]byte, error) {
 	lote, err := p.source.LatestLote(ctx)
 	if err != nil {
 		return nil, err
 	}
-	destino := Socio{Nombre: "PRUEBA", MonedaBase: "USDT"}
-	if !prueba {
-		socios, err := p.source.ActiveSocios(ctx)
-		if err != nil {
-			return nil, err
-		}
-		encontrado := false
-		for _, socio := range socios {
-			if strings.EqualFold(strings.TrimSpace(socio.Nombre), strings.TrimSpace(socioNombre)) {
-				destino = socio
-				encontrado = true
-				break
-			}
-		}
-		if !encontrado && len(socios) > 0 {
-			destino = socios[0]
-		}
+	destino, err := p.resolverSocio(ctx, socioNombre)
+	if err != nil {
+		return nil, err
 	}
 	return p.renderer.Render(Cartelera{
 		Socio:      destino.Nombre,
@@ -280,9 +302,64 @@ func (p *Publisher) Preview(ctx context.Context, socioNombre string, prueba bool
 		Monedas:    destino.Monedas,
 		Lote:       lote.ID,
 		Tasas:      lote.Tasas,
-		Prueba:     prueba,
 		Generada:   p.now(),
 	})
+}
+
+// PublishSocio renderiza y despacha la cartelera de un solo socio.
+func (p *Publisher) PublishSocio(ctx context.Context, socioNombre string, isPrueba bool) (Result, error) {
+	lote, err := p.source.LatestLote(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	socio, err := p.resolverSocio(ctx, socioNombre)
+	if err != nil {
+		return Result{}, err
+	}
+	resultado := Result{IDTasa: lote.ID, Prueba: isPrueba}
+	destino := socio
+	if isPrueba {
+		if p.testChatID == "" {
+			return resultado, errors.New("publisher: falta configurar EVOLUTION_TEST_GROUP para publicar en prueba")
+		}
+		destino.ChatID = p.testChatID
+	}
+	detalle := p.enviar(ctx, destino, lote, isPrueba)
+	resultado.Detalle = []Detalle{detalle}
+	if detalle.Status == "ok" {
+		resultado.Procesados = 1
+	} else {
+		resultado.Fallidos = 1
+		return resultado, fmt.Errorf("publisher: falló el envío de %s: %s", socio.Nombre, detalle.Error)
+	}
+	return resultado, nil
+}
+
+func (p *Publisher) resolverSocio(ctx context.Context, nombre string) (Socio, error) {
+	nombre = strings.TrimSpace(nombre)
+	if nombre != "" {
+		if finder, ok := p.source.(SocioFinder); ok {
+			if socio, err := finder.SocioByName(ctx, nombre); err == nil {
+				return socio, nil
+			}
+		}
+	}
+	socios, err := p.source.ActiveSocios(ctx)
+	if err != nil {
+		return Socio{}, err
+	}
+	if len(socios) == 0 {
+		return Socio{}, errors.New("publisher: no hay socios activos para la cartelera")
+	}
+	if nombre == "" {
+		return socios[0], nil
+	}
+	for _, socio := range socios {
+		if strings.EqualFold(strings.TrimSpace(socio.Nombre), nombre) {
+			return socio, nil
+		}
+	}
+	return Socio{}, fmt.Errorf("publisher: no se encontró el socio %q", nombre)
 }
 
 func (p *Publisher) enviarImagen(ctx context.Context, socio Socio, loteID string, png []byte, prueba bool) Detalle {

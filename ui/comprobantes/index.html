@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261030_06"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261031_01"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -692,7 +692,7 @@
           </div>
 
           <div class="flex items-center justify-end gap-2 shrink-0 border-t sm:border-t-0 border-blue-900/30 pt-2 sm:pt-0">
-            <button @click="enviarTasaIndividual(socio)" class="p-1.5 bg-amber-950/80 border border-amber-600/40 text-amber-300 rounded-xl hover:bg-amber-900 transition-all active:scale-95 shadow-lg shadow-amber-900/20" title="Enviar Tasa por WhatsApp">⚡</button>
+            <button @click="verCarteleraSocio(socio)" class="p-1.5 bg-amber-950/80 border border-amber-600/40 text-amber-300 rounded-xl hover:bg-amber-900 transition-all active:scale-95 shadow-lg shadow-amber-900/20" title="Ver cartelera del socio">⚡</button>
             <button @click="abrirConfigSocio(socio)" class="px-3 py-1.5 bg-purple-950/80 border border-purple-600/40 text-purple-300 rounded-xl font-bold text-xs hover:bg-purple-900 transition-all flex-1 sm:flex-none text-center active:scale-95">⚙ Configurar</button>
             <button @click="eliminarSocioDirectorio(socio.nombre)" class="p-1.5 bg-rose-950/80 border border-rose-600/40 text-rose-300 rounded-xl hover:bg-rose-900 transition-all active:scale-95" title="Eliminar Socio">🗑</button>
           </div>
@@ -965,6 +965,7 @@
 
         <!-- ACCIONES SECUNDARIAS DE ENVÍO -->
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-3 border-t border-blue-900/60">
+          <button type="button" @click="verCarteleraSocio(socioConfigEdit)" class="min-h-11 px-3 py-2 bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 rounded-xl text-xs font-black active:scale-95 transition-all">👁️ Ver Previa</button>
           <button type="button" @click="enviarTasaIndividual(socioConfigEdit, true)" class="min-h-11 px-3 py-2 bg-purple-950/80 border border-purple-500/50 text-purple-300 rounded-xl text-xs font-black active:scale-95 transition-all">🧪 Enviar a Prueba</button>
           <button type="button" @click="enviarTasaIndividual(socioConfigEdit, false)" class="min-h-11 px-3 py-2 bg-amber-950/80 border border-amber-500/50 text-amber-300 rounded-xl text-xs font-black active:scale-95 transition-all">⚡ Enviar Prod</button>
         </div>
@@ -977,6 +978,42 @@
       </div>
     </template>
 
+  </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- MODAL: Vista previa de cartelera individual                       -->
+<!-- ================================================================= -->
+<div x-show="modalCarteleraAbierto"
+     x-cloak
+     class="glauk-modal"
+     @click.self="cerrarCarteleraSocio()">
+  <div class="glauk-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="glauk-cartelera-title">
+    <div class="glauk-modal__handle" aria-hidden="true"></div>
+    <header class="glauk-modal__header">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 shrink-0 rounded-xl bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-cyan-300 text-base">👁️</div>
+        <div class="min-w-0">
+          <h3 id="glauk-cartelera-title">Cartelera del Socio</h3>
+          <p><strong class="text-cyan-400" x-text="carteleraPreviewNombre || '—'"></strong></p>
+        </div>
+      </div>
+      <button type="button" class="glauk-modal__close" @click="cerrarCarteleraSocio()" aria-label="Cerrar cartelera">✕</button>
+    </header>
+    <div class="glauk-modal__body">
+      <template x-if="carteleraPreviewUrl">
+        <img :src="carteleraPreviewUrl" alt="Cartelera del socio"
+             class="w-full h-auto rounded-xl border border-cyan-500/20 shadow-2xl">
+      </template>
+      <template x-if="!carteleraPreviewUrl">
+        <p class="text-xs text-slate-400 font-bold py-8 text-center">Generando cartelera oficial…</p>
+      </template>
+    </div>
+    <footer class="glauk-modal__footer">
+      <button type="button" @click="enviarTasaIndividual({ nombre: carteleraPreviewNombre }, true)" class="px-3 py-2.5 bg-purple-950/80 border border-purple-500/50 text-purple-300 rounded-xl text-xs font-black active:scale-95 transition-all">🧪 Enviar a Prueba</button>
+      <button type="button" @click="enviarTasaIndividual({ nombre: carteleraPreviewNombre }, false)" class="px-3 py-2.5 bg-amber-950/80 border border-amber-500/50 text-amber-300 rounded-xl text-xs font-black active:scale-95 transition-all">⚡ Enviar Prod</button>
+      <button type="button" @click="cerrarCarteleraSocio()" class="px-4 py-2.5 bg-[#030611] text-slate-300 rounded-xl text-xs font-bold border border-blue-900 hover:text-white transition-all">Cerrar</button>
+    </footer>
   </div>
 </div>
 

@@ -53,6 +53,36 @@ func (fakeRenderer) Render(Cartelera) ([]byte, error) {
 	return []byte("png"), nil
 }
 
+type captureRenderer struct {
+	last Cartelera
+}
+
+func (c *captureRenderer) Render(cartelera Cartelera) ([]byte, error) {
+	c.last = cartelera
+	return []byte("png"), nil
+}
+
+func TestPreviewMantieneNombreRealYSpreadsEnModoPrueba(t *testing.T) {
+	t.Parallel()
+
+	renderer := &captureRenderer{}
+	p := New(fakeSource{
+		lote: Lote{ID: "T096", Tasas: map[string]float64{"USD": 1, "ARS": 1622}},
+		socios: []Socio{
+			{Nombre: "ANA", ChatID: "ana@g.us", MonedaBase: "USD", Monedas: []byte(`{"ARS":{"porcentaje":{"deposito":5,"pago":3}}}`)},
+		},
+	}, &fakeSender{}, renderer, "prueba@g.us", nil)
+	if _, err := p.Preview(context.Background(), "ANA", true); err != nil {
+		t.Fatalf("preview rechazada: %v", err)
+	}
+	if renderer.last.Socio != "ANA" {
+		t.Fatalf("el cartel de prueba debe conservar el socio real, obtuve %q", renderer.last.Socio)
+	}
+	if len(renderer.last.Monedas) == 0 || renderer.last.MonedaBase != "USD" {
+		t.Fatalf("faltan spreads o moneda base en el cartel: %+v", renderer.last)
+	}
+}
+
 func testPublisher(testChat string, sender *fakeSender) *Publisher {
 	return New(fakeSource{
 		lote: Lote{ID: "T096", Tasas: map[string]float64{"USD": 1, "ARS": 1622}},
@@ -63,7 +93,7 @@ func testPublisher(testChat string, sender *fakeSender) *Publisher {
 	}, sender, fakeRenderer{}, testChat, nil)
 }
 
-func TestPublishPruebaSoloEnviaAlGrupoDePrueba(t *testing.T) {
+func TestPublishPruebaEnviaCartelesIndividualesAlGrupoDePrueba(t *testing.T) {
 	t.Parallel()
 
 	sender := &fakeSender{}
@@ -72,10 +102,15 @@ func TestPublishPruebaSoloEnviaAlGrupoDePrueba(t *testing.T) {
 		t.Fatalf("publicación de prueba rechazada: %v", err)
 	}
 	destinos := sender.chatIDs()
-	if len(destinos) != 1 || destinos[0] != "prueba@g.us" {
-		t.Fatalf("destinos de prueba = %v", destinos)
+	if len(destinos) != 2 {
+		t.Fatalf("debe enviar un cartel por socio al grupo test: %v", destinos)
 	}
-	if resultado.Procesados != 1 || !resultado.Prueba {
+	for _, destino := range destinos {
+		if destino != "prueba@g.us" {
+			t.Fatalf("destino de prueba incorrecto: %v", destinos)
+		}
+	}
+	if resultado.Procesados != 2 || !resultado.Prueba {
 		t.Fatalf("resultado inesperado: %+v", resultado)
 	}
 }
@@ -170,10 +205,15 @@ func TestPublishImagesPruebaIgnoraChatsDeSocios(t *testing.T) {
 		t.Fatalf("publicación de prueba rechazada: %v", err)
 	}
 	destinos := sender.chatIDs()
-	if len(destinos) != 1 || destinos[0] != "prueba@g.us" {
-		t.Fatalf("prueba debe usar solo el grupo test: %v", destinos)
+	if len(destinos) != 2 {
+		t.Fatalf("prueba debe reenviar cada cartel al grupo test: %v", destinos)
 	}
-	if resultado.Procesados != 1 || !resultado.Prueba {
+	for _, destino := range destinos {
+		if destino != "prueba@g.us" {
+			t.Fatalf("prueba debe usar solo el grupo test: %v", destinos)
+		}
+	}
+	if resultado.Procesados != 2 || !resultado.Prueba {
 		t.Fatalf("resultado inesperado: %+v", resultado)
 	}
 }

@@ -7,6 +7,7 @@ import { obtenerDirectorioNormalizado } from '../services/directorioService.js';
 import { alternarEstadoSocioWA } from '../services/socioEstadoService.js';
 import { alternarHerenciaSocio } from '../services/socioHerenciaService.js';
 import { prepararEdicionSocio, guardarConfiguracionSocio } from '../services/socioConfigModalService.js';
+import { apiUrl } from '../../../../../shared/js/api-base.js';
 import {
   apagarTodosLosSocios,
   memorizarSociosVigentes,
@@ -27,6 +28,9 @@ export function createDirectorioState() {
     busquedaDirectorio: '',
     socioConfigEdit: null,
     modalConfigSocioAbierto: false,
+    modalCarteleraAbierto: false,
+    carteleraPreviewUrl: '',
+    carteleraPreviewNombre: '',
     listaMonedasActivas: LISTA_MONEDAS_ACTIVAS,
     infoMonedasMaestra: obtenerInfoMonedasMaestra(),
 
@@ -88,6 +92,30 @@ export function createDirectorioState() {
     abrirConfigSocio(socio) {
       this.socioConfigEdit = prepararEdicionSocio(socio, this.infoMonedasMaestra);
       this.modalConfigSocioAbierto = true;
+    },
+    async verCarteleraSocio(socio) {
+      const nombre = String(socio?.nombre || socio?.nombre_socio || '').trim();
+      if (!nombre) return;
+      this.cerrarCarteleraSocio();
+      this.carteleraPreviewNombre = nombre;
+      this.modalCarteleraAbierto = true;
+      try {
+        const response = await fetch(apiUrl(`/api/v1/tasas/preview/${encodeURIComponent(nombre)}`), {
+          cache: 'no-store'
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        this.carteleraPreviewUrl = URL.createObjectURL(blob);
+      } catch (error) {
+        console.error('[directorio cartelera ❌]', error);
+        this.modalCarteleraAbierto = false;
+        alert('No se pudo generar la cartelera: ' + error.message);
+      }
+    },
+    cerrarCarteleraSocio() {
+      if (this.carteleraPreviewUrl) URL.revokeObjectURL(this.carteleraPreviewUrl);
+      this.carteleraPreviewUrl = '';
+      this.modalCarteleraAbierto = false;
     },
     async guardarConfigSocioModal() {
       await guardarConfiguracionSocio(this.socioConfigEdit);
