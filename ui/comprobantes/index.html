@@ -310,9 +310,21 @@
 <div class="glauk-kpis-grid">
 
  <!-- 1. Sujeto Auditado (Llamada explícita al servicio pasando la variable) -->
-<div class="col-span-2 sm:col-span-1 bg-[#060c24] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl border border-blue-900/50 shadow-xl">
-  <p class="text-[8px] md:text-[9px] font-extrabold text-blue-400/80 uppercase">SUJETO / ENTIDAD AUDITADA</p>
- <h3 class="text-xs md:text-base font-black text-white mt-0.5 truncate" x-text="obtenerSujetoAuditado(filtroSocio)"></h3>
+<div class="col-span-2 sm:col-span-1 bg-[#060c24] p-2.5 md:p-3.5 rounded-xl md:rounded-2xl border border-blue-900/50 shadow-xl flex items-center justify-between gap-3">
+  <div class="min-w-0">
+    <p class="text-[8px] md:text-[9px] font-extrabold text-blue-400/80 uppercase">SUJETO / ENTIDAD AUDITADA</p>
+    <h3 class="text-xs md:text-base font-black text-white mt-0.5 truncate" x-text="obtenerSujetoAuditado(filtroSocio)"></h3>
+  </div>
+  <button type="button"
+          @click="filtroSocio ? abrirReporteSocio(filtroSocio) : abrirFiltros()"
+          :title="filtroSocio ? 'Generar reporte de ' + filtroSocio : 'Selecciona un socio para generar el reporte'"
+          class="shrink-0 px-2.5 py-2 md:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] md:text-xs font-black shadow-lg shadow-emerald-900/30 transition-all active:scale-95 flex items-center gap-1.5">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 2v6h6M8 13h8M8 17h5"/>
+    </svg>
+    Reportes
+  </button>
 </div>
 
   <!-- 2. Ítems Operados -->
