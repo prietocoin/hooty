@@ -593,7 +593,15 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusOK, resultado)
+		notificado := h.notificarLote(r.Context(), resultado.IDTasa)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id_tasa":    resultado.IDTasa,
+			"procesados": resultado.Procesados,
+			"fallidos":   resultado.Fallidos,
+			"prueba":     resultado.Prueba,
+			"detalle":    resultado.Detalle,
+			"notificado": notificado,
+		})
 		return
 	}
 
@@ -607,11 +615,23 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
+	notificado := h.notificarLote(r.Context(), id)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id_tasa":    id,
 		"procesados": procesados,
 		"prueba":     isPrueba,
+		"notificado": notificado,
 	})
+}
+
+// notificarLote inserta el evento de n8n para el lote publicado. Si falla, la
+// publicación ya ocurrió: se registra el error y se informa notificado=false.
+func (h *Handler) notificarLote(ctx context.Context, idTasa string) bool {
+	if _, err := h.store.NotifyRates(ctx, idTasa); err != nil {
+		h.log.Error("hooty.api.tasas_publicar_notificar", "id_tasa", idTasa, "error", err)
+		return false
+	}
+	return true
 }
 
 // DeleteLote responde DELETE /api/v1/tasas/lote/{id}. Elimina el lote físico y

@@ -81,12 +81,22 @@ export function initMonitor() {
 
   async function publicarLote() {
     const prueba = Boolean(state.modoPruebaGlobal);
+    const boton = qs('#btnPublicar');
+    if (boton) {
+      boton.disabled = true;
+      boton.setAttribute('aria-busy', 'true');
+    }
     showToast(prueba ? '🧪 Publicando lote de prueba...' : '⚡ Publicando carteleras oficiales...');
     try {
       const datos = await api.publicarLote(prueba);
       showToast(`🚀 Publicado a ${datos.procesados ?? 0} socios ON`);
     } catch (error) {
       showToast(`❌ Error al publicar: ${error.message}`);
+    } finally {
+      if (boton) {
+        boton.disabled = false;
+        boton.removeAttribute('aria-busy');
+      }
     }
   }
 
