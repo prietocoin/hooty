@@ -1,5 +1,5 @@
 import { qs } from '../../../shared/js/dom.js';
-import { api } from '../api.js?v=20261024_99_FIX_TASAS';
+import { api } from '../api.js?v=20261031_01';
 import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import {
   esHerencia, nuevaRegla, payloadGuardar, reglasSegunModo

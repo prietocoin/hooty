@@ -1,12 +1,13 @@
 import { qs } from '../../../shared/js/dom.js';
-import { api } from '../api.js?v=20261024_99_FIX_TASAS';
+import { api } from '../api.js?v=20261031_01';
 import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import { esEntidadProtegida, esHerencia, payloadGuardar, reglasSegunModo, sociosFiltrados } from '../domain.js';
-import { renderListaSocios } from '../components/lista-socios.js?v=20261024_99_FIX_TASAS';
+import { renderListaSocios } from '../components/lista-socios.js?v=20261031_01';
 
 export function crearDirectorio({
   recargar = async () => {},
   editar = () => {},
+  previa = () => {},
   confirmar = globalThis.confirm,
   alertar = globalThis.alert
 } = {}) {
@@ -68,6 +69,7 @@ export function crearDirectorio({
     if (!socio) return;
     switch (boton.dataset.accion) {
       case 'configurar': editar(socio); break;
+      case 'previa': await previa(socio); break;
       case 'toggle': await toggleSocio(socio); break;
       case 'herencia': await toggleHerencia(socio); break;
       case 'eliminar': await eliminarSocio(socio); break;
