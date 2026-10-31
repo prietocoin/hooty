@@ -1,4 +1,4 @@
-import { api } from './api.js?v=20261031_01';
+import { api } from './api.js?v=20261031_02';
 import { state } from './store.js?v=20261024_99_FIX_TASAS';
 import { crearEditor } from './controllers/editor.js?v=20261031_01';
 import { crearDirectorio } from './controllers/directorio.js?v=20261031_01';
@@ -37,7 +37,24 @@ async function abrirPrevia(socio) {
         <strong style="display:block;color:#e2e8f0;font-size:14px;">👁 Cartelera del socio</strong>
         <span data-nombre style="display:block;color:#22d3ee;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
       </div>
-      <button type="button" data-cerrar aria-label="Cerrar" style="width:36px;height:36px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:#030611;color:#cbd5e1;font-size:16px;cursor:pointer;">✕</button>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <button type="button" data-test title="Enviar a Prueba" aria-label="Enviar a Prueba"
+                style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1px solid rgba(168,85,247,.45);background:rgba(88,28,135,.35);color:#d8b4fe;cursor:pointer;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/></svg>
+        </button>
+        <button type="button" data-enviar title="Enviar al socio" aria-label="Enviar al socio"
+                style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1px solid rgba(245,158,11,.45);background:rgba(120,53,15,.35);color:#fcd34d;cursor:pointer;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+        </button>
+        <button type="button" data-descargar title="Descargar" aria-label="Descargar"
+                style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1px solid rgba(34,211,238,.45);background:rgba(8,47,73,.35);color:#67e8f9;cursor:pointer;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        </button>
+        <button type="button" data-cerrar title="Cerrar" aria-label="Cerrar"
+                style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:#030611;color:#cbd5e1;cursor:pointer;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
     </div>
     <div data-cuerpo style="padding:14px;">
       <p style="margin:0;padding:32px 0;text-align:center;color:#94a3b8;font-size:12px;font-weight:700;">Generando cartelera oficial…</p>
@@ -53,7 +70,30 @@ async function abrirPrevia(socio) {
     document.removeEventListener('keydown', alPresionar);
   };
   const alPresionar = (event) => { if (event.key === 'Escape') cerrar(); };
+  const enviar = async (prueba) => {
+    try {
+      await api.disparar(nombre, prueba);
+      alert(`✅ Cartelera de ${nombre} enviada ${prueba ? 'al grupo de prueba' : 'al socio'}.`);
+    } catch (error) {
+      alert('❌ Error al enviar cartelera: ' + error.message);
+    }
+  };
+  const descargar = () => {
+    if (!url) {
+      alert('La cartelera todavía se está generando.');
+      return;
+    }
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = `Cartelera_${nombre.replace(/[^a-z0-9]/gi, '_')}.png`;
+    document.body.append(enlace);
+    enlace.click();
+    enlace.remove();
+  };
   card.querySelector('[data-cerrar]').addEventListener('click', cerrar);
+  card.querySelector('[data-test]').addEventListener('click', () => { void enviar(true); });
+  card.querySelector('[data-enviar]').addEventListener('click', () => { void enviar(false); });
+  card.querySelector('[data-descargar]').addEventListener('click', descargar);
   overlay.addEventListener('click', (event) => { if (event.target === overlay) cerrar(); });
   document.addEventListener('keydown', alPresionar);
 

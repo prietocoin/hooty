@@ -28,10 +28,22 @@ export async function previewBlob(nombre) {
   return respuesta.blob();
 }
 
+export const disparar = (nombre, prueba) => {
+  return fetch(apiUrl('/api/v1/tasas/disparar'), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ socio: nombre, is_prueba: Boolean(prueba), modo_prueba: Boolean(prueba) })
+  }).then(async (respuesta) => {
+    const datos = await respuesta.json().catch(() => ({}));
+    if (!respuesta.ok) throw new Error(datos.error || `Error HTTP ${respuesta.status}`);
+    return datos;
+  });
+};
+
 export const apagarTodos = () => post(`${BASE}/apagar-todos`);
 export const memorizar = () => post(`${BASE}/plantilla/memorizar`);
 export const restaurar = () => post(`${BASE}/plantilla/restaurar`);
 
 export const api = {
-  listar, guardar, toggle, eliminar, apagarTodos, memorizar, restaurar, tasasUltimas, previewBlob
+  listar, guardar, toggle, eliminar, apagarTodos, memorizar, restaurar, tasasUltimas, previewBlob, disparar
 };
