@@ -26,6 +26,7 @@ type Store interface {
 	GetComprobante(ctx context.Context, hash string) (ComprobanteRow, error)
 	UpdateComprobante(ctx context.Context, hash string, patch ComprobantePatch) (ComprobanteRow, error)
 	ListPerfiles(ctx context.Context) ([]Perfil, error)
+	UpdatePerfilEstado(ctx context.Context, nombre string, activo bool) error
 	LatestTasa(ctx context.Context) (Tasa, error)
 	SaveLote(ctx context.Context, tasas map[string]any) (string, error)
 	PublishLote(ctx context.Context) (string, int, error)
@@ -100,6 +101,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/comprobantes/simular", h.Simular)
 	mux.HandleFunc("GET /api/v1/perfiles", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/perfiles/{$}", h.ListPerfiles)
+	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado", h.PatchPerfilEstado)
+	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado/{$}", h.PatchPerfilEstado)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/tasas/monitor/{$}", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/tasas/preview", h.PreviewLote)
@@ -125,8 +128,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodPut &&
-		r.Method != http.MethodPost && r.Method != http.MethodDelete {
-		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
+		r.Method != http.MethodPost && r.Method != http.MethodDelete &&
+		r.Method != http.MethodPatch {
+		w.Header().Set("Allow", "GET, PATCH, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 		return
 	}
@@ -152,7 +156,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodDelete && strings.HasPrefix(path, "/api/v1/tasas/lote/"):
 		h.DeleteLote(w, r)
 	case r.Method == http.MethodDelete:
-		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
+		w.Header().Set("Allow", "GET, PATCH, PUT, POST, DELETE, OPTIONS")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+	case r.Method == http.MethodPatch && strings.HasPrefix(path, "/api/v1/perfiles/"):
+		h.PatchPerfilEstado(w, r)
+	case r.Method == http.MethodPatch:
+		w.Header().Set("Allow", "GET, PATCH, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 	case path == "/api/v1/comprobantes":
 		h.ListComprobantes(w, r)
@@ -340,6 +349,40 @@ func (h *Handler) ListPerfiles(w http.ResponseWriter, r *http.Request) {
 		items = append(items, NewPerfilDTO(perfil))
 	}
 	writeJSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) PatchPerfilEstado(w http.ResponseWriter, r *http.Request) {
+	nombre := strings.TrimSpace(r.PathValue("nombre"))
+	if nombre == "" {
+		resto := strings.TrimPrefix(strings.TrimRight(r.URL.Path, "/"), "/api/v1/perfiles/")
+		resto = strings.TrimSuffix(resto, "/estado")
+		nombre, _ = url.PathUnescape(strings.TrimSpace(resto))
+	}
+	if nombre == "" || strings.Contains(nombre, "/") {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+	var body struct {
+		Activo *bool `json:"activo"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil || body.Activo == nil {
+		writeError(w, http.StatusBadRequest, "activo es obligatorio")
+		return
+	}
+	if err := h.store.UpdatePerfilEstado(r.Context(), nombre, *body.Activo); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			writeError(w, http.StatusNotFound, "socio no encontrado")
+			return
+		}
+		h.log.Error("hooty.api.perfil_estado", "socio", nombre, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success": true,
+		"nombre":  nombre,
+		"activo":  *body.Activo,
+	})
 }
 
 func (h *Handler) LatestTasa(w http.ResponseWriter, r *http.Request) {
@@ -660,7 +703,7 @@ func parseDate(raw string) (string, error) {
 
 func setCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PATCH, PUT, POST, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-Id, Authorization, X-Hooty-Token")
 	w.Header().Set("Access-Control-Expose-Headers", "X-Total-Count, X-Limit, X-Offset, X-Has-More")
 }

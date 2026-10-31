@@ -635,6 +635,23 @@ func (r *Repository) DeleteLote(ctx context.Context, id string) (bool, error) {
 	return tag.RowsAffected() > 0, nil
 }
 
+// UpdatePerfilEstado enciende o apaga la cartelera del socio en la tabla física.
+func (r *Repository) UpdatePerfilEstado(ctx context.Context, nombre string, activo bool) error {
+	tag, err := r.pool.Exec(ctx, `
+UPDATE perfiles_glaukov
+SET mostrar = jsonb_set(COALESCE(mostrar, '{}'::jsonb), '{tasas}', to_jsonb($2::boolean), true)
+WHERE LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))`,
+		strings.TrimSpace(nombre), activo)
+	if err != nil {
+		log.Printf("[ERROR] Fallo DB al actualizar estado del socio %q: %v", nombre, err)
+		return fmt.Errorf("api: actualizar estado del socio %q: %w", nombre, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // SocioByName implementa publisher.SocioFinder para previews y envíos
 // individuales, incluso si el socio no está en la lista ON.
 func (r *Repository) SocioByName(ctx context.Context, nombre string) (publisher.Socio, error) {

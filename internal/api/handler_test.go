@@ -15,21 +15,23 @@ import (
 )
 
 type fakeStore struct {
-	rows       []ComprobanteRow
-	total      int
-	perfiles   []Perfil
-	tasa       Tasa
-	filters    ReportFilters
-	last       Filter
-	savedTasas map[string]any
-	deletedID  string
-	listErr    error
-	getErr     error
-	perfilErr  error
-	tasaErr    error
-	saveErr    error
-	publishErr error
-	deleteErr  error
+	rows               []ComprobanteRow
+	total              int
+	perfiles           []Perfil
+	tasa               Tasa
+	filters            ReportFilters
+	last               Filter
+	savedTasas         map[string]any
+	deletedID          string
+	perfilEstadoNombre string
+	perfilEstadoActivo bool
+	listErr            error
+	getErr             error
+	perfilErr          error
+	tasaErr            error
+	saveErr            error
+	publishErr         error
+	deleteErr          error
 }
 
 func (f *fakeStore) ListComprobantes(_ context.Context, filter Filter) ([]ComprobanteRow, int, error) {
@@ -59,6 +61,12 @@ func (f *fakeStore) UpdateComprobante(_ context.Context, _ string, _ Comprobante
 
 func (f *fakeStore) ListPerfiles(_ context.Context) ([]Perfil, error) {
 	return f.perfiles, f.perfilErr
+}
+
+func (f *fakeStore) UpdatePerfilEstado(_ context.Context, nombre string, activo bool) error {
+	f.perfilEstadoNombre = nombre
+	f.perfilEstadoActivo = activo
+	return f.perfilErr
 }
 
 func (f *fakeStore) LatestTasa(_ context.Context) (Tasa, error) {
@@ -567,6 +575,24 @@ func TestTasasActivasInterpretaMostrar(t *testing.T) {
 		if got := tasasActivas(raw); got != esperado {
 			t.Fatalf("tasasActivas(%q) = %v, se esperaba %v", raw, got, esperado)
 		}
+	}
+}
+
+func TestPatchPerfilEstadoAceptaPATCH(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	NewHandler(store, nil).Register(mux)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/perfiles/CHASAN/estado",
+		strings.NewReader(`{"activo":false}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PATCH estado status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if store.perfilEstadoNombre != "CHASAN" || store.perfilEstadoActivo {
+		t.Fatalf("estado no propagado: %q / %v", store.perfilEstadoNombre, store.perfilEstadoActivo)
 	}
 }
 

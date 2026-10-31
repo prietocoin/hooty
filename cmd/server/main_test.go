@@ -54,6 +54,10 @@ func (routeStore) ListPerfiles(context.Context) ([]api.Perfil, error) {
 	}, nil
 }
 
+func (routeStore) UpdatePerfilEstado(context.Context, string, bool) error {
+	return nil
+}
+
 func (routeStore) LatestTasa(context.Context) (api.Tasa, error) {
 	return api.Tasa{IDTasa: "T086", Tasas: json.RawMessage(`{"USD":1}`)}, nil
 }
