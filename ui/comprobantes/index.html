@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261031_01"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261031_02"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -692,7 +692,8 @@
           </div>
 
           <div class="flex items-center justify-end gap-2 shrink-0 border-t sm:border-t-0 border-blue-900/30 pt-2 sm:pt-0">
-            <button @click="verCarteleraSocio(socio)" class="p-1.5 bg-amber-950/80 border border-amber-600/40 text-amber-300 rounded-xl hover:bg-amber-900 transition-all active:scale-95 shadow-lg shadow-amber-900/20" title="Ver cartelera del socio">⚡</button>
+            <button @click="abrirPrevia(socio)" class="p-1.5 bg-cyan-950/80 border border-cyan-600/40 text-cyan-300 rounded-xl hover:bg-cyan-900 transition-all active:scale-95 shadow-lg shadow-cyan-900/20" title="Ver cartelera del socio">👁</button>
+            <button @click="enviarTasaIndividual(socio)" class="p-1.5 bg-amber-950/80 border border-amber-600/40 text-amber-300 rounded-xl hover:bg-amber-900 transition-all active:scale-95 shadow-lg shadow-amber-900/20" title="Enviar Tasa por WhatsApp">⚡</button>
             <button @click="abrirConfigSocio(socio)" class="px-3 py-1.5 bg-purple-950/80 border border-purple-600/40 text-purple-300 rounded-xl font-bold text-xs hover:bg-purple-900 transition-all flex-1 sm:flex-none text-center active:scale-95">⚙ Configurar</button>
             <button @click="eliminarSocioDirectorio(socio.nombre)" class="p-1.5 bg-rose-950/80 border border-rose-600/40 text-rose-300 rounded-xl hover:bg-rose-900 transition-all active:scale-95" title="Eliminar Socio">🗑</button>
           </div>
@@ -965,7 +966,7 @@
 
         <!-- ACCIONES SECUNDARIAS DE ENVÍO -->
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-3 border-t border-blue-900/60">
-          <button type="button" @click="verCarteleraSocio(socioConfigEdit)" class="min-h-11 px-3 py-2 bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 rounded-xl text-xs font-black active:scale-95 transition-all">👁️ Ver Previa</button>
+          <button type="button" @click="abrirPrevia(socioConfigEdit)" class="min-h-11 px-3 py-2 bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 rounded-xl text-xs font-black active:scale-95 transition-all">👁️ Ver Previa</button>
           <button type="button" @click="enviarTasaIndividual(socioConfigEdit, true)" class="min-h-11 px-3 py-2 bg-purple-950/80 border border-purple-500/50 text-purple-300 rounded-xl text-xs font-black active:scale-95 transition-all">🧪 Enviar a Prueba</button>
           <button type="button" @click="enviarTasaIndividual(socioConfigEdit, false)" class="min-h-11 px-3 py-2 bg-amber-950/80 border border-amber-500/50 text-amber-300 rounded-xl text-xs font-black active:scale-95 transition-all">⚡ Enviar Prod</button>
         </div>

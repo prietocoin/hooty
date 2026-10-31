@@ -93,7 +93,7 @@ export function createDirectorioState() {
       this.socioConfigEdit = prepararEdicionSocio(socio, this.infoMonedasMaestra);
       this.modalConfigSocioAbierto = true;
     },
-    async verCarteleraSocio(socio) {
+    async abrirPrevia(socio) {
       const nombre = String(socio?.nombre || socio?.nombre_socio || '').trim();
       if (!nombre) return;
       this.cerrarCarteleraSocio();

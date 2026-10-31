@@ -24,7 +24,6 @@ export function initMonitor() {
   const etiquetaLote = qs('#lblLoteActual');
   const grid = qs('#gridMonitor');
   const entradaBorrado = qs('#txtBatchIdToDelete');
-  let previewUrl = '';
 
   function actualizarValor(code, valor) {
     state.borradorTasas[code] = parseFloat(valor) || 0;
@@ -91,30 +90,6 @@ export function initMonitor() {
     }
   }
 
-  async function verPrevia() {
-    const spinner = qs('#previewSpinner');
-    const imagen = qs('#imgPreviewCartelera');
-    const etiqueta = qs('#lblPreviewSocio');
-    if (!spinner || !imagen) return;
-    spinner.classList.remove('hidden');
-    imagen.classList.add('hidden');
-    imagen.removeAttribute('src');
-    abrirModal('modalPreview');
-    const prueba = Boolean(state.modoPruebaGlobal);
-    if (etiqueta) etiqueta.textContent = prueba ? 'PRUEBA' : 'CARTELERA OFICIAL';
-    try {
-      const blob = await api.previewBlob('', prueba);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(blob);
-      imagen.src = previewUrl;
-      imagen.classList.remove('hidden');
-      spinner.classList.add('hidden');
-    } catch (error) {
-      cerrarModal('modalPreview');
-      showToast(`❌ Error generando la vista previa: ${error.message}`);
-    }
-  }
-
   async function traerBorradorHoo() {
     showToast('📑 Leyendo el borrador Hoo...');
     try {
@@ -170,7 +145,6 @@ export function initMonitor() {
 
   alHacer('#btnGuardarLote', 'click', guardarLote);
   alHacer('#btnPublicar', 'click', publicarLote);
-  alHacer('#btnVerPrevia', 'click', verPrevia);
   alHacer('#btnHoo', 'click', traerBorradorHoo);
   alHacer('#btnRemesas', 'click', enviarTasaRemesas);
   alHacer('#btnBorrarLote', 'click', abrirBorrado);
