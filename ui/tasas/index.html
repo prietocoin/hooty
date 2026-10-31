@@ -83,6 +83,9 @@
             <button id="btnPublicar" class="btn btn-publish" type="button">
               ⚡ <span>Publicar Lote a Socios ON</span>
             </button>
+            <button id="btnVerPrevia" class="btn btn-purple" type="button">
+              👁️ <span>Ver Previa</span>
+            </button>
             <button id="btnHoo" class="btn btn-purple" type="button">
               📑 <span>Traer Borrador Hoo</span>
             </button>
@@ -112,12 +115,28 @@
       </div>
     </div>
   </div>
+  <div id="modalPreview" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="tituloPreview">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="tituloPreview">👁️ Vista Previa Cartelera — <span id="lblPreviewSocio">---</span></h3>
+        <button type="button" class="close-btn close-btn-plain modal-close" data-close-modal="modalPreview" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="previewSpinner" class="preview-spinner">⚡ Generando cartelera PNG...</div>
+        <img id="imgPreviewCartelera" class="hidden" alt="Vista Previa Cartelera"
+             style="width:100%;height:auto;border-radius:12px;display:block;">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" data-close-modal="modalPreview">Cerrar</button>
+      </div>
+    </div>
+  </div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite">Mensaje</div>
   <div id="carteleraCaptura" aria-hidden="true"
        style="position:fixed;left:-100000px;top:0;width:900px;pointer-events:none;"></div>
   <script src="../config.js?v=20261027_01"></script>
   <script src="../shared/vendor/html2canvas.min.js"></script>
-  <script type="module" src="./js/main.js?v=20261030_2202"></script>
+  <script type="module" src="./js/main.js?v=20261031_01"></script>
   <script type="module" src="/shared/js/mobile-nav.js?v=20261027_01"></script>
 </body>
 </html>
