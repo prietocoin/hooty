@@ -201,6 +201,7 @@ func (s *Store) GuardarComprobanteYMarcar(ctx context.Context, comprobante domai
 		comprobante.Tasa1, comprobante.Tasa2,
 		comprobante.Monto1, comprobante.Monto2, comprobante.ME1, comprobante.ME2,
 		comprobante.LoteTasa,
+		domain.NormalizeTipoOp(comprobante.TipoOp),
 		clock.ForTimestamp(comprobante.FechaOperacion),
 		clock.ForTimestamp(comprobante.CreadoEn),
 		clock.ForTimestamp(comprobante.ActualizadoEn),

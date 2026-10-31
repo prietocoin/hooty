@@ -58,7 +58,7 @@ func TestGuardarComprobanteYMarcarExigeDosFilas(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO comprobantes").
-		WithArgs(anyArgs(25)...).
+		WithArgs(anyArgs(26)...).
 		WillReturnResult(pgconn.NewCommandTag("INSERT 0 1"))
 	mock.ExpectExec("UPDATE impactos").
 		WithArgs(pgxmock.AnyArg()).
@@ -97,7 +97,7 @@ func TestGuardarComprobanteYMarcarCommitConDosFilas(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO comprobantes").
-		WithArgs(anyArgs(25)...).
+		WithArgs(anyArgs(26)...).
 		WillReturnResult(pgconn.NewCommandTag("INSERT 0 1"))
 	mock.ExpectExec("UPDATE impactos").
 		WithArgs(pgxmock.AnyArg()).

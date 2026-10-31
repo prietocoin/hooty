@@ -211,13 +211,18 @@ func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch C
 		return ComprobanteRow{}, err
 	}
 
+	var tipoOpSQL any
+	if patch.TipoOp != nil {
+		tipoOpSQL = domain.NormalizeTipoOp(*patch.TipoOp)
+	}
+
 	tag, err := tx.Exec(ctx, sqlUpdateComprobante,
 		existing.MontoRecibo, existing.MonedaRecibo,
 		existing.Socio1, existing.Socio2,
 		existing.Tasa1, existing.Tasa2,
 		existing.Monto1, existing.Monto2, existing.ME1, existing.ME2,
 		existing.Banco, existing.Titular, existing.Referencia,
-		domain.NormalizeTipoOp(existing.TipoOp),
+		tipoOpSQL,
 		hash,
 	)
 	if err != nil {
@@ -992,7 +997,7 @@ UPDATE comprobantes SET
     banco = $11,
     titular = $12,
     referencia = $13,
-    tipo_op = $14,
+    tipo_op = COALESCE($14::text, tipo_op),
     actualizado_en = NOW()
 WHERE hash_largo = $15`
 

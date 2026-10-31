@@ -78,8 +78,17 @@ func EnsureTipoOpColumn(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err := tx.Exec(ctx, `ALTER TABLE comprobantes ADD COLUMN IF NOT EXISTS tipo_op text DEFAULT 'D'`); err != nil {
 		return fmt.Errorf("postgres: crear tipo_op: %w", err)
 	}
+	if _, err := tx.Exec(ctx, `UPDATE comprobantes SET tipo_op = UPPER(BTRIM(tipo_op)) WHERE tipo_op IS NOT NULL AND UPPER(BTRIM(tipo_op)) IN ('D', 'P', 'A') AND tipo_op <> UPPER(BTRIM(tipo_op))`); err != nil {
+		return fmt.Errorf("postgres: normalizar mayúsculas tipo_op: %w", err)
+	}
 	if _, err := tx.Exec(ctx, `UPDATE comprobantes SET tipo_op = 'D' WHERE tipo_op IS NULL OR UPPER(BTRIM(tipo_op)) NOT IN ('D', 'P', 'A')`); err != nil {
 		return fmt.Errorf("postgres: normalizar tipo_op: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `ALTER TABLE comprobantes ALTER COLUMN tipo_op SET DEFAULT 'D'`); err != nil {
+		return fmt.Errorf("postgres: fijar default tipo_op: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `ALTER TABLE comprobantes ALTER COLUMN tipo_op SET NOT NULL`); err != nil {
+		return fmt.Errorf("postgres: fijar NOT NULL tipo_op: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
 DO $$

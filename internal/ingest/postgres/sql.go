@@ -53,14 +53,14 @@ INSERT INTO comprobantes (
     monto_recibo, moneda_recibo, banco, titular, referencia, url_imagen,
     grupo_1, grupo_2, caption_1, caption_2,
     socio_1, socio_2, tasa_1, tasa_2, monto_1, monto_2, me1, me2,
-    lote_tasa, fecha_operacion, creado_en, actualizado_en
+    lote_tasa, tipo_op, fecha_operacion, creado_en, actualizado_en
 )
 VALUES (
     $1, $2, $3,
     $4, $5, $6, $7, $8, $9,
     $10, $11, $12, $13,
     $14, $15, $16, $17, $18, $19, $20, $21,
-    $22, $23, $24, $25
+    $22, $23, $24, $25, $26
 )
 ON CONFLICT (hash_largo) DO UPDATE SET
     hash_corto = EXCLUDED.hash_corto,
