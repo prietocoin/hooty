@@ -1,5 +1,5 @@
 import { qs } from '../../../shared/js/dom.js';
-import { api } from '../api.js?v=20261030_03';
+import { api } from '../api.js?v=20261030_2101';
 import { fusionarTasas } from '../config.js';
 import { state } from '../state.js?v=20261030_02';
 import { abrirModal, cerrarModal } from '../ui/modal.js';

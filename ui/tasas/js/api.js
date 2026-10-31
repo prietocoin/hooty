@@ -2,6 +2,7 @@ import { apiUrl } from '../../shared/js/api-base.js';
 
 const BASE = '/api/v1/tasas';
 const HOO_RATES_URL = 'https://hoo.jairokov.com/global-rates';
+const WRITE_METHOD = 'PUT';
 
 export class ApiError extends Error {
   constructor(mensaje, estado = 0, ruta = '') {
@@ -20,7 +21,11 @@ function mensajeHttp(estado) {
 }
 
 async function solicitarJson(ruta, opciones = {}) {
-  const init = { ...opciones, headers: { Accept: 'application/json', ...(opciones.headers || {}) } };
+  const init = {
+    cache: 'no-store',
+    ...opciones,
+    headers: { Accept: 'application/json', ...(opciones.headers || {}) }
+  };
   const tieneCuerpo = Boolean(init.body);
   const tieneTipo = Object.keys(init.headers).some((clave) => clave.toLowerCase() === 'content-type');
   if (tieneCuerpo && !tieneTipo) {
@@ -90,14 +95,14 @@ export const api = {
 
   guardarLote(tasas) {
     return solicitarJson('/guardar-lote', {
-      method: 'PUT',
+      method: WRITE_METHOD,
       body: JSON.stringify({ tasas })
     });
   },
 
   publicarLote(modoPruebaGlobal) {
     return solicitarJson('/publicar-lote', {
-      method: 'PUT',
+      method: WRITE_METHOD,
       body: JSON.stringify({ modo_prueba_global: modoPruebaGlobal })
     });
   },
