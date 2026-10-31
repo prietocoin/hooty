@@ -27,8 +27,8 @@ var (
 	separador    = color.NRGBA{R: 255, G: 255, B: 255, A: 38} // rgba(255,255,255,0.15)
 	bordeBandera = color.NRGBA{R: 255, G: 255, B: 255, A: 51} // rgba(255,255,255,0.2)
 
-	rellenoTarjeta = color.NRGBA{R: 13, G: 19, B: 38, A: 255} // #0d1326
-	bordeTarjeta   = color.NRGBA{R: 30, G: 41, B: 59, A: 255} // #1e293b
+	rellenoTarjeta = color.NRGBA{R: 13, G: 19, B: 38, A: 153} // #0d1326/60
+	bordeTarjeta   = color.NRGBA{R: 30, G: 41, B: 59, A: 179} // #1e293b/70
 
 	tinteOficial = color.NRGBA{R: 217, G: 119, B: 6, A: 38}
 	bordeOficial = color.NRGBA{R: 217, G: 119, B: 6, A: 102}

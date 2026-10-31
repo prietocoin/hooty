@@ -22,6 +22,15 @@ func pintarTarjetas(lienzo *gg.Context, tarjetas []Tarjeta) error {
 // pintarTarjeta dibuja el marco y su contenido: el encabezado con la bandera, el
 // país y la tendencia, y la franja de tasas separada por una línea tenue.
 func pintarTarjeta(lienzo *gg.Context, x, y float64, datos Tarjeta) error {
+	// Vidrio: se pinta el fondo desenfocado dentro de la silueta antes de la capa
+	// translúcida, de modo que las constelaciones se vean suaves detrás de la fila.
+	lienzo.DrawRoundedRectangle(x, y, anchoTarjeta, altoTarjeta, 16)
+	lienzo.Clip()
+	if fondo, err := FondoDifuminado(); err == nil {
+		lienzo.DrawImage(fondo, 0, 0)
+	}
+	lienzo.ResetClip()
+
 	tarjeta(lienzo, x, y)
 	if err := pintarEncabezadoTarjeta(lienzo, x, y, datos); err != nil {
 		return err

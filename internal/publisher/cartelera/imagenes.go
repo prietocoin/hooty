@@ -29,7 +29,40 @@ func (c *cacheImagen) obtener() (image.Image, error) {
 var (
 	fondo = &cacheImagen{ruta: "assets/background.jpg"}
 	logo  = &cacheImagen{ruta: "assets/logo.png"}
+	// fondoDifuminado aproxima el `backdrop-blur` de CSS: reduce y vuelve a
+	// escalar el fondo una sola vez y luego se dibuja debajo de cada fila.
+	fondoDifuminado = &cacheDifuminado{}
 )
+
+type cacheDifuminado struct {
+	unaVez sync.Once
+	imagen image.Image
+	error  error
+}
+
+func (c *cacheDifuminado) obtener() (image.Image, error) {
+	c.unaVez.Do(func() {
+		original, err := Fondo()
+		if err != nil {
+			c.error = err
+			return
+		}
+		caja := original.Bounds()
+		pequeno := escalar(original, maxInt(1, caja.Dx()/14), maxInt(1, caja.Dy()/14))
+		c.imagen = escalar(pequeno, caja.Dx(), caja.Dy())
+	})
+	return c.imagen, c.error
+}
+
+// FondoDifuminado devuelve la versión suave del fondo para el vidrio de las filas.
+func FondoDifuminado() (image.Image, error) { return fondoDifuminado.obtener() }
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
 
 // decodificar convierte un recurso embebido en imagen. El formato lo resuelven
 // los decodificadores importados por efecto: JPEG para el fondo y PNG para el resto.
