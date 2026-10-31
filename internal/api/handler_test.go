@@ -21,12 +21,14 @@ type fakeStore struct {
 	filters    ReportFilters
 	last       Filter
 	savedTasas map[string]any
+	deletedID  string
 	listErr    error
 	getErr     error
 	perfilErr  error
 	tasaErr    error
 	saveErr    error
 	publishErr error
+	deleteErr  error
 }
 
 func (f *fakeStore) ListComprobantes(_ context.Context, filter Filter) ([]ComprobanteRow, int, error) {
@@ -72,6 +74,14 @@ func (f *fakeStore) PublishLote(_ context.Context) (string, int, error) {
 		return "", 0, f.publishErr
 	}
 	return "T999", 2, nil
+}
+
+func (f *fakeStore) DeleteLote(_ context.Context, id string) (bool, error) {
+	f.deletedID = id
+	if f.deleteErr != nil {
+		return false, f.deleteErr
+	}
+	return id != "T000", nil
 }
 
 func (f *fakeStore) ReportFilters(_ context.Context) (ReportFilters, error) {
@@ -492,6 +502,38 @@ func TestTasasGuardarYPublicarUsanPUT(t *testing.T) {
 	}
 	if publicado.IDTasa != "T999" || publicado.Procesados != 2 {
 		t.Fatalf("publicación inesperada: %+v", publicado)
+	}
+}
+
+func TestDeleteLoteUsaDELETE(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	NewHandler(store, nil).Register(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/tasas/lote/T096", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("DELETE lote status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if store.deletedID != "T096" {
+		t.Fatalf("id borrado = %q", store.deletedID)
+	}
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/tasas/lote/T000", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("DELETE inexistente status = %d, se esperaba 404", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/tasas/lote/T096", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST lote status = %d, se esperaba 405", rec.Code)
 	}
 }
 

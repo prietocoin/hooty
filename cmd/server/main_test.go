@@ -70,6 +70,10 @@ func (routeStore) PublishLote(context.Context) (string, int, error) {
 	return "T999", 2, nil
 }
 
+func (routeStore) DeleteLote(context.Context, string) (bool, error) {
+	return true, nil
+}
+
 func newTestMux(t *testing.T) http.Handler {
 	t.Helper()
 	uiHandler, err := hootyui.UIHandler()

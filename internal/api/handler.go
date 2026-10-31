@@ -27,6 +27,7 @@ type Store interface {
 	LatestTasa(ctx context.Context) (Tasa, error)
 	SaveLote(ctx context.Context, tasas map[string]any) (string, error)
 	PublishLote(ctx context.Context) (string, int, error)
+	DeleteLote(ctx context.Context, id string) (bool, error)
 	ReportFilters(ctx context.Context) (ReportFilters, error)
 }
 
@@ -75,6 +76,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote/{$}", h.SaveLote)
 	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote", h.PublishLote)
 	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote/{$}", h.PublishLote)
+	mux.HandleFunc("DELETE /api/v1/tasas/lote/{id}", h.DeleteLote)
+	mux.HandleFunc("DELETE /api/v1/tasas/lote/{id}/{$}", h.DeleteLote)
 	mux.HandleFunc("GET /api/v1/reportes/filtros", h.ReportFilters)
 	mux.HandleFunc("GET /api/v1/reportes/filtros/{$}", h.ReportFilters)
 }
@@ -87,8 +90,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Options(w, r)
 		return
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodPut && r.Method != http.MethodPost {
-		w.Header().Set("Allow", "GET, PUT, POST, OPTIONS")
+	if r.Method != http.MethodGet && r.Method != http.MethodPut &&
+		r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 		return
 	}
@@ -98,7 +102,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && path == "/api/v1/comprobantes/simular":
 		h.Simular(w, r)
 	case r.Method == http.MethodPost:
-		w.Header().Set("Allow", "GET, PUT, POST, OPTIONS")
+		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 	case r.Method == http.MethodPut && strings.HasPrefix(path, "/api/v1/comprobantes/"):
 		h.UpdateComprobante(w, r)
@@ -107,7 +111,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPut && path == "/api/v1/tasas/publicar-lote":
 		h.PublishLote(w, r)
 	case r.Method == http.MethodPut:
-		w.Header().Set("Allow", "GET, PUT, OPTIONS")
+		w.Header().Set("Allow", "GET, PUT, DELETE, OPTIONS")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+	case r.Method == http.MethodDelete && strings.HasPrefix(path, "/api/v1/tasas/lote/"):
+		h.DeleteLote(w, r)
+	case r.Method == http.MethodDelete:
+		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
 	case path == "/api/v1/comprobantes":
 		h.ListComprobantes(w, r)
@@ -379,6 +388,32 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeleteLote responde DELETE /api/v1/tasas/lote/{id}. Elimina el lote físico y
+// devuelve 404 si el identificador no existe.
+func (h *Handler) DeleteLote(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		id = strings.TrimPrefix(strings.TrimRight(r.URL.Path, "/"), "/api/v1/tasas/lote/")
+	}
+	if id == "" || strings.Contains(id, "/") {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+	borrado, err := h.store.DeleteLote(r.Context(), id)
+	if err != nil {
+		h.log.Error("hooty.api.tasas_borrar", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	if !borrado {
+		writeError(w, http.StatusNotFound, "lote no encontrado")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message": "Lote " + id + " eliminado correctamente.",
+	})
+}
+
 func (h *Handler) ReportFilters(w http.ResponseWriter, r *http.Request) {
 	filters, err := h.store.ReportFilters(r.Context())
 	if err != nil {
@@ -471,7 +506,7 @@ func parseDate(raw string) (string, error) {
 
 func setCORS(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Request-Id, Authorization, X-Hooty-Token")
 	w.Header().Set("Access-Control-Expose-Headers", "X-Total-Count, X-Limit, X-Offset, X-Has-More")
 }

@@ -630,6 +630,16 @@ WHERE UPPER(BTRIM(COALESCE(nombre, ''))) NOT IN ('', 'GENERAL')
 	return tasa.IDTasa, procesados, nil
 }
 
+// DeleteLote elimina un lote de tasas_glaukov y distingue "borrado" de
+// "no existía" para que el handler responda 404 en el segundo caso.
+func (r *Repository) DeleteLote(ctx context.Context, id string) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM tasas_glaukov WHERE LOWER(id_tasa) = LOWER($1)`, strings.TrimSpace(id))
+	if err != nil {
+		return false, fmt.Errorf("api: borrar lote %q: %w", id, err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // LatestTasa devuelve el último registro de la vista tasa.
 func (r *Repository) LatestTasa(ctx context.Context) (Tasa, error) {
 	var item Tasa
