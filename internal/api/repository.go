@@ -652,6 +652,92 @@ WHERE LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))`,
 	return nil
 }
 
+// SavePerfil inserta o actualiza la configuración del socio en la tabla física.
+func (r *Repository) SavePerfil(ctx context.Context, perfil PerfilWrite) error {
+	rol := strings.TrimSpace(perfil.Rol)
+	if rol == "" {
+		rol = "SOCIO"
+	}
+	base := domain.NormalizeCurrency(perfil.MonedaBase, "USDT")
+	mostrar := objetoJSON(perfil.Mostrar, `{"tasas":true,"dashboard":true}`)
+	monedas := objetoJSON(perfil.Monedas, `{}`)
+	_, err := r.pool.Exec(ctx, `
+INSERT INTO perfiles_glaukov (id_grupo, nombre, rol, moneda_base, saldo_inicial, mostrar, monedas, herencia)
+VALUES ($1, UPPER(BTRIM($2)), $3, $4, $5, $6::jsonb, $7::jsonb, $8)
+ON CONFLICT ((UPPER(BTRIM(nombre)))) DO UPDATE SET
+  id_grupo = EXCLUDED.id_grupo,
+  rol = EXCLUDED.rol,
+  moneda_base = EXCLUDED.moneda_base,
+  saldo_inicial = EXCLUDED.saldo_inicial,
+  mostrar = EXCLUDED.mostrar,
+  monedas = EXCLUDED.monedas,
+  herencia = EXCLUDED.herencia`,
+		strings.TrimSpace(perfil.IDGrupo), perfil.Nombre, rol, base,
+		perfil.SaldoInicial, mostrar, monedas, perfil.Herencia)
+	if err != nil {
+		log.Printf("[ERROR] Fallo DB al guardar socio %q: %v", perfil.Nombre, err)
+		return fmt.Errorf("api: guardar socio %q: %w", perfil.Nombre, err)
+	}
+	return nil
+}
+
+// ApagarPerfiles desactiva la cartelera de todos los socios salvo GENERAL.
+func (r *Repository) ApagarPerfiles(ctx context.Context) error {
+	_, err := r.pool.Exec(ctx, `
+UPDATE perfiles_glaukov
+SET mostrar = jsonb_set(
+  COALESCE(mostrar, '{}'::jsonb),
+  '{tasas}', to_jsonb(UPPER(BTRIM(nombre)) = 'GENERAL'))
+WHERE nombre IS NOT NULL`)
+	if err != nil {
+		log.Printf("[ERROR] Fallo DB al apagar socios: %v", err)
+		return fmt.Errorf("api: apagar socios: %w", err)
+	}
+	return nil
+}
+
+// MemorizarPlantilla copia mostrar a recordar_mostrar.
+func (r *Repository) MemorizarPlantilla(ctx context.Context) error {
+	if _, err := r.pool.Exec(ctx, `UPDATE perfiles_glaukov SET recordar_mostrar = mostrar`); err != nil {
+		log.Printf("[ERROR] Fallo DB al memorizar plantilla: %v", err)
+		return fmt.Errorf("api: memorizar plantilla: %w", err)
+	}
+	return nil
+}
+
+// RestaurarPlantilla recupera recordar_mostrar y fuerza GENERAL activo.
+func (r *Repository) RestaurarPlantilla(ctx context.Context) error {
+	_, err := r.pool.Exec(ctx, `
+UPDATE perfiles_glaukov
+SET mostrar = CASE
+  WHEN UPPER(BTRIM(nombre)) = 'GENERAL'
+    THEN jsonb_set(COALESCE(recordar_mostrar, '{}'::jsonb), '{tasas}', 'true'::jsonb)
+  ELSE COALESCE(recordar_mostrar, '{"tasas": false, "dashboard": false}'::jsonb)
+END`)
+	if err != nil {
+		log.Printf("[ERROR] Fallo DB al restaurar plantilla: %v", err)
+		return fmt.Errorf("api: restaurar plantilla: %w", err)
+	}
+	return nil
+}
+
+func objetoJSON(raw json.RawMessage, fallback string) string {
+	texto := strings.TrimSpace(string(raw))
+	if texto == "" || texto == "null" {
+		return fallback
+	}
+	if strings.HasPrefix(texto, `"`) {
+		var decodificado string
+		if err := json.Unmarshal(raw, &decodificado); err == nil {
+			texto = strings.TrimSpace(decodificado)
+		}
+	}
+	if !json.Valid([]byte(texto)) {
+		return fallback
+	}
+	return texto
+}
+
 // SocioByName implementa publisher.SocioFinder para previews y envíos
 // individuales, incluso si el socio no está en la lista ON.
 func (r *Repository) SocioByName(ctx context.Context, nombre string) (publisher.Socio, error) {

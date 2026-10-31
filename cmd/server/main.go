@@ -64,6 +64,9 @@ func run() error {
 
 	migrateCtx, cancelMigrate := context.WithTimeout(ctx, 30*time.Second)
 	err = postgres.EnsureZeroRateAllowed(migrateCtx, pool)
+	if err == nil {
+		err = postgres.EnsurePlantillaColumn(migrateCtx, pool)
+	}
 	cancelMigrate()
 	if err != nil {
 		return err

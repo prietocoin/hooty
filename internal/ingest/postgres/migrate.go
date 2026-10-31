@@ -50,6 +50,18 @@ func EnsureZeroRateAllowed(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
+// EnsurePlantillaColumn garantiza la columna de plantilla usada por el
+// directorio para memorizar/restaurar el estado de los socios.
+func EnsurePlantillaColumn(ctx context.Context, pool *pgxpool.Pool) error {
+	if pool == nil {
+		return errors.New("postgres: pool es obligatorio para migrar la plantilla")
+	}
+	if _, err := pool.Exec(ctx, `ALTER TABLE perfiles_glaukov ADD COLUMN IF NOT EXISTS recordar_mostrar jsonb`); err != nil {
+		return fmt.Errorf("postgres: crear columna recordar_mostrar: %w", err)
+	}
+	return nil
+}
+
 // rateCheckAllowsZero reconoce una definición que ya admite el estado 0.
 func rateCheckAllowsZero(definition string) bool {
 	lower := strings.ToLower(definition)

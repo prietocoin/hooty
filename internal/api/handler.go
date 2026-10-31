@@ -27,6 +27,10 @@ type Store interface {
 	UpdateComprobante(ctx context.Context, hash string, patch ComprobantePatch) (ComprobanteRow, error)
 	ListPerfiles(ctx context.Context) ([]Perfil, error)
 	UpdatePerfilEstado(ctx context.Context, nombre string, activo bool) error
+	SavePerfil(ctx context.Context, perfil PerfilWrite) error
+	ApagarPerfiles(ctx context.Context) error
+	MemorizarPlantilla(ctx context.Context) error
+	RestaurarPlantilla(ctx context.Context) error
 	LatestTasa(ctx context.Context) (Tasa, error)
 	SaveLote(ctx context.Context, tasas map[string]any) (string, error)
 	PublishLote(ctx context.Context) (string, int, error)
@@ -101,6 +105,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/comprobantes/simular", h.Simular)
 	mux.HandleFunc("GET /api/v1/perfiles", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/perfiles/{$}", h.ListPerfiles)
+	mux.HandleFunc("POST /api/v1/perfiles/guardar", h.SavePerfil)
+	mux.HandleFunc("POST /api/v1/perfiles/apagar-todos", h.ApagarPerfiles)
+	mux.HandleFunc("POST /api/v1/perfiles/plantilla/memorizar", h.MemorizarPlantilla)
+	mux.HandleFunc("POST /api/v1/perfiles/plantilla/restaurar", h.RestaurarPlantilla)
 	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado", h.PatchPerfilEstado)
 	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado/{$}", h.PatchPerfilEstado)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
@@ -139,6 +147,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && path == "/api/v1/comprobantes/simular":
 		h.Simular(w, r)
+	case r.Method == http.MethodPost && path == "/api/v1/perfiles/guardar":
+		h.SavePerfil(w, r)
+	case r.Method == http.MethodPost && path == "/api/v1/perfiles/apagar-todos":
+		h.ApagarPerfiles(w, r)
+	case r.Method == http.MethodPost && path == "/api/v1/perfiles/plantilla/memorizar":
+		h.MemorizarPlantilla(w, r)
+	case r.Method == http.MethodPost && path == "/api/v1/perfiles/plantilla/restaurar":
+		h.RestaurarPlantilla(w, r)
 	case r.Method == http.MethodPost:
 		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -383,6 +399,56 @@ func (h *Handler) PatchPerfilEstado(w http.ResponseWriter, r *http.Request) {
 		"nombre":  nombre,
 		"activo":  *body.Activo,
 	})
+}
+
+// SavePerfil responde POST /api/v1/perfiles/guardar con un upsert atómico.
+func (h *Handler) SavePerfil(w http.ResponseWriter, r *http.Request) {
+	var perfil PerfilWrite
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&perfil); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_profile_payload")
+		return
+	}
+	perfil.Nombre = strings.TrimSpace(perfil.Nombre)
+	if perfil.Nombre == "" {
+		writeError(w, http.StatusBadRequest, "nombre es obligatorio")
+		return
+	}
+	if err := h.store.SavePerfil(r.Context(), perfil); err != nil {
+		h.log.Error("hooty.api.perfil_guardar", "socio", perfil.Nombre, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "nombre": perfil.Nombre})
+}
+
+// ApagarPerfiles responde POST /api/v1/perfiles/apagar-todos.
+func (h *Handler) ApagarPerfiles(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.ApagarPerfiles(r.Context()); err != nil {
+		h.log.Error("hooty.api.perfiles_apagar", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
+// MemorizarPlantilla responde POST /api/v1/perfiles/plantilla/memorizar.
+func (h *Handler) MemorizarPlantilla(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.MemorizarPlantilla(r.Context()); err != nil {
+		h.log.Error("hooty.api.plantilla_memorizar", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Plantilla memorizada."})
+}
+
+// RestaurarPlantilla responde POST /api/v1/perfiles/plantilla/restaurar.
+func (h *Handler) RestaurarPlantilla(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.RestaurarPlantilla(r.Context()); err != nil {
+		h.log.Error("hooty.api.plantilla_restaurar", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "Plantilla restaurada."})
 }
 
 func (h *Handler) LatestTasa(w http.ResponseWriter, r *http.Request) {

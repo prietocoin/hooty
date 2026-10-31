@@ -58,6 +58,14 @@ func (routeStore) UpdatePerfilEstado(context.Context, string, bool) error {
 	return nil
 }
 
+func (routeStore) SavePerfil(context.Context, api.PerfilWrite) error { return nil }
+
+func (routeStore) ApagarPerfiles(context.Context) error { return nil }
+
+func (routeStore) MemorizarPlantilla(context.Context) error { return nil }
+
+func (routeStore) RestaurarPlantilla(context.Context) error { return nil }
+
 func (routeStore) LatestTasa(context.Context) (api.Tasa, error) {
 	return api.Tasa{IDTasa: "T086", Tasas: json.RawMessage(`{"USD":1}`)}, nil
 }

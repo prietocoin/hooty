@@ -77,6 +77,18 @@ type Perfil struct {
 	Herencia     bool
 }
 
+// PerfilWrite es el payload de POST /api/v1/perfiles/guardar.
+type PerfilWrite struct {
+	Nombre       string          `json:"nombre"`
+	IDGrupo      string          `json:"id_grupo"`
+	Rol          string          `json:"rol"`
+	MonedaBase   string          `json:"moneda_base"`
+	SaldoInicial float64         `json:"saldo_inicial"`
+	Mostrar      json.RawMessage `json:"mostrar"`
+	Monedas      json.RawMessage `json:"monedas"`
+	Herencia     bool            `json:"herencia"`
+}
+
 // Tasa es la fila vigente de la vista tasa.
 type Tasa struct {
 	IDTasa string

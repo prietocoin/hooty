@@ -25,6 +25,7 @@ type fakeStore struct {
 	deletedID          string
 	perfilEstadoNombre string
 	perfilEstadoActivo bool
+	savedPerfil        PerfilWrite
 	listErr            error
 	getErr             error
 	perfilErr          error
@@ -68,6 +69,17 @@ func (f *fakeStore) UpdatePerfilEstado(_ context.Context, nombre string, activo 
 	f.perfilEstadoActivo = activo
 	return f.perfilErr
 }
+
+func (f *fakeStore) SavePerfil(_ context.Context, perfil PerfilWrite) error {
+	f.savedPerfil = perfil
+	return f.perfilErr
+}
+
+func (f *fakeStore) ApagarPerfiles(context.Context) error { return f.perfilErr }
+
+func (f *fakeStore) MemorizarPlantilla(context.Context) error { return f.perfilErr }
+
+func (f *fakeStore) RestaurarPlantilla(context.Context) error { return f.perfilErr }
 
 func (f *fakeStore) LatestTasa(_ context.Context) (Tasa, error) {
 	return f.tasa, f.tasaErr
@@ -593,6 +605,38 @@ func TestPatchPerfilEstadoAceptaPATCH(t *testing.T) {
 	}
 	if store.perfilEstadoNombre != "CHASAN" || store.perfilEstadoActivo {
 		t.Fatalf("estado no propagado: %q / %v", store.perfilEstadoNombre, store.perfilEstadoActivo)
+	}
+}
+
+func TestGuardarPerfilYPlantillaAceptanPOST(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	NewHandler(store, nil).Register(mux)
+
+	body := `{"nombre":"NELSY","rol":"SOCIO","moneda_base":"USDT","saldo_inicial":10,"mostrar":{"tasas":true},"monedas":{}}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/perfiles/guardar", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST guardar status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if store.savedPerfil.Nombre != "NELSY" {
+		t.Fatalf("perfil no guardado: %+v", store.savedPerfil)
+	}
+
+	for _, ruta := range []string{
+		"/api/v1/perfiles/plantilla/memorizar",
+		"/api/v1/perfiles/plantilla/restaurar",
+		"/api/v1/perfiles/apagar-todos",
+	} {
+		req = httptest.NewRequest(http.MethodPost, ruta, strings.NewReader(`{}`))
+		rec = httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("POST %s status = %d, body=%s", ruta, rec.Code, rec.Body.String())
+		}
 	}
 }
 
