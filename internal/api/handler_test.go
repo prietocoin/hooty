@@ -366,10 +366,10 @@ func TestUpdateComprobantePropagaTipoOp(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT status = %d, body=%s", rec.Code, rec.Body.String())
 	}
-	if store.patch.TipoOp == nil {
+	if store.patch.TipoOp == "" {
 		t.Fatal("el handler no enlazó tipo_op en ComprobantePatch")
 	}
-	if got := *store.patch.TipoOp; got != "A" {
+	if got := store.patch.TipoOp; got != "A" {
 		t.Fatalf("tipo_op enlazado = %q, se esperaba A", got)
 	}
 }
@@ -618,15 +618,21 @@ func TestApplyComprobantePatchTipoOp(t *testing.T) {
 
 	c := domain.Comprobante{}
 	tipo := "A"
-	if err := applyComprobantePatch(&c, ComprobantePatch{TipoOp: &tipo}); err != nil {
+	if err := applyComprobantePatch(&c, ComprobantePatch{TipoOp: tipo}); err != nil {
 		t.Fatalf("tipo_op A rechazado: %v", err)
 	}
 	if c.TipoOp != "A" {
 		t.Fatalf("tipo_op = %q", c.TipoOp)
 	}
 	invalido := "X"
-	if err := applyComprobantePatch(&c, ComprobantePatch{TipoOp: &invalido}); err == nil {
+	if err := applyComprobantePatch(&c, ComprobantePatch{TipoOp: invalido}); err == nil {
 		t.Fatal("tipo_op inválido debe rechazarse")
+	}
+	if err := applyComprobantePatch(&c, ComprobantePatch{TipoOp: ""}); err != nil {
+		t.Fatalf("tipo_op vacío debe conservar el valor: %v", err)
+	}
+	if c.TipoOp != "A" {
+		t.Fatalf("tipo_op vacío pisó el valor: %q", c.TipoOp)
 	}
 }
 

@@ -85,14 +85,14 @@ function renderDef(regla, index) {
   const boton = (valor) => {
     const clases = modo === valor
       ? `is-active ${CLASES_TIPO_ACTIVO[valor]}`
-      : 'text-slate-400';
+      : 'text-slate-400 hover:text-white';
     return `
       <button type="button" data-accion="modo" data-indice="${index}" data-modo="${valor}"
               class="${clases}"
               aria-pressed="${modo === valor}">${valor}</button>`;
   };
   return `
-    <div class="regla-def" role="group" aria-label="Tipo de operación de ${escapeHTML(regla.codigo)}">
+    <div class="regla-def inline-flex rounded-md bg-slate-950 p-0.5 border border-slate-700/60" role="group" aria-label="Tipo de operación de ${escapeHTML(regla.codigo)}">
       ${TIPOS_OPERACION.map(boton).join('')}
     </div>`;
 }
@@ -102,22 +102,24 @@ function renderColumnaOperacion({ regla, index, campo, tipo, base, etiqueta }) {
   const porcentaje = esDeposito ? regla.deposito : regla.pago;
   const resultado = tasaResultante(base, porcentaje, tipo);
   const claseCampo = esDeposito ? 'regla-field--dep' : 'regla-field--pago';
-  const claseResultado = esDeposito ? 'is-dep' : 'is-pago';
+  const claseResultado = esDeposito ? 'is-dep text-cyan-300' : 'is-pago text-rose-300';
+  const claseEtiqueta = esDeposito ? 'text-emerald-400' : 'text-rose-400';
   const nombre = esDeposito ? 'depósito' : 'pago';
 
   return `
-    <div class="regla-field ${claseCampo}">
-      <span class="regla-field-label">${etiqueta}</span>
-      <div class="regla-percent">
-        <input type="number" step="0.01" inputmode="decimal"
+    <div class="regla-field ${claseCampo} flex flex-col gap-1">
+      <span class="regla-field-label ${claseEtiqueta} text-[10px] font-bold uppercase tracking-wider">${etiqueta}</span>
+      <div class="regla-percent flex items-center bg-slate-950/80 border border-slate-700 rounded-lg px-1.5 py-1">
+        <input type="number" step="any" inputmode="decimal"
                aria-label="Spread de ${nombre} de ${escapeHTML(regla.codigo)}"
                data-regla="${index}" data-campo="${campo}"
                value="${escapeHTML(porcentaje)}"
-               class="regla-percent-input">
-        <span aria-hidden="true">%</span>
+               class="regla-percent-input w-8 bg-transparent text-xs text-white font-mono text-center focus:outline-none">
+        <span class="text-[10px] text-slate-500 mr-1" aria-hidden="true">%</span>
+        <span class="regla-result ${claseResultado} ml-auto text-xs font-mono font-bold"
+              data-resultado="${index}-${campo}"
+              title="Tasa resultante">${formatearResultadoSpread(resultado)}</span>
       </div>
-      <span class="regla-result ${claseResultado}" data-resultado="${index}-${campo}"
-            title="Tasa resultante">${formatearResultadoSpread(resultado)}</span>
     </div>`;
 }
 
@@ -129,46 +131,48 @@ function renderRegla(regla, index, tasasBase) {
   const valorBase = Number.isFinite(Number(base)) ? String(base) : '';
 
   return `
-    <div class="regla-card ${activo ? '' : 'is-off'}">
-      <div class="regla-head">
-        <div class="regla-id">
-          ${bandera ? `<img class="regla-flag" src="${bandera}" alt="${alt}" loading="lazy" onerror="this.style.display='none'">` : ''}
-          <span class="regla-name">${escapeHTML(regla.nombre)} <span class="regla-code">${escapeHTML(regla.codigo)}</span></span>
+    <div class="regla-card rounded-xl border border-slate-800 bg-[#0d1527] p-3 mb-3 ${activo ? '' : 'is-off'}">
+      <div class="regla-head flex items-center justify-between gap-2 pb-2.5 border-b border-slate-800/60">
+        <div class="regla-id flex items-center gap-2 min-w-0">
+          <span class="text-base leading-none">
+            ${bandera ? `<img class="regla-flag" src="${bandera}" alt="${alt}" loading="lazy" onerror="this.style.display='none'">` : ''}
+          </span>
+          <span class="regla-name font-bold text-white text-sm truncate">${escapeHTML(regla.nombre)}</span>
+          <span class="regla-code text-xs font-semibold text-cyan-400 font-mono">${escapeHTML(regla.codigo)}</span>
         </div>
-        <div class="regla-controls">
+        <div class="regla-controls flex items-center gap-2 shrink-0">
           ${renderDef(regla, index)}
           <button type="button"
                   data-accion="toggle-cartelera"
                   data-indice="${index}"
-                  class="regla-switch ${activo ? 'is-on' : 'is-off'}"
+                  class="regla-switch relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${activo ? 'is-on bg-emerald-500' : 'is-off bg-slate-700'}"
                   aria-pressed="${activo}"
                   title="Incluir ${escapeHTML(regla.codigo)} en cartelera"
                   aria-label="Incluir ${escapeHTML(regla.codigo)} en la cartelera">
-            <span class="regla-switch-thumb"></span>
+            <span class="regla-switch-thumb ${activo ? 'translate-x-4' : 'translate-x-0.5'} inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 mt-0.5 shadow"></span>
           </button>
           <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
-                  class="regla-del text-slate-500 hover:text-rose-400"
+                  class="regla-del text-slate-500 hover:text-rose-400 p-1"
                   title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>
-              <path d="M10 11v5M14 11v5"/>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
             </svg>
           </button>
         </div>
       </div>
 
-      <div class="regla-grid">
-        <label class="regla-field">
-          <span class="regla-field-label">Base</span>
-          <input type="number" step="0.01" inputmode="decimal"
+      <div class="regla-grid grid grid-cols-3 gap-2 pt-2.5">
+        <div class="regla-field flex flex-col gap-1">
+          <span class="regla-field-label text-[10px] font-bold text-slate-400 uppercase tracking-wider">Base</span>
+          <input type="number" step="any" inputmode="decimal"
                  aria-label="Tasa base de ${escapeHTML(regla.codigo)}"
                  data-regla="${index}" data-campo="base"
                  value="${escapeHTML(valorBase)}"
-                 class="regla-base-input">
-        </label>
-        ${renderColumnaOperacion({ regla, index, campo: 'deposito', tipo: 'D', base, etiqueta: '↓ DEP' })}
-        ${renderColumnaOperacion({ regla, index, campo: 'pago', tipo: 'P', base, etiqueta: '↑ PAG' })}
+                 class="regla-base-input w-full bg-slate-950/80 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono font-bold text-center focus:outline-none focus:border-cyan-500">
+        </div>
+        ${renderColumnaOperacion({ regla, index, campo: 'deposito', tipo: 'D', base, etiqueta: '↓ Depósito' })}
+        ${renderColumnaOperacion({ regla, index, campo: 'pago', tipo: 'P', base, etiqueta: '↑ Pago' })}
       </div>
     </div>`;
 }

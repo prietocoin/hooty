@@ -45,7 +45,7 @@ function footer(herencia) {
   }
   return `<footer class="glauk-modal__footer">
       <button type="button" data-accion="cerrar" class="min-h-11 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">Cancelar</button>
-      <button type="button" data-accion="guardar" class="perfiles-save-btn min-h-11 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 text-xs font-bold transition shadow-lg">💾 Guardar Cambios</button>
+      <button type="button" data-accion="guardar" class="perfiles-save-btn bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl shadow-lg transition-all">💾 Guardar Cambios</button>
     </footer>`;
 }
 

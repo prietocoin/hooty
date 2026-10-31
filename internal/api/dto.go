@@ -59,7 +59,7 @@ type ComprobantePatch struct {
 	Monto2 *float64 `json:"monto_2"`
 	Tasa2  *float64 `json:"tasa_2"`
 	ME2    *float64 `json:"me2"`
-	TipoOp *string  `json:"tipo_op"`
+	TipoOp string   `json:"tipo_op"`
 
 	// Alias de compatibilidad con la UI histórica.
 	NombreSocio1 *string  `json:"nombre_socio_1"`

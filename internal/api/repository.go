@@ -211,9 +211,9 @@ func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch C
 		return ComprobanteRow{}, err
 	}
 
-	var tipoOpSQL any
-	if patch.TipoOp != nil {
-		tipoOpSQL = domain.NormalizeTipoOp(*patch.TipoOp)
+	tipoOpSQL := strings.ToUpper(strings.TrimSpace(patch.TipoOp))
+	if tipoOpSQL != "" {
+		tipoOpSQL = domain.NormalizeTipoOp(tipoOpSQL)
 	}
 
 	tag, err := tx.Exec(ctx, sqlUpdateComprobante,
@@ -496,8 +496,8 @@ func applyComprobantePatch(c *domain.Comprobante, patch ComprobantePatch) error 
 		c.MonedaRecibo = *patch.Moneda
 	}
 
-	if patch.TipoOp != nil {
-		tipo := strings.ToUpper(strings.TrimSpace(*patch.TipoOp))
+	if patch.TipoOp != "" {
+		tipo := strings.ToUpper(strings.TrimSpace(patch.TipoOp))
 		if !domain.TipoOpValido(tipo) {
 			return domain.Validationf("tipo_op debe ser D, P o A")
 		}
@@ -997,7 +997,7 @@ UPDATE comprobantes SET
     banco = $11,
     titular = $12,
     referencia = $13,
-    tipo_op = COALESCE($14::text, tipo_op),
+    tipo_op = COALESCE(NULLIF($14::text, ''), tipo_op),
     actualizado_en = NOW()
 WHERE hash_largo = $15`
 
