@@ -1180,7 +1180,7 @@
         banco: this.domValor('banco', this.itemEdicion?.banco || ''),
         titular: this.domValor('titular', this.itemEdicion?.titular || ''),
         referencia: this.domValor('referencia', this.itemEdicion?.referencia || ''),
-        tipo_op: String(this.itemEdicion?.tipo_op || 'D').toUpperCase().trim()
+        tipo_op: String(this.domValor('tipo_op', this.itemEdicion?.tipo_op || 'D')).toUpperCase().trim()
       };
 
       console.log('[Hooty] Despachando PUT con payload:', payload);
@@ -1468,18 +1468,13 @@
                   </div>
 
                   <div>
-                    <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Tipo de Operación</label>
-                    <div class="inline-flex w-full rounded-lg border border-slate-700 bg-slate-900/80 p-0.5 text-[10px]">
-                      <button type="button" @click="itemEdicion.tipo_op = 'D'"
-                              :class="itemEdicion.tipo_op === 'D' ? 'bg-cyan-600 text-white font-semibold' : 'text-slate-400 hover:text-white'"
-                              class="flex-1 px-1.5 py-1 rounded transition-colors">D</button>
-                      <button type="button" @click="itemEdicion.tipo_op = 'P'"
-                              :class="itemEdicion.tipo_op === 'P' ? 'bg-rose-600 text-white font-semibold' : 'text-slate-400 hover:text-white'"
-                              class="flex-1 px-1.5 py-1 rounded transition-colors">P</button>
-                      <button type="button" @click="itemEdicion.tipo_op = 'A'"
-                              :class="itemEdicion.tipo_op === 'A' ? 'bg-amber-600 text-white font-semibold' : 'text-slate-400 hover:text-white'"
-                              class="flex-1 px-1.5 py-1 rounded transition-colors">A</button>
-                    </div>
+                    <label class="block text-[11px] font-bold text-slate-400 mb-1" for="editar-tipo-op">TIPO DE OPERACIÓN</label>
+                    <select id="editar-tipo-op" name="tipo_op" x-model="itemEdicion.tipo_op"
+                            class="w-full bg-[#0b1329] border border-cyan-800/60 rounded px-3 py-2 text-sm text-cyan-300 font-semibold focus:outline-none focus:border-cyan-500">
+                      <option value="D">D - Depósito</option>
+                      <option value="P">P - Pago</option>
+                      <option value="A">A - Ajuste</option>
+                    </select>
                   </div>
                 </div>
 

@@ -52,22 +52,25 @@ func run() error {
 	}
 	defer pool.Close()
 
+	migrateCtx, cancelMigrate := context.WithTimeout(ctx, 30*time.Second)
+	err = postgres.EnsureZeroRateAllowed(migrateCtx, pool)
+	if err == nil {
+		err = postgres.EnsurePlantillaColumn(migrateCtx, pool)
+	}
+	if err == nil {
+		err = postgres.EnsureTipoOpColumn(migrateCtx, pool)
+	}
+	cancelMigrate()
+	if err != nil {
+		return err
+	}
+
 	verifyCtx, cancelVerify := context.WithTimeout(ctx, 10*time.Second)
 	err = postgres.VerifySchema(verifyCtx, pool)
 	if err == nil {
 		err = api.VerifyViews(verifyCtx, pool)
 	}
 	cancelVerify()
-	if err != nil {
-		return err
-	}
-
-	migrateCtx, cancelMigrate := context.WithTimeout(ctx, 30*time.Second)
-	err = postgres.EnsureZeroRateAllowed(migrateCtx, pool)
-	if err == nil {
-		err = postgres.EnsurePlantillaColumn(migrateCtx, pool)
-	}
-	cancelMigrate()
 	if err != nil {
 		return err
 	}
