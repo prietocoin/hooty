@@ -3,11 +3,11 @@ import { api } from '../api.js?v=20261031_01';
 import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import {
   esHerencia, nuevaRegla, payloadGuardar, reglasSegunModo
-} from '../domain.js';
-import { renderModalSocio } from '../components/modal-socio.js?v=20261031_01';
+} from '../domain.js?v=20261031_02';
+import { renderModalSocio } from '../components/modal-socio.js?v=20261031_02';
 import {
   baseMoneda, renderReglasEditor, tasaResultante
-} from '../components/reglas-editor.js?v=20261031_01';
+} from '../components/reglas-editor.js?v=20261031_02';
 import { formatearTasaEstricta } from '../utils/tasas.js?v=20261024_99_FIX_TASAS';
 import { renderReglasHerencia } from '../components/reglas-herencia.js';
 import { notificarSociosActualizados } from '../../../shared/js/sync.js';
@@ -211,15 +211,6 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
   function onChange(event) {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    if (target.dataset.accion === 'toggle-cartelera') {
-      const indice = Number(target.dataset.indice);
-      const regla = state.reglas[indice];
-      if (!regla) return;
-      regla.activo = target.checked;
-      const tarjeta = target.closest('.regla-card');
-      if (tarjeta) tarjeta.classList.toggle('is-off', !target.checked);
-      return;
-    }
     const campo = target.dataset.campo;
     if (campo === 'herencia') {
       state.socioEdicion.herencia = target.value === 'true';
@@ -254,6 +245,25 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
       case 'eliminar-moneda': eliminarMoneda(indice); break;
       case 'toggle-dep': alternarSigno(indice, 'dep'); break;
       case 'toggle-pago': alternarSigno(indice, 'pago'); break;
+      case 'toggle-cartelera': {
+        const regla = state.reglas[indice];
+        if (!regla) break;
+        regla.activo = !(regla.activo !== false);
+        const tarjeta = boton.closest('.regla-card');
+        if (tarjeta) tarjeta.classList.toggle('is-off', !regla.activo);
+        boton.classList.toggle('is-on', regla.activo);
+        boton.classList.toggle('is-off', !regla.activo);
+        boton.setAttribute('aria-pressed', String(regla.activo));
+        break;
+      }
+      case 'modo':
+        if (state.reglas[indice]) {
+          const modo = boton.dataset.modo === 'P' ? 'P' : (boton.dataset.modo === 'D' ? 'D' : 'DEF');
+          state.reglas[indice].modo = modo;
+          state.reglas[indice].tipo = modo === 'P' ? 'P' : 'D';
+          renderReglas();
+        }
+        break;
       case 'tipo':
         if (state.reglas[indice]) {
           state.reglas[indice].tipo = boton.dataset.tipo === 'P' ? 'P' : 'D';

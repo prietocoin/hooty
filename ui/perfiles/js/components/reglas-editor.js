@@ -47,14 +47,14 @@ function opcionesCatalogo(seleccionada, reglas) {
 }
 
 function renderDef(regla, index) {
-  const esD = regla.tipo !== 'P';
+  const modo = regla.modo || 'DEF';
+  const boton = (valor) => `
+    <button type="button" data-accion="modo" data-indice="${index}" data-modo="${valor}"
+            class="${modo === valor ? 'is-active' : ''}"
+            aria-pressed="${modo === valor}">${valor}</button>`;
   return `
     <div class="regla-def" role="group" aria-label="Naturaleza por defecto de ${escapeHTML(regla.codigo)}">
-      <span class="regla-def-label">DEF</span>
-      <button type="button" data-accion="tipo" data-indice="${index}" data-tipo="D"
-              class="${esD ? 'is-active' : ''}" aria-pressed="${esD}" title="Defecto Depósito">D</button>
-      <button type="button" data-accion="tipo" data-indice="${index}" data-tipo="P"
-              class="${esD ? '' : 'is-active'}" aria-pressed="${!esD}" title="Defecto Pago">P</button>
+      ${boton('DEF')}${boton('D')}${boton('P')}
     </div>`;
 }
 
@@ -93,31 +93,31 @@ function renderRegla(regla, index, tasasBase) {
   const base = baseMoneda(regla, tasasBase);
   const bandera = urlBandera(regla);
   const alt = `Bandera ${escapeHTML(regla.codigo)}`;
+  const activo = regla.activo !== false;
 
   return `
-    <div class="regla-card ${regla.activo === false ? 'is-off' : ''}">
+    <div class="regla-card ${activo ? '' : 'is-off'}">
       <div class="regla-head">
         <div class="regla-id">
           ${bandera ? `<img class="regla-flag" src="${bandera}" alt="${alt}" loading="lazy" onerror="this.style.display='none'">` : ''}
           <span class="regla-name">${escapeHTML(regla.nombre)} <span class="regla-code">(${escapeHTML(regla.codigo)})</span></span>
         </div>
+        <button type="button"
+                data-accion="toggle-cartelera"
+                data-indice="${index}"
+                class="regla-switch ${activo ? 'is-on' : 'is-off'}"
+                aria-pressed="${activo}"
+                title="Incluir ${escapeHTML(regla.codigo)} en cartelera"
+                aria-label="Incluir ${escapeHTML(regla.codigo)} en la cartelera">
+          <span class="regla-switch-thumb"></span>
+        </button>
+      </div>
 
-        <div class="regla-head-actions">
-          <span class="regla-base" title="Tasa base del lote activo">${formatearTasaEstricta(base)}</span>
-          ${renderDef(regla, index)}
-          <div class="regla-head-stack">
-            <label class="regla-toggle" title="Incluir ${escapeHTML(regla.codigo)} en cartelera">
-              <input type="checkbox"
-                     data-accion="toggle-cartelera"
-                     data-indice="${index}"
-                     ${regla.activo !== false ? 'checked' : ''}
-                     aria-label="Incluir ${escapeHTML(regla.codigo)} en la cartelera">
-              <span class="regla-toggle-track" aria-hidden="true"><span class="regla-toggle-thumb"></span></span>
-            </label>
-            <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
-                    class="regla-del" title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">🗑️</button>
-          </div>
-        </div>
+      <div class="regla-actions-row">
+        <span class="regla-base" title="Tasa base del lote activo">${formatearTasaEstricta(base)}</span>
+        ${renderDef(regla, index)}
+        <button type="button" data-accion="eliminar-moneda" data-indice="${index}"
+                class="regla-del" title="Quitar moneda" aria-label="Quitar ${escapeHTML(regla.codigo)}">🗑️</button>
       </div>
 
       <div class="regla-ops">

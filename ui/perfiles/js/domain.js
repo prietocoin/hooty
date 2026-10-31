@@ -56,13 +56,17 @@ export function reglasDeMonedas(raw) {
     const regla = data && typeof data === 'object' ? data : {};
     const porcentaje = porcentajeDe(regla);
     const meta = metaMoneda(codigo);
+    const tipo = tipoDeMoneda(regla);
+    const modoRaw = String(regla.modo || '').toUpperCase();
+    const modo = modoRaw === 'D' || modoRaw === 'P' ? modoRaw : (tipo === 'P' ? 'P' : 'DEF');
     return {
       codigo,
       nombre: meta.nombre || codigo,
       iso: isoMoneda(codigo, meta),
       base: meta.base || '',
       activo: regla.activo !== false,
-      tipo: tipoDeMoneda(regla),
+      tipo,
+      modo,
       deposito: numeroDeMoneda(porcentaje.deposito ?? regla.deposito ?? regla.deposito_pct),
       polar_D: signoDeMoneda(regla.polar_D ?? regla.dep_op ?? regla.deposito_op, '+'),
       pago: numeroDeMoneda(porcentaje.pago ?? regla.pago ?? regla.pago_pct),
@@ -94,6 +98,7 @@ export function nuevaRegla(codigo) {
     base: meta.base || '',
     activo: true,
     tipo: 'D',
+    modo: 'DEF',
     deposito: 0,
     polar_D: '+',
     pago: 0,
@@ -107,7 +112,9 @@ export function nuevaRegla(codigo) {
 export function construirMonedas(reglas = []) {
   const monedas = {};
   for (const regla of reglas) {
-    const tipo = tipoDeMoneda(regla);
+    const modoRaw = String(regla.modo || '').toUpperCase();
+    const modo = modoRaw === 'D' || modoRaw === 'P' ? modoRaw : (tipoDeMoneda(regla) === 'P' ? 'P' : 'DEF');
+    const tipo = modo === 'P' ? 'P' : 'D';
     const polar_D = signoDeMoneda(regla.polar_D, '+');
     const polar_P = signoDeMoneda(regla.polar_P, '-');
     const deposito = numeroDeMoneda(regla.deposito);
@@ -115,6 +122,7 @@ export function construirMonedas(reglas = []) {
     monedas[regla.codigo] = {
       activo: regla.activo !== false,
       tipo,
+      modo,
       polar_D,
       polar_P,
       porcentaje: { deposito, pago },
