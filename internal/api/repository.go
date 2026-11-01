@@ -203,6 +203,23 @@ func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch C
 	if err := applyComprobantePatch(&existing, patch); err != nil {
 		return ComprobanteRow{}, err
 	}
+
+	// Si cambió la fecha (o el lote quedó vacío) y el operador no fijó un lote
+	// manual, se resuelve el lote histórico dentro de la misma transacción.
+	fechaCambiada := patch.FechaOperacion != nil || patch.FechaHoraInput != nil || patch.FechaInput != nil
+	loteManual := patch.LoteManual != nil && *patch.LoteManual
+	if !loteManual && (fechaCambiada || strings.TrimSpace(existing.LoteTasa) == "") {
+		lote, err := lotePorFecha(ctx, tx, existing.FechaOperacion)
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return ComprobanteRow{}, err
+		}
+		if errors.Is(err, ErrNotFound) {
+			existing.LoteTasa = ""
+		} else {
+			existing.LoteTasa = lote.IDTasa
+		}
+	}
+
 	if err := r.reconcileEditedFinancials(ctx, tx, &existing, previous, patch); err != nil {
 		return ComprobanteRow{}, err
 	}
@@ -954,6 +971,35 @@ func tasasActivas(raw string) bool {
 	default:
 		return true
 	}
+}
+
+// LotePorFecha devuelve el lote vigente en el instante indicado: el último
+// lote creado en o antes de esa fecha.
+func (r *Repository) LotePorFecha(ctx context.Context, fecha time.Time) (Tasa, error) {
+	return lotePorFecha(ctx, r.pool, fecha)
+}
+
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func lotePorFecha(ctx context.Context, q rowQuerier, fecha time.Time) (Tasa, error) {
+	var item Tasa
+	var tasas []byte
+	err := q.QueryRow(ctx, `
+SELECT COALESCE(id_tasa, ''), COALESCE(tasas::text, '{}')
+FROM tasas_glaukov
+WHERE created_at <= $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1`, fecha).Scan(&item.IDTasa, &tasas)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Tasa{}, ErrNotFound
+	}
+	if err != nil {
+		return Tasa{}, fmt.Errorf("api: leer lote por fecha: %w", err)
+	}
+	item.Tasas = json.RawMessage(tasas)
+	return item, nil
 }
 
 // LatestTasa devuelve el último registro de la vista tasa.

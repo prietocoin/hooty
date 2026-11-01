@@ -21,6 +21,7 @@ type fakeStore struct {
 	total              int
 	perfiles           []Perfil
 	tasa               Tasa
+	loteFecha          time.Time
 	filters            ReportFilters
 	last               Filter
 	savedTasas         map[string]any
@@ -101,6 +102,11 @@ func (f *fakeStore) NotifyRates(_ context.Context, idTasa string) (string, error
 }
 
 func (f *fakeStore) LatestTasa(_ context.Context) (Tasa, error) {
+	return f.tasa, f.tasaErr
+}
+
+func (f *fakeStore) LotePorFecha(_ context.Context, fecha time.Time) (Tasa, error) {
+	f.loteFecha = fecha
 	return f.tasa, f.tasaErr
 }
 
@@ -287,6 +293,38 @@ func TestPerfilesTasaYFiltros(t *testing.T) {
 		if payload[tc.key] == nil {
 			t.Fatalf("respuesta sin %s: %s", tc.key, rec.Body.String())
 		}
+	}
+}
+
+func TestLotePorFechaHandler(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	newTestHandler(store).Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/tasas/lote-por-fecha?fecha=2026-10-28T12:30", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var payload TasaDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("JSON inválido: %v", err)
+	}
+	if payload.IDTasa != "T070" {
+		t.Fatalf("id_tasa = %q", payload.IDTasa)
+	}
+	if got := store.loteFecha.Format("2006-01-02T15:04"); got != "2026-10-28T12:30" {
+		t.Fatalf("fecha resuelta = %q", got)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/tasas/lote-por-fecha", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("sin fecha status = %d", rec.Code)
 	}
 }
 

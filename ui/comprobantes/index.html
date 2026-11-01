@@ -22,8 +22,8 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261101_07"></script>
-  <script type="module" src="./js/pwa.js?v=20261101_07"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261101_08"></script>
+  <script type="module" src="./js/pwa.js?v=20261101_08"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
 
@@ -1048,6 +1048,7 @@
   simulando: false,
   simulacionError: '',
   itemEdicion: null,
+  loteManual: false,
 
   numeroPuro(valor) {
     if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
@@ -1117,6 +1118,30 @@
     const monto = this.truncarMonto2Dec((montoRecibo / tasa) * signo);
     this.itemEdicion[campoMonto] = monto;
     this.itemEdicion[campoME] = monto;
+  },
+
+  async resolverLotePorFecha() {
+    if (!this.itemEdicion || this.loteManual) return;
+    const fecha = this.domValor('fecha_hora_input', this.itemEdicion.fecha_hora_input || '');
+    if (!fecha) return;
+    try {
+      const resp = await fetch(`/api/v1/tasas/lote-por-fecha?fecha=${encodeURIComponent(fecha)}`, {
+        headers: { Accept: 'application/json' }
+      });
+      if (resp.status === 404) {
+        this.itemEdicion.lote_tasa_asignado = '';
+        this.itemEdicion.lote_tasa = '';
+        return;
+      }
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const lote = String(data?.id_tasa || '').trim();
+      this.itemEdicion.lote_tasa_asignado = lote;
+      this.itemEdicion.lote_tasa = lote;
+      if (lote) await this.actualizarSimulacion('lote');
+    } catch (err) {
+      console.warn('[Hooty] No se pudo resolver el lote por fecha:', err);
+    }
   },
 
   formatearME(valor) {
@@ -1254,6 +1279,7 @@
         me2: this.numeroPuro(this.itemEdicion?.me2),
         fecha_hora_input: this.domValor('fecha_hora_input', this.itemEdicion?.fecha_hora_input || ''),
         lote_tasa: this.domValor('lote_tasa', this.itemEdicion?.lote_tasa_asignado || ''),
+        lote_manual: this.loteManual,
         banco: this.domValor('banco', this.itemEdicion?.banco || ''),
         titular: this.domValor('titular', this.itemEdicion?.titular || ''),
         referencia: this.domValor('referencia', this.itemEdicion?.referencia || '')
@@ -1342,6 +1368,7 @@
 
     modalAbierto = true;
     modalListo = false;
+    loteManual = false;
     simulando = false;
     simulacionError = '';
     setTimeout(() => {
@@ -1399,6 +1426,7 @@
                 <input type="datetime-local"
                        id="editar-fecha-input" name="fecha_hora_input"
                        x-model="itemEdicion.fecha_hora_input"
+                       @change="resolverLotePorFecha()"
                        class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-white font-mono font-bold outline-none focus:border-cyan-400">
               </div>
             </div>
@@ -1566,6 +1594,7 @@
                     <label class="block text-[8px] font-bold text-purple-400 uppercase mb-0.5" for="editar-lote-tasa">Lote Tasa</label>
                     <input id="editar-lote-tasa" name="lote_tasa" type="text"
                            x-model="itemEdicion.lote_tasa_asignado"
+                           @input="loteManual = true"
                            @change="if (itemEdicion.lote_tasa_asignado) actualizarSimulacion('lote')"
                            placeholder="Ej. T097 o vacío para tasa manual"
                            class="w-full bg-[#080e26] border border-purple-500/40 rounded-lg px-2 py-1.5 text-xs text-purple-200 font-mono font-bold uppercase outline-none focus:border-purple-400">

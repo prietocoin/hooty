@@ -74,6 +74,10 @@ func (routeStore) LatestTasa(context.Context) (api.Tasa, error) {
 	return api.Tasa{IDTasa: "T086", Tasas: json.RawMessage(`{"USD":1}`)}, nil
 }
 
+func (routeStore) LotePorFecha(context.Context, time.Time) (api.Tasa, error) {
+	return api.Tasa{IDTasa: "T086", Tasas: json.RawMessage(`{"USD":1}`)}, nil
+}
+
 func (routeStore) ReportFilters(context.Context) (api.ReportFilters, error) {
 	return api.ReportFilters{Roles: []string{"SOCIO"}}, nil
 }

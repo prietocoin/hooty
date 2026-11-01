@@ -66,6 +66,7 @@ type ComprobantePatch struct {
 	LoteTasa         *string `json:"lote_tasa"`
 	LoteTasaAsignado *string `json:"lote_tasa_asignado"`
 	Lote             *string `json:"lote"`
+	LoteManual       *bool   `json:"lote_manual"`
 	FechaOperacion   *string `json:"fecha_operacion"`
 	FechaHoraInput   *string `json:"fecha_hora_input"`
 	FechaInput       *string `json:"fecha_input"`

@@ -34,6 +34,7 @@ type Store interface {
 	RestaurarPlantilla(ctx context.Context) error
 	NotifyRates(ctx context.Context, idTasa string) (string, error)
 	LatestTasa(ctx context.Context) (Tasa, error)
+	LotePorFecha(ctx context.Context, fecha time.Time) (Tasa, error)
 	SaveLote(ctx context.Context, tasas map[string]any) (string, error)
 	PublishLote(ctx context.Context) (string, int, error)
 	DeleteLote(ctx context.Context, id string) (bool, error)
@@ -162,6 +163,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/saldo/{$}", h.PatchPerfilSaldo)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/tasas/monitor/{$}", h.LatestTasa)
+	mux.HandleFunc("GET /api/v1/tasas/lote-por-fecha", h.LotePorFecha)
+	mux.HandleFunc("GET /api/v1/tasas/lote-por-fecha/{$}", h.LotePorFecha)
 	mux.HandleFunc("GET /api/v1/tasas/preview", h.PreviewLote)
 	mux.HandleFunc("GET /api/v1/tasas/preview/{socio}", h.PreviewLote)
 	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote", h.SaveLote)
@@ -252,6 +255,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.ListPerfiles(w, r)
 	case path == "/api/v1/tasas/monitor":
 		h.LatestTasa(w, r)
+	case path == "/api/v1/tasas/lote-por-fecha":
+		h.LotePorFecha(w, r)
 	case path == "/api/v1/tasas/preview" || strings.HasPrefix(path, "/api/v1/tasas/preview/"):
 		h.PreviewLote(w, r)
 	case path == "/api/v1/reportes/filtros":
@@ -716,6 +721,31 @@ func (h *Handler) LatestTasa(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		h.log.Error("hooty.api.tasa", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, NewTasaDTO(tasa))
+}
+
+// LotePorFecha resuelve el lote histórico activo en la fecha indicada.
+func (h *Handler) LotePorFecha(w http.ResponseWriter, r *http.Request) {
+	raw := strings.TrimSpace(r.URL.Query().Get("fecha"))
+	if raw == "" {
+		writeError(w, http.StatusBadRequest, "fecha es obligatoria")
+		return
+	}
+	fecha, err := parseFechaComprobante(raw)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "fecha inválida; use YYYY-MM-DDTHH:MM")
+		return
+	}
+	tasa, err := h.store.LotePorFecha(r.Context(), fecha)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "no hay lote para esa fecha")
+		return
+	}
+	if err != nil {
+		h.log.Error("hooty.api.tasa_por_fecha", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
