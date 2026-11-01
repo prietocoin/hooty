@@ -40,13 +40,30 @@ func TestComprobanteDTOProyectaContraparteNegativaEnPago(t *testing.T) {
 		ME1: 8.99, ME2: 8.99, Monto1: 8.99, Monto2: 8.99,
 		TipoOp: "P",
 	}
-	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"P"}}`)}
-	dto := NewComprobanteDTO(row, perfil1, nil)
+	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+"}}`)}
+	perfil2 := &Perfil{Nombre: "NELSY", MonedaBase: "COP", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"-"}}`)}
+	dto := NewComprobanteDTO(row, perfil1, perfil2)
 	if dto.ME1 != 8.99 || dto.ME2 != -8.99 {
 		t.Fatalf("ME firmado inesperado: %v / %v", dto.ME1, dto.ME2)
 	}
 	if dto.Monto1 != 8.99 || dto.Monto2 != -8.99 {
 		t.Fatalf("monto firmado inesperado: %v / %v", dto.Monto1, dto.Monto2)
+	}
+}
+
+func TestComprobanteDTONoFuerzaSignoCuandoElPerfilCoincide(t *testing.T) {
+	t.Parallel()
+
+	row := ComprobanteRow{
+		HashLargo: "pago2", HashCorto: "PAGO2", Instancia: "hooty",
+		MonedaRecibo: "USD", Socio1: "CHASAN", Socio2: "NELSY",
+		ME1: 8.99, ME2: 8.99, TipoOp: "P",
+	}
+	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+"}}`)}
+	perfil2 := &Perfil{Nombre: "NELSY", MonedaBase: "COP", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+"}}`)}
+	dto := NewComprobanteDTO(row, perfil1, perfil2)
+	if dto.ME1 != 8.99 || dto.ME2 != 8.99 {
+		t.Fatalf("el perfil manda y no debe forzarse contraparte: %v / %v", dto.ME1, dto.ME2)
 	}
 }
 
@@ -104,8 +121,8 @@ func TestComprobanteDTOAliases(t *testing.T) {
 		CreadoEn:       time.Date(2026, 10, 25, 10, 1, 0, 0, time.UTC),
 		ActualizadoEn:  time.Date(2026, 10, 25, 10, 2, 0, 0, time.UTC),
 	}
-	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"P"}}`)}
-	perfil2 := &Perfil{Nombre: "NELSY", MonedaBase: "COP", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"D"}}`)}
+	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+"}}`)}
+	perfil2 := &Perfil{Nombre: "NELSY", MonedaBase: "COP", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"D","polar_P":"-"}}`)}
 
 	dto := NewComprobanteDTO(row, perfil1, perfil2)
 	if dto.Monto != dto.MontoRecibo || dto.MontoLocal != dto.MontoRecibo {

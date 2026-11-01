@@ -273,10 +273,11 @@ func (h *Handler) ListComprobantes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	index := MapPerfiles(perfiles)
+	fundda := index[socioKey("FUNDDA")]
 	items := make([]ComprobanteDTO, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, NewComprobanteDTO(row,
-			index[socioKey(row.Socio1)], index[socioKey(row.Socio2)]))
+			index[socioKey(row.Socio1)], index[socioKey(row.Socio2)], fundda))
 	}
 
 	w.Header().Set("X-Total-Count", strconv.Itoa(total))
@@ -319,7 +320,7 @@ func (h *Handler) GetComprobante(w http.ResponseWriter, r *http.Request) {
 	}
 	index := MapPerfiles(perfiles)
 	writeJSON(w, http.StatusOK, NewComprobanteDTO(row,
-		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)]))
+		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)], index[socioKey("FUNDDA")]))
 }
 
 // Simular resuelve tasas y montos con el motor canónico, sin persistir.
@@ -402,7 +403,7 @@ func (h *Handler) UpdateComprobante(w http.ResponseWriter, r *http.Request) {
 	}
 	index := MapPerfiles(perfiles)
 	writeJSON(w, http.StatusOK, NewComprobanteDTO(row,
-		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)]))
+		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)], index[socioKey("FUNDDA")]))
 }
 
 func (h *Handler) ListPerfiles(w http.ResponseWriter, r *http.Request) {

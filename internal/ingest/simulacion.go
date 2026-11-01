@@ -244,16 +244,7 @@ func factorSpread(regla monedaRegla, tipoOp string) float64 {
 // signosLado resuelve el signo de cada socio con su propia polaridad. Solo la
 // regla de herencia o el abono (tipo A) pueden invertir un lado.
 func signosLado(perfil1, perfil2, efectivo1, efectivo2 domain.Perfil, currency, tipoOp string) (int, int) {
-	if tipoOp == "P" {
-		// En un pago, el Socio 1 recibe el ingreso y el Socio 2 es la
-		// contraparte que egresa. No se permite que ambos queden positivos
-		// aunque sus perfiles tengan la misma polaridad configurada.
-		return 1, -1
-	}
 	if tipoOp == "A" {
-		if strings.EqualFold(strings.TrimSpace(perfil1.Nombre), "FUNDDA") {
-			return -1, 1
-		}
 		return 1, -1
 	}
 	regla1, _ := buscarRegla(reglasDe(efectivo1), currency)

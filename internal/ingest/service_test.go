@@ -458,7 +458,7 @@ func TestCalcularLiquidacionPagoRestaLaContraparte(t *testing.T) {
 	lote := domain.LoteTasas{ID: "T052", Tasas: map[string]float64{"USD": 1, "VES": 40, "COP": 4000}}
 	comp, err := ingest.CalcularLiquidacion(input,
 		domain.Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+","porcentaje":{"deposito":0,"pago":0}}}`)},
-		domain.Perfil{Nombre: "NELSY", MonedaBase: "COP", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+","porcentaje":{"deposito":0,"pago":0}}}`)},
+		domain.Perfil{Nombre: "NELSY", MonedaBase: "COP", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"-","porcentaje":{"deposito":0,"pago":0}}}`)},
 		lote, testNow)
 	if err != nil {
 		t.Fatalf("liquidación P: %v", err)

@@ -228,7 +228,11 @@ type TasaDTO struct {
 }
 
 // NewComprobanteDTO construye la fila de compatibilidad.
-func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil) ComprobanteDTO {
+func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil, funddaOpt ...*Perfil) ComprobanteDTO {
+	var fundda *Perfil
+	if len(funddaOpt) > 0 {
+		fundda = funddaOpt[0]
+	}
 	moneda := domain.NormalizeCurrency(row.MonedaRecibo, "USDT")
 	socio1 := strings.TrimSpace(row.Socio1)
 	socio2 := strings.TrimSpace(row.Socio2)
@@ -242,7 +246,7 @@ func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil) Comprobante
 	if row.TipoOpManual {
 		tipoEfectivo = domain.NormalizeTipoOp(row.TipoOp)
 	}
-	signo1, signo2 := signosProyeccion(tipoEfectivo, moneda, perfil1, perfil2)
+	signo1, signo2 := signosProyeccion(tipoEfectivo, moneda, perfil1, perfil2, fundda)
 	monto1 := math.Abs(row.Monto1) * float64(signo1)
 	monto2 := math.Abs(row.Monto2) * float64(signo2)
 	me1 := math.Abs(row.ME1) * float64(signo1)
@@ -446,33 +450,41 @@ type monedaRegla struct {
 }
 
 // signosProyeccion aplica el mismo sentido contable que la ingesta al leer
-// filas históricas que pudieron congelarse siempre positivas.
-func signosProyeccion(tipo, moneda string, perfil1, perfil2 *Perfil) (int, int) {
+// filas históricas que pudieron congelarse siempre positivas. Solo 'A' es fijo;
+// 'P' y 'D' dependen de la polaridad del perfil/contrato de cada socio.
+func signosProyeccion(tipo, moneda string, perfil1, perfil2, fundda *Perfil) (int, int) {
 	switch domain.NormalizeTipoOp(tipo) {
-	case "P":
-		return 1, -1
 	case "A":
-		if perfil1 != nil && strings.EqualFold(strings.TrimSpace(perfil1.Nombre), "FUNDDA") {
-			return -1, 1
-		}
 		return 1, -1
 	default:
-		return signoDeposito(perfil1, moneda), signoDeposito(perfil2, moneda)
+		return signoPerfil(perfil1, fundda, moneda, tipo),
+			signoPerfil(perfil2, fundda, moneda, tipo)
 	}
 }
 
-func signoDeposito(perfil *Perfil, moneda string) int {
-	if perfil == nil || len(perfil.Monedas) == 0 {
+func signoPerfil(perfil, fundda *Perfil, moneda, tipo string) int {
+	if perfil == nil {
 		return 1
+	}
+	efectivo := perfil
+	if perfil.Herencia && fundda != nil && strings.TrimSpace(fundda.Nombre) != "" {
+		efectivo = fundda
 	}
 	var reglas map[string]monedaRegla
-	if err := json.Unmarshal(perfil.Monedas, &reglas); err != nil {
-		return 1
-	}
-	for codigo, regla := range reglas {
-		if domain.NormalizeCurrency(codigo, "") != domain.NormalizeCurrency(moneda, "") {
-			continue
+	if len(efectivo.Monedas) > 0 {
+		if err := json.Unmarshal(efectivo.Monedas, &reglas); err != nil {
+			return 1
 		}
+	}
+	var regla monedaRegla
+	for codigo, candidata := range reglas {
+		if domain.NormalizeCurrency(codigo, "") == domain.NormalizeCurrency(moneda, "") {
+			regla = candidata
+			break
+		}
+	}
+
+	if domain.NormalizeTipoOp(tipo) == "D" {
 		for _, valor := range []string{regla.PolarD, regla.Polaridad} {
 			switch strings.TrimSpace(valor) {
 			case "-":
@@ -481,6 +493,26 @@ func signoDeposito(perfil *Perfil, moneda string) int {
 				return 1
 			}
 		}
+		return 1
+	}
+
+	// 'P' usa polar_P y, si falta, la contrapartida de la polaridad de depósito.
+	if pago := strings.TrimSpace(regla.PolarP); pago != "" {
+		return signoDeLetra(pago)
+	}
+	deposito := strings.TrimSpace(regla.PolarD)
+	if deposito == "" {
+		deposito = strings.TrimSpace(regla.Polaridad)
+	}
+	if deposito == "-" {
+		return 1
+	}
+	return -1
+}
+
+func signoDeLetra(valor string) int {
+	if strings.TrimSpace(valor) == "-" {
+		return -1
 	}
 	return 1
 }
