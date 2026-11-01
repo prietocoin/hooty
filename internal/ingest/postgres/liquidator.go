@@ -392,11 +392,22 @@ func (l *Liquidator) lote(ctx context.Context, id string) (domain.LoteTasas, err
 	}
 	var loteID string
 	var raw []byte
+	loteIDBuscado := strings.TrimSpace(id)
 	err := l.pool.QueryRow(ctx, `
 SELECT COALESCE(id_tasa, ''), COALESCE(tasas::text, '{}')
 FROM tasa
 WHERE id_tasa = $1
-LIMIT 1`, strings.TrimSpace(id)).Scan(&loteID, &raw)
+LIMIT 1`, loteIDBuscado).Scan(&loteID, &raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// La vista puede exponer solo el lote vigente. El histórico vive en la
+		// tabla física y es la fuente para fechas retroactivas.
+		err = l.pool.QueryRow(ctx, `
+SELECT COALESCE(id_tasa, ''), COALESCE(tasas::text, '{}')
+FROM tasas_glaukov
+WHERE LOWER(BTRIM(id_tasa)) = LOWER(BTRIM($1))
+ORDER BY created_at DESC, id DESC
+LIMIT 1`, loteIDBuscado).Scan(&loteID, &raw)
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return l.loteVigente(ctx)
 	}
