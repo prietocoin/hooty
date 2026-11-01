@@ -474,6 +474,38 @@ func TestCalcularLiquidacionPagoRestaLaContraparte(t *testing.T) {
 	}
 }
 
+func TestCalcularLiquidacionTasasIndependientesPorSocio(t *testing.T) {
+	t.Parallel()
+
+	input := domain.LiquidacionInput{
+		HashLargo:      "hash-tasas",
+		HashCorto:      "HASTASAS",
+		Instancia:      "hooty",
+		Extraccion:     domain.Extraccion{Monto: 100, Moneda: "USD"},
+		URLImagen:      "https://cdn.example/imagen.jpg",
+		Grupo1:         "120363000000000001@g.us",
+		Grupo2:         "120363000000000002@g.us",
+		FechaOperacion: testNow.Add(-time.Minute),
+	}
+	lote := domain.LoteTasas{ID: "T052", Tasas: map[string]float64{"USD": 1, "VES": 40, "COP": 4000}}
+	comp, err := ingest.CalcularLiquidacion(input,
+		domain.Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"D","polar_D":"+","porcentaje":{"deposito":5,"pago":0}}}`)},
+		domain.Perfil{Nombre: "NELSY", MonedaBase: "COP", Monedas: json.RawMessage(`{"USD":{"tipo":"D","polar_D":"-","porcentaje":{"deposito":10,"pago":0}}}`)},
+		lote, testNow)
+	if err != nil {
+		t.Fatalf("liquidación: %v", err)
+	}
+	if comp.Tasa1 != 0.02625 {
+		t.Fatalf("T1 = %v, se esperaba 0.02625", comp.Tasa1)
+	}
+	if comp.Tasa2 != 0.000275 {
+		t.Fatalf("T2 = %v, se esperaba 0.000275", comp.Tasa2)
+	}
+	if comp.Tasa1 == comp.Tasa2 {
+		t.Fatalf("cada socio debe resolver su propia tasa: %+v", comp)
+	}
+}
+
 func TestCalcularLiquidacionRechazaMismoSocio(t *testing.T) {
 	t.Parallel()
 

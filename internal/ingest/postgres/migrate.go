@@ -150,7 +150,7 @@ func EnsureImageURLFallback(ctx context.Context, pool *pgxpool.Pool) error {
 DO $$
 DECLARE columna text;
 BEGIN
-    FOR columna IN SELECT unnest(ARRAY['r2_url', 'file_url']::text[]) LOOP
+    FOR columna IN SELECT unnest(ARRAY['r2_url', 'file_url', 'url_r2_comprobante', 'link_img']::text[]) LOOP
         IF EXISTS (
             SELECT 1 FROM information_schema.columns
             WHERE table_schema = 'public'
