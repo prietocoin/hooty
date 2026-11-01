@@ -485,8 +485,8 @@ func (h *Handler) Simular(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-// UpdateComprobante edita cabecera y ambos lados del binomio sin tocar la
-// identidad (hash, grupos, lote, fecha de operación ni URL de imagen).
+// UpdateComprobante edita cabecera, fecha de operación, lote de tasa y ambos
+// lados del binomio sin tocar la identidad (hash, grupos ni URL de imagen).
 func (h *Handler) UpdateComprobante(w http.ResponseWriter, r *http.Request) {
 	raw := r.PathValue("hash")
 	if raw == "" {

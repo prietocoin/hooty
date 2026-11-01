@@ -667,6 +667,33 @@ func TestApplyComprobantePatchTipoOp(t *testing.T) {
 	}
 }
 
+func TestApplyComprobantePatchFechaYLote(t *testing.T) {
+	t.Parallel()
+
+	c := domain.Comprobante{}
+	fecha := "2026-10-31T14:30"
+	lote := "T097"
+	if err := applyComprobantePatch(&c, ComprobantePatch{
+		FechaHoraInput: &fecha,
+		LoteTasa:       &lote,
+	}); err != nil {
+		t.Fatalf("fecha/lote rechazados: %v", err)
+	}
+	if got := c.FechaOperacion.Format("2006-01-02T15:04"); got != fecha {
+		t.Fatalf("fecha = %q, se esperaba %q", got, fecha)
+	}
+	if c.LoteTasa != "T097" {
+		t.Fatalf("lote = %q", c.LoteTasa)
+	}
+	vacio := ""
+	if err := applyComprobantePatch(&c, ComprobantePatch{LoteTasa: &vacio}); err != nil {
+		t.Fatalf("lote vacío debe permitirse: %v", err)
+	}
+	if c.LoteTasa != "" {
+		t.Fatalf("lote vacío no se aplicó: %q", c.LoteTasa)
+	}
+}
+
 func TestReprocessComprobanteEndpoint(t *testing.T) {
 	t.Parallel()
 

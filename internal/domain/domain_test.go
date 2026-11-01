@@ -67,7 +67,6 @@ func TestComprobanteValidateRechazaViolaciones(t *testing.T) {
 		{"tipo_op inválido", func(c *Comprobante) { c.TipoOp = "X" }, "tipo_op"},
 		{"monto cero", func(c *Comprobante) { c.Monto1 = 0 }, "importe"},
 		{"me cero", func(c *Comprobante) { c.ME2 = 0 }, "equivalentes"},
-		{"sin lote", func(c *Comprobante) { c.LoteTasa = "" }, "lote_tasa"},
 		{"sin imagen", func(c *Comprobante) { c.URLImagen = "" }, "url_imagen"},
 		{"sin fecha", func(c *Comprobante) { c.FechaOperacion = time.Time{} }, "fecha_operacion"},
 	}
@@ -80,6 +79,16 @@ func TestComprobanteValidateRechazaViolaciones(t *testing.T) {
 				t.Fatalf("se esperaba error con %q, obtuve %v", tc.hint, err)
 			}
 		})
+	}
+}
+
+func TestComprobanteValidatePermiteLoteVacioParaTasaManual(t *testing.T) {
+	t.Parallel()
+
+	c := validComprobante()
+	c.LoteTasa = ""
+	if err := c.Validate(); err != nil {
+		t.Fatalf("un comprobante con tasa manual puede no tener lote: %v", err)
 	}
 }
 

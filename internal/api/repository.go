@@ -223,6 +223,8 @@ func (r *Repository) UpdateComprobante(ctx context.Context, hash string, patch C
 		existing.Monto1, existing.Monto2, existing.ME1, existing.ME2,
 		existing.Banco, existing.Titular, existing.Referencia,
 		tipoOpSQL,
+		existing.LoteTasa,
+		clock.ForTimestamp(existing.FechaOperacion),
 		hash,
 	)
 	if err != nil {
@@ -537,7 +539,53 @@ func applyComprobantePatch(c *domain.Comprobante, patch ComprobantePatch) error 
 	if patch.ME2 != nil {
 		c.ME2 = *patch.ME2
 	}
+
+	if fecha := primeraCadena(patch.FechaOperacion, patch.FechaHoraInput, patch.FechaInput); fecha != nil {
+		parsed, err := parseFechaComprobante(*fecha)
+		if err != nil {
+			return err
+		}
+		c.FechaOperacion = parsed
+	}
+	if lote := primeraCadena(patch.LoteTasa, patch.LoteTasaAsignado, patch.Lote); lote != nil {
+		c.LoteTasa = strings.TrimSpace(*lote)
+	}
 	return nil
+}
+
+func primeraCadena(valores ...*string) *string {
+	for _, valor := range valores {
+		if valor != nil {
+			return valor
+		}
+	}
+	return nil
+}
+
+// parseFechaComprobante acepta el datetime-local de la UI y las variantes ISO
+// que puede enviar un cliente. La columna es timestamp without time zone, por
+// eso se conserva la hora de pared de Caracas.
+func parseFechaComprobante(raw string) (time.Time, error) {
+	texto := strings.TrimSpace(raw)
+	if texto == "" {
+		return time.Time{}, domain.Validationf("fecha_operacion es obligatoria")
+	}
+	layouts := []string{
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	}
+	for _, layout := range layouts {
+		if parsed, err := time.ParseInLocation(layout, texto, clock.Caracas()); err == nil {
+			return clock.WallClock(parsed), nil
+		}
+	}
+	if parsed, err := time.Parse(time.RFC3339, texto); err == nil {
+		return clock.WallClock(parsed.In(clock.Caracas())), nil
+	}
+	return time.Time{}, domain.Validationf("fecha_operacion inválida; use YYYY-MM-DDTHH:MM")
 }
 
 // ListPerfiles devuelve la vista perfil completa.
@@ -1017,8 +1065,10 @@ UPDATE comprobantes SET
     referencia = $13,
     tipo_op = COALESCE(NULLIF($14::text, ''), tipo_op),
     tipo_op_manual = CASE WHEN NULLIF($14::text, '') IS NOT NULL THEN TRUE ELSE tipo_op_manual END,
+    lote_tasa = $15,
+    fecha_operacion = $16,
     actualizado_en = NOW()
-WHERE hash_largo = $15`
+WHERE hash_largo = $17`
 
 const sqlComprobanteColumns = `
     c.hash_largo,

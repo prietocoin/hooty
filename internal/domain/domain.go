@@ -272,9 +272,7 @@ func (c Comprobante) Validate() error {
 	if err := validarLadoContable("2", c.Tasa2, c.Monto2, c.ME2); err != nil {
 		return err
 	}
-	if strings.TrimSpace(c.LoteTasa) == "" {
-		return Validationf("lote_tasa es obligatorio")
-	}
+	// lote_tasa puede quedar vacío cuando el operador corrige la tasa a mano.
 	if c.TipoOp != "" && !TipoOpValido(c.TipoOp) {
 		return Validationf("tipo_op debe ser D, P o A")
 	}

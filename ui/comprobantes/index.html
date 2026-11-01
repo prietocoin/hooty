@@ -22,8 +22,8 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261101_06"></script>
-  <script type="module" src="./js/pwa.js?v=20261101_06"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261101_07"></script>
+  <script type="module" src="./js/pwa.js?v=20261101_07"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
 
@@ -1153,7 +1153,7 @@
       // Al cambiar divisa o socio, el backend debe resolver las tasas nuevas
       // del catálogo. Solo se envían tasas explícitas cuando el usuario las
       // editó (o al recalcular montos con las tasas vigentes del formulario).
-      if (origen !== 'moneda' && origen !== 'socio') {
+      if (origen !== 'moneda' && origen !== 'socio' && origen !== 'lote') {
         payload.tasa_1 = this.tasaNumero('tasa_1', this.itemEdicion.tasa_1);
         payload.tasa_2 = this.tasaNumero('tasa_2', this.itemEdicion.tasa_2);
       }
@@ -1252,6 +1252,8 @@
         monto_2: this.domNumero('monto_2', this.itemEdicion?.monto_2),
         me1: this.numeroPuro(this.itemEdicion?.me1),
         me2: this.numeroPuro(this.itemEdicion?.me2),
+        fecha_hora_input: this.domValor('fecha_hora_input', this.itemEdicion?.fecha_hora_input || ''),
+        lote_tasa: this.domValor('lote_tasa', this.itemEdicion?.lote_tasa_asignado || ''),
         banco: this.domValor('banco', this.itemEdicion?.banco || ''),
         titular: this.domValor('titular', this.itemEdicion?.titular || ''),
         referencia: this.domValor('referencia', this.itemEdicion?.referencia || '')
@@ -1317,6 +1319,7 @@
       monto: Number(raw.monto ?? raw.monto_local ?? 0),
       monto_recibo: Number(raw.monto_recibo ?? raw.monto ?? raw.monto_local ?? 0),
       moneda_recibo: String(raw.moneda_recibo || raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
+      fecha_hora_input: raw.fecha_hora_input || raw.fecha_operacion || raw.fecha_hora_comprobante || '',
       tasa_1: formatearTasaRegla(numeroPuro(raw.tasa_1 || raw.tasa1 || raw.grupo_1?.tasa)),
       tasa_original_1: numeroPuro(raw.tasa_1 || raw.tasa1 || raw.grupo_1?.tasa),
       monto_1: numeroPuro(raw.monto_1 ?? raw.grupo_1?.monto),
@@ -1334,7 +1337,7 @@
       tipo_op_original: String(raw.tipo_op || raw.tipo_op1 || 'D').split('-')[0].toUpperCase(),
       tipo_op_manual: Boolean(raw.tipo_op_manual || raw.tipo_editado || raw.isManual),
       moneda: String(raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
-      lote_tasa_asignado: raw.lote_tasa_asignado || raw.lote_tasa || raw.lote || 'T070'
+      lote_tasa_asignado: raw.lote_tasa_asignado || raw.lote_tasa || raw.lote || ''
     }));
 
     modalAbierto = true;
@@ -1394,6 +1397,7 @@
               <div class="sm:col-span-1">
                 <label class="block text-[8px] font-bold text-slate-400 uppercase mb-0.5">Fecha Input</label>
                 <input type="datetime-local"
+                       id="editar-fecha-input" name="fecha_hora_input"
                        x-model="itemEdicion.fecha_hora_input"
                        class="w-full bg-[#080e26] border border-blue-900/80 rounded-lg px-2 py-1.5 text-xs text-white font-mono font-bold outline-none focus:border-cyan-400">
               </div>
@@ -1559,9 +1563,12 @@
                   </div>
 
                   <div>
-                    <label class="block text-[8px] font-bold text-purple-400 uppercase mb-0.5">Lote Tasa (fijo)</label>
-                    <p class="w-full bg-[#080e26] border border-purple-500/20 rounded-lg px-2 py-1.5 text-xs text-purple-300/80 font-mono font-bold uppercase"
-                       x-text="itemEdicion.lote_tasa_asignado || itemEdicion.lote_tasa || '-'"></p>
+                    <label class="block text-[8px] font-bold text-purple-400 uppercase mb-0.5" for="editar-lote-tasa">Lote Tasa</label>
+                    <input id="editar-lote-tasa" name="lote_tasa" type="text"
+                           x-model="itemEdicion.lote_tasa_asignado"
+                           @change="if (itemEdicion.lote_tasa_asignado) actualizarSimulacion('lote')"
+                           placeholder="Ej. T097 o vacío para tasa manual"
+                           class="w-full bg-[#080e26] border border-purple-500/40 rounded-lg px-2 py-1.5 text-xs text-purple-200 font-mono font-bold uppercase outline-none focus:border-purple-400">
                   </div>
 
                   <div>
