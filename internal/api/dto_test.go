@@ -18,7 +18,9 @@ func TestTipoOperacion(t *testing.T) {
 		{"misma moneda base", "VES", &Perfil{Nombre: "CHASAN", MonedaBase: "VES"}, "A"},
 		{"regla P del perfil", "USD", &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"P"}}`)}, "P"},
 		{"regla D del perfil", "USD", &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"def":"D"}}`)}, "D"},
-		{"sin perfil", "USD", nil, "D"},
+		{"tipo_op del perfil", "USD", &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo_op":"P","tipo":"D"}}`)}, "P"},
+		{"A no aplica a moneda distinta", "USD", &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"A"}}`)}, "P"},
+		{"sin perfil", "USD", nil, "P"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -26,6 +28,30 @@ func TestTipoOperacion(t *testing.T) {
 				t.Fatalf("tipoOperacion = %q, se esperaba %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestComprobanteDTOExponeTipoManual(t *testing.T) {
+	t.Parallel()
+
+	row := ComprobanteRow{
+		HashLargo: "8a3e", HashCorto: "8A3E", Instancia: "hooty",
+		MonedaRecibo: "USD", Socio1: "CHASAN", Socio2: "NELSY",
+		TipoOp: "A", TipoOpManual: true,
+	}
+	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"P"}}`)}
+	dto := NewComprobanteDTO(row, perfil1, nil)
+	if dto.TipoOp != "A" || dto.TipoOp1 != "P" {
+		t.Fatalf("tipo manual/automático inesperado: %q / %q", dto.TipoOp, dto.TipoOp1)
+	}
+	if !dto.TipoOpManual || !dto.IsManual || dto.TipoManual != "A" {
+		t.Fatalf("marca manual no expuesta: %+v", dto)
+	}
+
+	row.TipoOpManual = false
+	dto = NewComprobanteDTO(row, perfil1, nil)
+	if dto.TipoOpManual || dto.IsManual || dto.TipoManual != "" {
+		t.Fatalf("fila automática no debe exponerse como manual: %+v", dto)
 	}
 }
 
@@ -60,7 +86,7 @@ func TestComprobanteDTOAliases(t *testing.T) {
 		ActualizadoEn:  time.Date(2026, 10, 25, 10, 2, 0, 0, time.UTC),
 	}
 	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"P"}}`)}
-	perfil2 := &Perfil{Nombre: "NELSY", MonedaBase: "COP", Rol: "SOCIO"}
+	perfil2 := &Perfil{Nombre: "NELSY", MonedaBase: "COP", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"D"}}`)}
 
 	dto := NewComprobanteDTO(row, perfil1, perfil2)
 	if dto.Monto != dto.MontoRecibo || dto.MontoLocal != dto.MontoRecibo {

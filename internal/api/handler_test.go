@@ -149,7 +149,7 @@ func testStore() *fakeStore {
 		total: 1,
 		perfiles: []Perfil{
 			{Nombre: "CHASAN", MonedaBase: "VES", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"P"}}`)},
-			{Nombre: "NELSY", MonedaBase: "COP", Rol: "SOCIO"},
+			{Nombre: "NELSY", MonedaBase: "COP", Rol: "SOCIO", Monedas: json.RawMessage(`{"USD":{"tipo":"D"}}`)},
 		},
 		tasa: Tasa{IDTasa: "T070", Tasas: json.RawMessage(`{"USD":1,"VES":40}`)},
 		filters: ReportFilters{

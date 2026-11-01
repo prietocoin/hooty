@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261031_08"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261031_09"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -1191,9 +1191,19 @@
         me2: this.numeroPuro(this.itemEdicion?.me2),
         banco: this.domValor('banco', this.itemEdicion?.banco || ''),
         titular: this.domValor('titular', this.itemEdicion?.titular || ''),
-        referencia: this.domValor('referencia', this.itemEdicion?.referencia || ''),
-        tipo_op: String(this.domValor('tipo_op', this.itemEdicion?.tipo_op || 'D')).toUpperCase().trim()
+        referencia: this.domValor('referencia', this.itemEdicion?.referencia || '')
       };
+
+      // Solo se marca el tipo como manual cuando el operador cambió realmente
+      // la selección. Guardar otros campos no debe congelar el tipo automático
+      // que calcula el perfil del Socio 1.
+      const tipoSeleccionado = String(
+        this.domValor('tipo_op', this.itemEdicion?.tipo_op || 'D')
+      ).toUpperCase().trim();
+      const tipoOriginal = String(this.itemEdicion?.tipo_op_original || '').toUpperCase().trim();
+      if (tipoSeleccionado && tipoSeleccionado !== tipoOriginal) {
+        payload.tipo_op = tipoSeleccionado;
+      }
 
       console.log('[Hooty] Despachando PUT con payload:', payload);
 
@@ -1254,8 +1264,12 @@
       me2: numeroPuro(raw.me2 ?? raw.m2_socio ?? raw.grupo_2?.monto),
       base_socio_1: String(raw.moneda_base_socio1 || raw.moneda_socio_1 || 'USDT').toUpperCase(),
       base_socio_2: String(raw.moneda_base_socio2 || raw.moneda_socio_2 || 'USDT').toUpperCase(),
-      tipo_manual: String(raw.tipo_manual || raw.tipo_op1 || raw.tipo_op || raw.tipo || 'D').split('-')[0].toUpperCase(),
-      tipo_op: String(raw.tipo_op || raw.tipo_op1 || raw.tipo_manual || raw.tipo || 'D').split('-')[0].toUpperCase(),
+      tipo_manual: raw.tipo_op_manual || raw.tipo_editado || raw.isManual
+        ? String(raw.tipo_manual || raw.tipo_op || 'D').split('-')[0].toUpperCase()
+        : '',
+      tipo_op: String(raw.tipo_op || raw.tipo_op1 || 'D').split('-')[0].toUpperCase(),
+      tipo_op_original: String(raw.tipo_op || raw.tipo_op1 || 'D').split('-')[0].toUpperCase(),
+      tipo_op_manual: Boolean(raw.tipo_op_manual || raw.tipo_editado || raw.isManual),
       moneda: String(raw.moneda || raw.moneda_local || 'USDT').toUpperCase(),
       lote_tasa_asignado: raw.lote_tasa_asignado || raw.lote_tasa || raw.lote || 'T070'
     }));

@@ -57,6 +57,7 @@ func (n *numeroFlexible) UnmarshalJSON(data []byte) error {
 // monedaRegla replica el contrato JSONB de perfiles.monedas.
 type monedaRegla struct {
 	Activo     bool           `json:"activo"`
+	TipoOp     string         `json:"tipo_op"`
 	Tipo       string         `json:"tipo"`
 	Def        string         `json:"def"`
 	PolarD     string         `json:"polar_D"`
@@ -186,10 +187,12 @@ func tipoOperacion(perfil1 domain.Perfil, currency string) string {
 	if !ok {
 		return "P"
 	}
-	for _, valor := range []string{regla.Tipo, regla.Def} {
-		tipo := strings.ToUpper(strings.TrimSpace(valor))
-		if tipo != "" {
-			return tipo[:1]
+	for _, valor := range []string{regla.TipoOp, regla.Tipo, regla.Def} {
+		switch strings.ToUpper(strings.TrimSpace(valor)) {
+		case "P":
+			return "P"
+		case "D":
+			return "D"
 		}
 	}
 	return "P"

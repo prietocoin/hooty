@@ -998,6 +998,7 @@ UPDATE comprobantes SET
     titular = $12,
     referencia = $13,
     tipo_op = COALESCE(NULLIF($14::text, ''), tipo_op),
+    tipo_op_manual = CASE WHEN NULLIF($14::text, '') IS NOT NULL THEN TRUE ELSE tipo_op_manual END,
     actualizado_en = NOW()
 WHERE hash_largo = $15`
 
@@ -1025,6 +1026,7 @@ const sqlComprobanteColumns = `
     COALESCE(c.me2, 0),
     COALESCE(c.lote_tasa, ''),
     COALESCE(c.tipo_op, 'D'),
+    COALESCE(c.tipo_op_manual, false),
     c.fecha_operacion,
     c.creado_en,
     c.actualizado_en`
@@ -1104,7 +1106,7 @@ func scanComprobante(row interface{ Scan(...any) error }) (ComprobanteRow, error
 		&item.Grupo1, &item.Grupo2, &item.Caption1, &item.Caption2,
 		&item.Socio1, &item.Socio2,
 		&item.Tasa1, &item.Tasa2, &item.Monto1, &item.Monto2, &item.ME1, &item.ME2,
-		&item.LoteTasa, &item.TipoOp, &fecha, &creado, &actualizado,
+		&item.LoteTasa, &item.TipoOp, &item.TipoOpManual, &fecha, &creado, &actualizado,
 	); err != nil {
 		return ComprobanteRow{}, err
 	}

@@ -83,6 +83,7 @@ func CalcularLiquidacion(input domain.LiquidacionInput, perfil1, perfil2 domain.
 		Caption2:       input.Caption2,
 		Socio1:         perfil1.Nombre,
 		Socio2:         perfil2.Nombre,
+		TipoOp:         tipoOperacion(perfil1, currency),
 		Tasa1:          tasa1,
 		Tasa2:          tasa2,
 		Monto1:         monto1,

@@ -4,7 +4,7 @@
  * el filtro ni el listado principal del Dashboard.
  */
 
-import { cargarComprobantesFiltrados } from '../services/comprobantesCargaService.js?v=20261031_03';
+import { cargarComprobantesFiltrados } from '../services/comprobantesCargaService.js?v=20261031_04';
 import {
   aplicarRangoHash,
   resolverIndiceHash
@@ -16,7 +16,7 @@ import {
   resolverSubtotalSocio,
   resolverTasaSocio,
   resolverTipoComprobante
-} from '../utils/comprobantesTasasUtils.js?v=20261031_03';
+} from '../utils/comprobantesTasasUtils.js?v=20261031_04';
 import {
   dentroRangoCaracas,
   fechaCaracasISO,

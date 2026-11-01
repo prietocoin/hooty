@@ -8,7 +8,7 @@ import {
   formatMonto, formatTasa, obtenerME1, obtenerME2, obtenerMonto1, obtenerMonto2,
   obtenerTasaSocioCalculada, claseInsignia, formatDiaHora,
   resolverTipoComprobante, resolverTasaSocio
-} from '../utils/comprobantesFormatters.js?v=20261031_04';
+} from '../utils/comprobantesFormatters.js?v=20261031_05';
 
 import { apiUrl } from '../../../../../shared/js/api-base.js?v=20261031_02';
 import { notify } from '../../../../../shared/js/toast.js?v=20261031_02';
@@ -22,12 +22,84 @@ import {
   eliminarComprobantePorHash,
   fetchComprobantePorHash
 } from '../services/comprobantesApiService.js?v=20261031_05';
-import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261031_03';
+import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261031_04';
 import { aplicarRangoHash } from '../services/comprobantesFilterService.js?v=20261031_02';
-import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261031_03';
+import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261031_04';
 import { capturarReporteEstadoCuenta } from '../services/comprobantesReporteService.js?v=20261027_01';
 import { obtenerSaldoAnteriorSocio, obtenerSujetoAuditado } from '../services/comprobantesSaldosService.js?v=20261031_02';
-import { obtenerRangoMesActualCaracas, formatearFechaLatina } from '../utils/comprobantesFechaUtils.js?v=20261031_02';
+import { formatearFechaLatina } from '../utils/comprobantesFechaUtils.js?v=20261031_02';
+
+const FILTROS_STORAGE_KEY = 'comprobantes_filtros_activos';
+const FILTROS_VACIOS = Object.freeze({
+  rol: '',
+  socio: '',
+  fechaInicio: '',
+  fechaFin: '',
+  desdeHash: '',
+  hastaHash: '',
+  orden: 'fecha_desc',
+  hash: ''
+});
+
+function filtrosVacios() {
+  return { ...FILTROS_VACIOS };
+}
+
+function leerFiltrosSesion() {
+  try {
+    if (typeof sessionStorage === 'undefined') return null;
+    const raw = sessionStorage.getItem(FILTROS_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') return null;
+    const filtros = {
+      rol: String(data.rol || '').trim(),
+      socio: String(data.socio || '').trim(),
+      fechaInicio: String(data.fechaInicio || '').trim(),
+      fechaFin: String(data.fechaFin || '').trim(),
+      desdeHash: String(data.desdeHash || '').trim(),
+      hastaHash: String(data.hastaHash || '').trim(),
+      orden: String(data.orden || 'fecha_desc'),
+      hash: String(data.hash || '').trim()
+    };
+    const chip = data.chip === 'hoy' && filtros.fechaInicio && filtros.fechaFin
+      ? 'hoy'
+      : 'todos';
+    return { filtros, chip };
+  } catch (err) {
+    console.warn('[comprobantesState] No se pudieron restaurar los filtros:', err);
+    return null;
+  }
+}
+
+function guardarFiltrosSesion(filtros = {}, chip = 'todos') {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    const limpio = {
+      rol: filtros.rol || '',
+      socio: filtros.socio || '',
+      fechaInicio: filtros.fechaInicio || '',
+      fechaFin: filtros.fechaFin || '',
+      desdeHash: filtros.desdeHash || '',
+      hastaHash: filtros.hastaHash || '',
+      orden: filtros.orden || 'fecha_desc',
+      hash: filtros.hash || '',
+      chip: chip === 'hoy' ? 'hoy' : 'todos'
+    };
+    const hayFiltros = Boolean(
+      limpio.rol || limpio.socio || limpio.fechaInicio || limpio.fechaFin ||
+      limpio.desdeHash || limpio.hastaHash || limpio.hash ||
+      (limpio.orden && limpio.orden !== 'fecha_desc')
+    );
+    if (!hayFiltros) {
+      sessionStorage.removeItem(FILTROS_STORAGE_KEY);
+      return;
+    }
+    sessionStorage.setItem(FILTROS_STORAGE_KEY, JSON.stringify(limpio));
+  } catch (err) {
+    console.warn('[comprobantesState] No se pudieron persistir los filtros:', err);
+  }
+}
 
 function claveComprobante(item) {
   const c = item?.comprobante || item || {};
@@ -37,7 +109,9 @@ function claveComprobante(item) {
 }
 
 export function comprobantesState() {
-  const { fechaInicio: inicioMes, fechaFin: finMes } = obtenerRangoMesActualCaracas();
+  const filtrosSesion = leerFiltrosSesion();
+  const filtrosIniciales = filtrosSesion ? filtrosSesion.filtros : filtrosVacios();
+  const chipInicial = filtrosSesion ? filtrosSesion.chip : 'todos';
 
   const state = {
     todosLosItems: [],
@@ -65,30 +139,21 @@ export function comprobantesState() {
     // BottomSheet de filtros y detalle táctil de tarjeta.
     filtrosSheetAbierto: false,
     menuMovilAbierto: false,
-    filtrosBorrador: {
-      rol: '',
-      socio: '',
-      fechaInicio: inicioMes,
-      fechaFin: finMes,
-      desdeHash: '',
-      hastaHash: '',
-      orden: 'fecha_desc',
-      hash: ''
-    },
-    filtroChip: 'todos',
+    filtrosBorrador: { ...filtrosIniciales },
+    filtroChip: chipInicial,
     detalleAbierto: false,
     itemDetalle: null,
     lightboxAbierto: false,
     lightboxImagen: '',
 
-    filtroRol: '',
-    filtroSocio: '',
-    filtroFechaInicio: inicioMes,
-    filtroFechaFin: finMes,
-    filtroDesdeHash: '',
-    filtroHastaHash: '',
-    filtroOrden: 'fecha_desc',
-    filtroHash: '',
+    filtroRol: filtrosIniciales.rol,
+    filtroSocio: filtrosIniciales.socio,
+    filtroFechaInicio: filtrosIniciales.fechaInicio,
+    filtroFechaFin: filtrosIniciales.fechaFin,
+    filtroDesdeHash: filtrosIniciales.desdeHash,
+    filtroHastaHash: filtrosIniciales.hastaHash,
+    filtroOrden: filtrosIniciales.orden,
+    filtroHash: filtrosIniciales.hash,
     saldoAnterior: 0,
 
     // Inspección de Lotes: búsqueda en vivo y chips de saldo.
@@ -226,6 +291,7 @@ export function comprobantesState() {
     actualizarSocioSeleccionado() {
       this.filtroSocio = String(this.filtroSocio || '').trim();
       this.saldoAnterior = obtenerSaldoAnteriorSocio(this.directorio, this.filtroSocio);
+      this.persistirFiltros();
       return this.resetearYRefrescar();
     },
 
@@ -233,10 +299,12 @@ export function comprobantesState() {
       this.filtroSocio = String(nombre || '').trim();
       this.saldoAnterior = obtenerSaldoAnteriorSocio(this.directorio, this.filtroSocio);
       this.vistaActiva = 'comprobantes';
+      this.persistirFiltros();
       return this.resetearYRefrescar();
     },
 
     async cargarComprobantes() {
+      this.saldoAnterior = obtenerSaldoAnteriorSocio(this.directorio, this.filtroSocio);
       return this.resetearYRefrescar();
     },
 
@@ -251,6 +319,10 @@ export function comprobantesState() {
         orden: this.filtroOrden,
         hash: this.filtroHash
       };
+    },
+
+    persistirFiltros() {
+      guardarFiltrosSesion(this.filtrosActuales(), this.filtroChip);
     },
 
     fechaHoyCaracas() {
@@ -293,16 +365,19 @@ export function comprobantesState() {
     },
 
     limpiarFiltros() {
-      this.filtrosBorrador = {
-        rol: '',
-        socio: '',
-        fechaInicio: '',
-        fechaFin: '',
-        desdeHash: '',
-        hastaHash: '',
-        orden: 'fecha_desc',
-        hash: ''
-      };
+      this.filtrosBorrador = filtrosVacios();
+      this.filtroRol = '';
+      this.filtroSocio = '';
+      this.filtroFechaInicio = '';
+      this.filtroFechaFin = '';
+      this.filtroDesdeHash = '';
+      this.filtroHastaHash = '';
+      this.filtroOrden = 'fecha_desc';
+      this.filtroHash = '';
+      this.filtroChip = 'todos';
+      this.saldoAnterior = 0;
+      guardarFiltrosSesion(filtrosVacios(), 'todos');
+      return this.resetearYRefrescar();
     },
 
     async aplicarFiltros() {
@@ -322,6 +397,7 @@ export function comprobantesState() {
       this.filtroHash = String(borrador.hash || '').trim();
       this.filtroChip = 'todos';
       this.saldoAnterior = obtenerSaldoAnteriorSocio(this.directorio, this.filtroSocio);
+      this.persistirFiltros();
       this.filtrosSheetAbierto = false;
       this.actualizarBloqueoScroll();
       return this.resetearYRefrescar();
@@ -333,13 +409,15 @@ export function comprobantesState() {
         this.filtroFechaInicio = hoy;
         this.filtroFechaFin = hoy;
         this.filtroChip = 'hoy';
+        this.persistirFiltros();
         return this.resetearYRefrescar();
       }
 
-      const { fechaInicio, fechaFin } = obtenerRangoMesActualCaracas();
-      this.filtroFechaInicio = fechaInicio;
-      this.filtroFechaFin = fechaFin;
+      // "Todos" no impone ningún rango: solo elimina las fechas activas.
+      this.filtroFechaInicio = '';
+      this.filtroFechaFin = '';
       this.filtroChip = 'todos';
+      this.persistirFiltros();
       return this.resetearYRefrescar();
     },
 

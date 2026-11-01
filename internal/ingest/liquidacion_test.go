@@ -7,6 +7,31 @@ import (
 	"hooty/internal/domain"
 )
 
+func TestTipoOperacionIngestaUsaPerfilSocio1(t *testing.T) {
+	t.Parallel()
+
+	perfil := domain.Perfil{
+		Nombre: "CHASAN", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"tipo_op":"P","tipo":"D"},"COP":{"tipo":"D"}}`),
+	}
+	if got := tipoOperacion(perfil, "USD"); got != "A" {
+		t.Fatalf("moneda base debe ser A, fue %q", got)
+	}
+	if got := tipoOperacion(perfil, "ARS"); got != "P" {
+		t.Fatalf("ARS debe leer el tipo del perfil, fue %q", got)
+	}
+	if got := tipoOperacion(perfil, "COP"); got != "D" {
+		t.Fatalf("COP debe leer D del perfil, fue %q", got)
+	}
+	if got := tipoOperacion(perfil, "BRL"); got != "P" {
+		t.Fatalf("sin regla el tipo natural debe ser P, fue %q", got)
+	}
+	perfil.Monedas = json.RawMessage(`{"ARS":{"tipo":"A"}}`)
+	if got := tipoOperacion(perfil, "ARS"); got != "P" {
+		t.Fatalf("una moneda distinta a la base no puede ser A, fue %q", got)
+	}
+}
+
 func TestSimularLiquidacionIndependienteConSpreadYPolaridad(t *testing.T) {
 	t.Parallel()
 

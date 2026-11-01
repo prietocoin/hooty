@@ -48,9 +48,27 @@ export function resolverMonedaTasa(item = {}) {
  */
 export function resolverTipoComprobante(item = {}, posicion = 1) {
   const esSocio2 = Number(posicion) === 2;
-  const bruto = esSocio2
-    ? (item?.tipo_op || item?.tipo_op2 || item?.tipo_op1 || item?.tipo_manual || item?.tipo || 'D')
-    : (item?.tipo_op || item?.tipo_op1 || item?.tipo_op2 || item?.tipo_manual || item?.tipo || 'D');
+  const manualRaw = item?.tipo_manual;
+  const esManual = item?.tipo_op_manual === true
+    || item?.tipo_op_manual === 'true'
+    || item?.tipo_editado === true
+    || item?.isManual === true
+    || Boolean(manualRaw);
+
+  if (esManual) {
+    const letraManual = String(manualRaw || item?.tipo_op || item?.tipo || '')
+      .trim().split('-')[0].toUpperCase();
+    if (letraManual === 'A' || letraManual === 'P' || letraManual === 'D') {
+      return letraManual;
+    }
+  }
+
+  // Sin edición manual mandan los tipos automáticos del perfil. Para el
+  // encabezado (posición 1) la fuente es siempre el Socio 1: tipo_op1.
+  const automatico = esSocio2
+    ? (item?.tipo_op2 || item?.tipo_op1)
+    : (item?.tipo_op1 || item?.tipo_op2);
+  const bruto = automatico || item?.tipo_op || item?.tipo || 'D';
   const letra = String(bruto).trim().split('-')[0].toUpperCase();
   return letra === 'A' || letra === 'P' || letra === 'D' ? letra : 'D';
 }

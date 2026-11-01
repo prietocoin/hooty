@@ -36,6 +36,7 @@ type ComprobanteRow struct {
 	ME2            float64
 	LoteTasa       string
 	TipoOp         string
+	TipoOpManual   bool
 	FechaOperacion time.Time
 	CreadoEn       time.Time
 	ActualizadoEn  time.Time
@@ -167,6 +168,10 @@ type ComprobanteDTO struct {
 	TipoOp1 string `json:"tipo_op1"`
 	TipoOp2 string `json:"tipo_op2"`
 
+	TipoOpManual bool   `json:"tipo_op_manual"`
+	TipoManual   string `json:"tipo_manual,omitempty"`
+	IsManual     bool   `json:"isManual,omitempty"`
+
 	MonedaSocio1     string `json:"moneda_socio_1"`
 	MonedaSocio2     string `json:"moneda_socio_2"`
 	MonedaBaseSocio1 string `json:"moneda_base_socio1"`
@@ -270,6 +275,10 @@ func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil) Comprobante
 		TipoOp1: tipo1,
 		TipoOp2: tipo2,
 
+		TipoOpManual: row.TipoOpManual,
+		TipoManual:   tipoManual(row),
+		IsManual:     row.TipoOpManual,
+
 		MonedaSocio1:     monedaBase1,
 		MonedaSocio2:     monedaBase2,
 		MonedaBaseSocio1: monedaBase1,
@@ -371,9 +380,18 @@ func MapPerfiles(perfiles []Perfil) map[string]*Perfil {
 	return index
 }
 
+// tipoManual solo expone una letra manual cuando el operador la guardó desde
+// el modal. Las filas heredadas conservan el tipo automático del perfil.
+func tipoManual(row ComprobanteRow) string {
+	if !row.TipoOpManual {
+		return ""
+	}
+	return domain.NormalizeTipoOp(row.TipoOp)
+}
+
 func tipoOperacion(moneda string, perfil *Perfil) string {
 	if perfil == nil {
-		return "D"
+		return "P"
 	}
 	moneda = domain.NormalizeCurrency(moneda, "")
 	base := domain.NormalizeCurrency(perfil.MonedaBase, "")
@@ -381,30 +399,33 @@ func tipoOperacion(moneda string, perfil *Perfil) string {
 		return "A"
 	}
 	if len(perfil.Monedas) == 0 {
-		return "D"
+		return "P"
 	}
 	var reglas map[string]monedaRegla
 	if err := json.Unmarshal(perfil.Monedas, &reglas); err != nil {
-		return "D"
+		return "P"
 	}
 	for codigo, regla := range reglas {
 		if domain.NormalizeCurrency(codigo, "") != moneda {
 			continue
 		}
-		tipo := strings.ToUpper(strings.TrimSpace(regla.Tipo))
-		if tipo == "" {
-			tipo = strings.ToUpper(strings.TrimSpace(regla.Def))
+		for _, valor := range []string{regla.TipoOp, regla.Tipo, regla.Def} {
+			switch strings.ToUpper(strings.TrimSpace(valor)) {
+			case "P":
+				return "P"
+			case "D":
+				return "D"
+			}
 		}
-		if tipo == "A" || tipo == "P" || tipo == "D" {
-			return tipo
-		}
+		return "P"
 	}
-	return "D"
+	return "P"
 }
 
 type monedaRegla struct {
-	Tipo string `json:"tipo"`
-	Def  string `json:"def"`
+	TipoOp string `json:"tipo_op"`
+	Tipo   string `json:"tipo"`
+	Def    string `json:"def"`
 }
 
 func rolDe(perfil *Perfil) string {
