@@ -667,6 +667,24 @@ WHERE LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))`,
 	return nil
 }
 
+// UpdatePerfilSaldo persiste el saldo base/anterior del socio sin tocar el
+// resto de su configuración (monedas, visibilidad, herencia).
+func (r *Repository) UpdatePerfilSaldo(ctx context.Context, nombre string, saldo float64) error {
+	tag, err := r.pool.Exec(ctx, `
+UPDATE perfiles_glaukov
+SET saldo_inicial = $2
+WHERE LOWER(BTRIM(COALESCE(nombre, ''))) = LOWER(BTRIM($1))`,
+		strings.TrimSpace(nombre), saldo)
+	if err != nil {
+		log.Printf("[ERROR] Fallo DB al actualizar saldo del socio %q: %v", nombre, err)
+		return fmt.Errorf("api: actualizar saldo del socio %q: %w", nombre, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // SavePerfil inserta o actualiza la configuración del socio en la tabla física.
 func (r *Repository) SavePerfil(ctx context.Context, perfil PerfilWrite) error {
 	rol := strings.TrimSpace(perfil.Rol)

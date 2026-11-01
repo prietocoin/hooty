@@ -27,6 +27,7 @@ type Store interface {
 	UpdateComprobante(ctx context.Context, hash string, patch ComprobantePatch) (ComprobanteRow, error)
 	ListPerfiles(ctx context.Context) ([]Perfil, error)
 	UpdatePerfilEstado(ctx context.Context, nombre string, activo bool) error
+	UpdatePerfilSaldo(ctx context.Context, nombre string, saldo float64) error
 	SavePerfil(ctx context.Context, perfil PerfilWrite) error
 	ApagarPerfiles(ctx context.Context) error
 	MemorizarPlantilla(ctx context.Context) error
@@ -144,6 +145,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/tasas/notificar-remesas", h.NotifyRates)
 	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado", h.PatchPerfilEstado)
 	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/estado/{$}", h.PatchPerfilEstado)
+	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/saldo", h.PatchPerfilSaldo)
+	mux.HandleFunc("PATCH /api/v1/perfiles/{nombre}/saldo/{$}", h.PatchPerfilSaldo)
 	mux.HandleFunc("GET /api/v1/tasas/monitor", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/tasas/monitor/{$}", h.LatestTasa)
 	mux.HandleFunc("GET /api/v1/tasas/preview", h.PreviewLote)
@@ -217,6 +220,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodDelete:
 		w.Header().Set("Allow", "GET, PATCH, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
+	case r.Method == http.MethodPatch && strings.HasPrefix(path, "/api/v1/perfiles/") && strings.HasSuffix(path, "/saldo"):
+		h.PatchPerfilSaldo(w, r)
 	case r.Method == http.MethodPatch && strings.HasPrefix(path, "/api/v1/perfiles/"):
 		h.PatchPerfilEstado(w, r)
 	case r.Method == http.MethodPatch:
@@ -566,6 +571,52 @@ func (h *Handler) PatchPerfilEstado(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"nombre":  nombre,
 		"activo":  *body.Activo,
+	})
+}
+
+func (h *Handler) PatchPerfilSaldo(w http.ResponseWriter, r *http.Request) {
+	nombre := strings.TrimSpace(r.PathValue("nombre"))
+	if nombre == "" {
+		resto := strings.TrimPrefix(strings.TrimRight(r.URL.Path, "/"), "/api/v1/perfiles/")
+		resto = strings.TrimSuffix(resto, "/saldo")
+		nombre, _ = url.PathUnescape(strings.TrimSpace(resto))
+	}
+	if nombre == "" || strings.Contains(nombre, "/") {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+
+	var body struct {
+		SaldoInicial  *float64 `json:"saldo_inicial"`
+		SaldoAnterior *float64 `json:"saldo_anterior"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_saldo_payload")
+		return
+	}
+	saldo := body.SaldoInicial
+	if saldo == nil {
+		saldo = body.SaldoAnterior
+	}
+	if saldo == nil || math.IsNaN(*saldo) || math.IsInf(*saldo, 0) {
+		writeError(w, http.StatusBadRequest, "saldo_inicial es obligatorio y debe ser numérico")
+		return
+	}
+
+	if err := h.store.UpdatePerfilSaldo(r.Context(), nombre, *saldo); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			writeError(w, http.StatusNotFound, "socio no encontrado")
+			return
+		}
+		h.log.Error("hooty.api.perfil_saldo", "socio", nombre, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":        true,
+		"nombre":         nombre,
+		"saldo_inicial":  *saldo,
+		"saldo_anterior": *saldo,
 	})
 }
 

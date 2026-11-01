@@ -40,3 +40,33 @@ export async function obtenerDirectorioNormalizado() {
     return [];
   }
 }
+
+/**
+ * Persiste únicamente el saldo base/anterior del socio. Usa el PATCH dedicado
+ * para no sobrescribir monedas, visibilidad ni herencia del perfil.
+ * @param {string} nombreSocio
+ * @param {number|string} saldo
+ * @returns {Promise<object>}
+ */
+export async function actualizarSaldoAnteriorSocio(nombreSocio, saldo) {
+  const nombre = String(nombreSocio || '').trim();
+  if (!nombre) throw new Error('Selecciona un socio para editar su saldo anterior.');
+
+  const valor = Number(saldo);
+  if (!Number.isFinite(valor)) throw new Error('El saldo anterior debe ser un número válido.');
+
+  const response = await fetch(apiUrl(`/api/v1/perfiles/${encodeURIComponent(nombre)}/saldo`), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify({ saldo_inicial: valor })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.success === false) {
+    throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
+  }
+  return data;
+}

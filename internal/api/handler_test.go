@@ -26,6 +26,8 @@ type fakeStore struct {
 	deletedID          string
 	perfilEstadoNombre string
 	perfilEstadoActivo bool
+	perfilSaldoNombre  string
+	perfilSaldo        float64
 	savedPerfil        PerfilWrite
 	notifiedID         string
 	listErr            error
@@ -69,6 +71,12 @@ func (f *fakeStore) ListPerfiles(_ context.Context) ([]Perfil, error) {
 func (f *fakeStore) UpdatePerfilEstado(_ context.Context, nombre string, activo bool) error {
 	f.perfilEstadoNombre = nombre
 	f.perfilEstadoActivo = activo
+	return f.perfilErr
+}
+
+func (f *fakeStore) UpdatePerfilSaldo(_ context.Context, nombre string, saldo float64) error {
+	f.perfilSaldoNombre = nombre
+	f.perfilSaldo = saldo
 	return f.perfilErr
 }
 
@@ -1019,5 +1027,51 @@ func TestErrorInternoNoFiltraSQL(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &payload)
 	if payload["error"] != "internal_error" {
 		t.Fatalf("error expuesto: %s", rec.Body.String())
+	}
+}
+
+func TestPatchPerfilSaldoPersisteValorFirmado(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	newTestHandler(store).Register(mux)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/perfiles/CHASAN/saldo",
+		strings.NewReader(`{"saldo_inicial":-50.25}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if store.perfilSaldoNombre != "CHASAN" || store.perfilSaldo != -50.25 {
+		t.Fatalf("saldo guardado = %q %v", store.perfilSaldoNombre, store.perfilSaldo)
+	}
+	var respuesta map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &respuesta); err != nil {
+		t.Fatal(err)
+	}
+	if respuesta["success"] != true || respuesta["saldo_anterior"] != -50.25 {
+		t.Fatalf("respuesta inesperada: %v", respuesta)
+	}
+}
+
+func TestPatchPerfilSaldoRechazaPayloadInvalido(t *testing.T) {
+	t.Parallel()
+
+	store := testStore()
+	mux := http.NewServeMux()
+	newTestHandler(store).Register(mux)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/perfiles/CHASAN/saldo",
+		strings.NewReader(`{"saldo_inicial":"abc"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
 	}
 }

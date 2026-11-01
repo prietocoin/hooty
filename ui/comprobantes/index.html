@@ -22,7 +22,7 @@
 
   <!-- CLIENTE MODULAR Y ALPINE.JS -->
   <script src="../config.js?v=20261027_01"></script>
-  <script type="module" src="./js/appBootstrap.js?v=20261031_12"></script>
+  <script type="module" src="./js/appBootstrap.js?v=20261101_01"></script>
   <script type="module" src="./js/pwa.js?v=20261027_01"></script>
   <script src="/shared/vendor/hooty/alpine.min.js?v=20261027_01" defer></script>
   <script src="/shared/vendor/html2canvas.min.js?v=20261027_01"></script>
@@ -1581,9 +1581,49 @@
     <!-- BARRA DE MÉTRICAS: mismo componente visual que el dashboard -->
     <div class="glauk-reporte-metricas">
       <div class="bg-[#060c24] p-2.5 rounded-xl border border-amber-500/30 shadow-xl min-w-0">
-        <p class="text-[8px] font-extrabold text-amber-400 uppercase truncate">Saldo anterior</p>
-        <h3 class="text-xs md:text-base font-black text-amber-300 mt-0.5 truncate"
-            x-text="reporteFormatearMonto(reporteSaldoInicialRango) + ' ' + reporteMoneda"></h3>
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-[8px] font-extrabold text-amber-400 uppercase truncate">Saldo anterior</p>
+          <span x-show="reporteSaldoAnteriorGuardando"
+                class="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-amber-300/30 border-t-amber-300"
+                aria-label="Guardando saldo anterior"></span>
+        </div>
+
+        <div x-show="!reporteSaldoAnteriorEditando" class="mt-0.5 min-w-0">
+          <button type="button"
+                  class="group flex max-w-full items-center gap-1 text-left disabled:cursor-not-allowed disabled:opacity-70"
+                  @click="iniciarEdicionSaldoAnterior()"
+                  :disabled="!reportePuedeEditarSaldo || reporteCargando"
+                  :title="reportePuedeEditarSaldo ? 'Editar saldo anterior del socio' : 'Selecciona un socio para editar su saldo anterior'">
+            <span class="truncate text-xs md:text-base font-black text-amber-300"
+                  x-text="reporteFormatearMonto(reporteSaldoInicialRango) + ' ' + reporteMoneda"></span>
+            <svg x-show="reportePuedeEditarSaldo"
+                 class="h-3 w-3 shrink-0 text-amber-500/70 transition-colors group-hover:text-amber-300"
+                 viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+            </svg>
+          </button>
+        </div>
+
+        <form x-show="reporteSaldoAnteriorEditando"
+              x-cloak
+              class="mt-0.5 flex items-center gap-1"
+              @submit.prevent="guardarSaldoAnteriorReporte()">
+          <input x-ref="reporteSaldoAnteriorInput"
+                 x-model="reporteSaldoAnteriorBorrador"
+                 type="text"
+                 inputmode="decimal"
+                 autocomplete="off"
+                 spellcheck="false"
+                 aria-label="Nuevo saldo anterior"
+                 class="w-full min-w-0 rounded-md border border-amber-500/50 bg-[#080e26] px-1.5 py-0.5 text-xs md:text-base font-black text-amber-200 outline-none focus:border-amber-300"
+                 :disabled="reporteSaldoAnteriorGuardando"
+                 @keydown.enter.prevent="guardarSaldoAnteriorReporte()"
+                 @keydown.escape.prevent="cancelarEdicionSaldoAnterior()"
+                 @blur="guardarSaldoAnteriorReporte()">
+          <span class="shrink-0 text-[9px] font-bold text-amber-500/80" x-text="reporteMoneda"></span>
+        </form>
       </div>
       <div class="bg-[#060c24] p-2.5 rounded-xl border border-blue-900/50 shadow-xl min-w-0">
         <p class="text-[8px] font-extrabold text-emerald-400 uppercase truncate">Movimiento parcial</p>

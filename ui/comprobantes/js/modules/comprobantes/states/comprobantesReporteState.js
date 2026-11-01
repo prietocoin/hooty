@@ -10,6 +10,7 @@ import {
   resolverIndiceHash
 } from '../services/comprobantesFilterService.js?v=20261031_02';
 import { obtenerSaldoAnteriorSocio } from '../services/comprobantesSaldosService.js?v=20261031_02';
+import { actualizarSaldoAnteriorSocio } from '../../directorio/services/directorioService.js?v=20261101_01';
 import { normalizarSocio, obtenerPosicionSocio } from '../utils/comprobantesSocioUtils.js?v=20261031_02';
 import {
   resolverMonedaSocio,
@@ -29,6 +30,7 @@ import {
   formatearMontoPlano,
   formatearTasaPlana
 } from '../utils/comprobantesNumerosUtils.js?v=20261031_02';
+import { notify } from '../../../../../shared/js/toast.js?v=20261031_02';
 
 function claveReporte(item = {}) {
   return String(item?.hash_largo || item?.id || '').trim().toLowerCase();
@@ -69,6 +71,9 @@ export function createComprobantesReporteState() {
     reporteOrden: 'fecha_asc',
     reporteItemsBase: [],
     reporteSaldoAnterior: 0,
+    reporteSaldoAnteriorEditando: false,
+    reporteSaldoAnteriorBorrador: '',
+    reporteSaldoAnteriorGuardando: false,
     reporteCargando: false,
     reporteSolicitudActual: 0,
     reportePaginaActual: 1,
@@ -84,6 +89,10 @@ export function createComprobantesReporteState() {
 
     get reporteEsDescendente() {
       return this.reporteOrden === 'fecha_desc';
+    },
+
+    get reportePuedeEditarSaldo() {
+      return Boolean(String(this.reporteSocio || '').trim());
     },
 
     /**
@@ -245,12 +254,100 @@ export function createComprobantesReporteState() {
       // (posiblemente descendente) del listado del Dashboard.
       this.reporteOrden = 'fecha_asc';
       this.reporteSaldoAnterior = socio ? obtenerSaldoAnteriorSocio(this.directorio, socio) : 0;
+      this.reporteSaldoAnteriorEditando = false;
+      this.reporteSaldoAnteriorBorrador = '';
       this.reporteItemsBase = [];
       this.reportePaginaActual = 1;
       this.modalReporteAbierto = true;
       this.actualizarAjusteReporte();
 
       return this.cargarReporteSocio();
+    },
+
+    iniciarEdicionSaldoAnterior() {
+      if (!this.reportePuedeEditarSaldo || this.reporteCargando || this.reporteSaldoAnteriorGuardando) return;
+      this.reporteSaldoAnteriorBorrador = formatearMontoPlano(this.reporteSaldoAnterior);
+      this.reporteSaldoAnteriorEditando = true;
+      this.$nextTick(() => {
+        const input = this.$refs?.reporteSaldoAnteriorInput;
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
+    },
+
+    cancelarEdicionSaldoAnterior() {
+      if (this.reporteSaldoAnteriorGuardando) return;
+      this.reporteSaldoAnteriorEditando = false;
+      this.reporteSaldoAnteriorBorrador = '';
+    },
+
+    /**
+     * Guarda el saldo base del perfil y recalcula el reporte en sitio. El input
+     * admite signo explícito y coma o punto decimal; el perfil conserva el
+     * valor numérico exacto.
+     */
+    async guardarSaldoAnteriorReporte() {
+      if (!this.reporteSaldoAnteriorEditando || this.reporteSaldoAnteriorGuardando) return;
+
+      const socio = String(this.reporteSocio || '').trim();
+      if (!socio) {
+        notify('Selecciona un socio para editar su saldo anterior.', { type: 'warning' });
+        this.cancelarEdicionSaldoAnterior();
+        return;
+      }
+
+      const texto = String(this.reporteSaldoAnteriorBorrador ?? '')
+        .trim()
+        .replace(/\s+/g, '')
+        .replace(',', '.');
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(texto)) {
+        notify('Ingresa un saldo numérico válido, por ejemplo -50.00 o 141.77.', { type: 'warning' });
+        return;
+      }
+
+      const valor = Number(texto);
+      if (!Number.isFinite(valor)) {
+        notify('El saldo anterior no es un número válido.', { type: 'warning' });
+        return;
+      }
+
+      const anterior = Number(this.reporteSaldoAnterior) || 0;
+      if (Math.abs(valor - anterior) < 0.005) {
+        this.reporteSaldoAnteriorEditando = false;
+        this.reporteSaldoAnteriorBorrador = '';
+        return;
+      }
+
+      this.reporteSaldoAnteriorGuardando = true;
+      try {
+        await actualizarSaldoAnteriorSocio(socio, valor);
+
+        this.reporteSaldoAnterior = valor;
+        const indice = (this.directorio || []).findIndex(
+          (item) => normalizarSocio(item?.nombre) === normalizarSocio(socio)
+        );
+        if (indice >= 0) {
+          this.directorio.splice(indice, 1, {
+            ...this.directorio[indice],
+            saldo_inicial: valor,
+            saldo_anterior: valor
+          });
+        }
+        if (normalizarSocio(this.filtroSocio) === normalizarSocio(socio)) {
+          this.saldoAnterior = valor;
+        }
+
+        this.reporteSaldoAnteriorEditando = false;
+        this.reporteSaldoAnteriorBorrador = '';
+        notify(`Saldo anterior de ${socio} actualizado en su perfil.`, { type: 'success' });
+      } catch (err) {
+        notify(`No se pudo guardar el saldo anterior: ${err.message || 'error del servidor'}`, { type: 'error' });
+      } finally {
+        this.reporteSaldoAnteriorGuardando = false;
+        this.actualizarAjusteReporte();
+      }
     },
 
     alternarAjusteReporte() {
