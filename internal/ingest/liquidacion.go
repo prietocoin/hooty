@@ -9,18 +9,19 @@ import (
 	"hooty/internal/domain"
 )
 
-// CalcularLiquidacion congela el snapshot base 2x.
-//
-// Fórmula v2 inicial: cada tasa de lado es la razón entre la tasa del recibo y
-// la tasa de la moneda base del socio; el importe del lado se obtiene dividiendo
-// el monto del recibo por esa tasa, y el equivalente ME se obtiene dividiendo el
-// importe del lado por la tasa de su moneda base. Las tasas del lote se asumen
-// expresadas contra la misma referencia (USDT/USD = 1).
-//
-// La polaridad, el spread y la herencia de perfiles son reglas P1: se
-// incorporarán cuando el contrato financiero quede aprobado. Los CHECK de la
-// base y Comprobante.Validate siguen siendo la última defensa.
+// CalcularLiquidacion conserva la firma histórica y delega en el motor
+// canónico sin herencia explícita. Los llamadores que tengan el perfil FUNDDA
+// deben usar CalcularLiquidacionConFundda.
 func CalcularLiquidacion(input domain.LiquidacionInput, perfil1, perfil2 domain.Perfil,
+	lote domain.LoteTasas, now time.Time) (domain.Comprobante, error) {
+	return CalcularLiquidacionConFundda(input, perfil1, perfil2, domain.Perfil{}, lote, now)
+}
+
+// CalcularLiquidacionConFundda congela el snapshot 2x con las mismas reglas
+// que la simulación: spread por lado, polaridad del perfil, herencia de FUNDDA
+// y signo del tipo de operación. Un lado sin regla queda en cero sin arrastrar
+// al otro.
+func CalcularLiquidacionConFundda(input domain.LiquidacionInput, perfil1, perfil2, fundda domain.Perfil,
 	lote domain.LoteTasas, now time.Time) (domain.Comprobante, error) {
 	if !domain.IsRealGroup(input.Grupo1) || !domain.IsRealGroup(input.Grupo2) {
 		return domain.Comprobante{}, domain.Validationf("el binomio requiere dos grupos reales")
@@ -50,17 +51,12 @@ func CalcularLiquidacion(input domain.LiquidacionInput, perfil1, perfil2 domain.
 	}
 
 	amount := math.Abs(input.Extraccion.Monto)
-	receiptRate, err := rateFor(lote, currency)
+	resultado, err := SimularLiquidacion(SimulacionInput{
+		MonedaRecibo: currency,
+		MontoRecibo:  amount,
+	}, perfil1, perfil2, fundda, lote)
 	if err != nil {
-		return domain.Comprobante{}, err
-	}
-	tasa1, monto1, me1, err := side(perfil1, amount, receiptRate, lote)
-	if err != nil {
-		return domain.Comprobante{}, fmt.Errorf("lado 1: %w", err)
-	}
-	tasa2, monto2, me2, err := side(perfil2, amount, receiptRate, lote)
-	if err != nil {
-		return domain.Comprobante{}, fmt.Errorf("lado 2: %w", err)
+		return domain.Comprobante{}, fmt.Errorf("liquidación: %w", err)
 	}
 
 	fechaOperacion := input.FechaOperacion
@@ -83,13 +79,13 @@ func CalcularLiquidacion(input domain.LiquidacionInput, perfil1, perfil2 domain.
 		Caption2:       input.Caption2,
 		Socio1:         perfil1.Nombre,
 		Socio2:         perfil2.Nombre,
-		TipoOp:         tipoOperacion(perfil1, currency),
-		Tasa1:          tasa1,
-		Tasa2:          tasa2,
-		Monto1:         monto1,
-		Monto2:         monto2,
-		ME1:            me1,
-		ME2:            me2,
+		TipoOp:         tipoOperacion(perfilEfectivo(perfil1, fundda), currency),
+		Tasa1:          resultado.Tasa1,
+		Tasa2:          resultado.Tasa2,
+		Monto1:         resultado.Monto1,
+		Monto2:         resultado.Monto2,
+		ME1:            resultado.ME1,
+		ME2:            resultado.ME2,
 		LoteTasa:       lote.ID,
 		FechaOperacion: fechaOperacion,
 		CreadoEn:       now,

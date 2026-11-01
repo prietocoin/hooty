@@ -31,6 +31,25 @@ func TestTipoOperacion(t *testing.T) {
 	}
 }
 
+func TestComprobanteDTOProyectaContraparteNegativaEnPago(t *testing.T) {
+	t.Parallel()
+
+	row := ComprobanteRow{
+		HashLargo: "pago", HashCorto: "PAGO", Instancia: "hooty",
+		MonedaRecibo: "USD", Socio1: "CHASAN", Socio2: "NELSY",
+		ME1: 8.99, ME2: 8.99, Monto1: 8.99, Monto2: 8.99,
+		TipoOp: "P",
+	}
+	perfil1 := &Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"P"}}`)}
+	dto := NewComprobanteDTO(row, perfil1, nil)
+	if dto.ME1 != 8.99 || dto.ME2 != -8.99 {
+		t.Fatalf("ME firmado inesperado: %v / %v", dto.ME1, dto.ME2)
+	}
+	if dto.Monto1 != 8.99 || dto.Monto2 != -8.99 {
+		t.Fatalf("monto firmado inesperado: %v / %v", dto.Monto1, dto.Monto2)
+	}
+}
+
 func TestComprobanteDTOExponeTipoManual(t *testing.T) {
 	t.Parallel()
 
@@ -95,7 +114,8 @@ func TestComprobanteDTOAliases(t *testing.T) {
 	if dto.Moneda != "USD" || dto.MonedaRecibo != "USD" {
 		t.Fatalf("moneda inesperada: %+v", dto)
 	}
-	if dto.URLR2Comprobante != dto.URLImagen || dto.LinkImg != dto.URLImagen {
+	if dto.URLR2Comprobante != dto.URLImagen || dto.LinkImg != dto.URLImagen ||
+		dto.R2URL != dto.URLImagen || dto.FileURL != dto.URLImagen {
 		t.Fatalf("aliases de imagen inconsistentes: %+v", dto)
 	}
 	if dto.Lote != "T070" || dto.LoteTasaAsignado != "T070" {

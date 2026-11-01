@@ -425,8 +425,8 @@ func TestCalcularLiquidacionCongelaDosLados(t *testing.T) {
 		"COP": 4000,
 	}}
 	comp, err := ingest.CalcularLiquidacion(input,
-		domain.Perfil{Nombre: "CHASAN", MonedaBase: "VES"},
-		domain.Perfil{Nombre: "NELSY", MonedaBase: "COP"},
+		domain.Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"D","polar_D":"+","porcentaje":{"deposito":0,"pago":0}}}`)},
+		domain.Perfil{Nombre: "NELSY", MonedaBase: "COP", Monedas: json.RawMessage(`{"USD":{"tipo":"D","polar_D":"+","porcentaje":{"deposito":0,"pago":0}}}`)},
 		lote, testNow)
 	if err != nil {
 		t.Fatalf("liquidación: %v", err)
@@ -439,6 +439,38 @@ func TestCalcularLiquidacionCongelaDosLados(t *testing.T) {
 	}
 	if comp.LoteTasa != "T052" || comp.Socio1 != "CHASAN" || comp.Socio2 != "NELSY" {
 		t.Fatalf("snapshot incompleto: %+v", comp)
+	}
+}
+
+func TestCalcularLiquidacionPagoRestaLaContraparte(t *testing.T) {
+	t.Parallel()
+
+	input := domain.LiquidacionInput{
+		HashLargo:      "hashp",
+		HashCorto:      "HASHP",
+		Instancia:      "hooty",
+		Extraccion:     domain.Extraccion{Monto: 100, Moneda: "USD", Banco: "B", Titular: "T", Referencia: "R"},
+		URLImagen:      "https://cdn.example/imagen.jpg",
+		Grupo1:         "120363000000000001@g.us",
+		Grupo2:         "120363000000000002@g.us",
+		FechaOperacion: testNow.Add(-time.Minute),
+	}
+	lote := domain.LoteTasas{ID: "T052", Tasas: map[string]float64{"USD": 1, "VES": 40, "COP": 4000}}
+	comp, err := ingest.CalcularLiquidacion(input,
+		domain.Perfil{Nombre: "CHASAN", MonedaBase: "VES", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+","porcentaje":{"deposito":0,"pago":0}}}`)},
+		domain.Perfil{Nombre: "NELSY", MonedaBase: "COP", Monedas: json.RawMessage(`{"USD":{"tipo":"P","polar_P":"+","porcentaje":{"deposito":0,"pago":0}}}`)},
+		lote, testNow)
+	if err != nil {
+		t.Fatalf("liquidación P: %v", err)
+	}
+	if comp.TipoOp != "P" {
+		t.Fatalf("tipo_op = %q", comp.TipoOp)
+	}
+	if comp.ME1 != 100 || comp.Monto1 != 4000 {
+		t.Fatalf("socio 1 debe ingresar: monto=%v me=%v", comp.Monto1, comp.ME1)
+	}
+	if comp.ME2 != -100 || comp.Monto2 != -400000 {
+		t.Fatalf("socio 2 debe restar como contraparte: monto=%v me=%v", comp.Monto2, comp.ME2)
 	}
 }
 

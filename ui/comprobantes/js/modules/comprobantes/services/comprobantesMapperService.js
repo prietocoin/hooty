@@ -201,7 +201,9 @@ export function prepararEdicionComprobante(item = {}, loteActivo = 'T070') {
   // 7. IMAGEN
   const rawImg = c.url_imagen || item.url_imagen ||
     c.url_r2_comprobante || item.url_r2_comprobante ||
-    c.link_img || item.link_img || '';
+    c.link_img || item.link_img ||
+    c.r2_url || item.r2_url ||
+    c.file_url || item.file_url || '';
 
   // 8. BADGE 2x: solo cuando existe una contraparte real.
   const esX2 = tieneSocio2(socio2Real);
@@ -230,6 +232,9 @@ export function prepararEdicionComprobante(item = {}, loteActivo = 'T070') {
 
     link_img: rawImg,
     url_r2_comprobante: rawImg,
+    url_imagen: rawImg,
+    r2_url: rawImg,
+    file_url: rawImg,
 
     nombre_socio_1: socio1Real,
     socio_1: socio1Real,

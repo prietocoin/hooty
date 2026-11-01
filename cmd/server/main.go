@@ -67,6 +67,9 @@ func run() error {
 	if err == nil {
 		err = postgres.EnsureTipoOpColumn(migrateCtx, pool)
 	}
+	if err == nil {
+		err = postgres.EnsureImageURLFallback(migrateCtx, pool)
+	}
 	cancelMigrate()
 	if err != nil {
 		return err

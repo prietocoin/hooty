@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -151,6 +152,8 @@ type ComprobanteDTO struct {
 	URLImagen        string `json:"url_imagen"`
 	LinkImg          string `json:"link_img"`
 	URLR2Comprobante string `json:"url_r2_comprobante"`
+	R2URL            string `json:"r2_url,omitempty"`
+	FileURL          string `json:"file_url,omitempty"`
 
 	Grupo1   string `json:"grupo_1"`
 	Grupo2   string `json:"grupo_2"`
@@ -235,6 +238,15 @@ func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil) Comprobante
 	rol2 := rolDe(perfil2)
 	tipo1 := tipoOperacion(moneda, perfil1)
 	tipo2 := tipoOperacion(moneda, perfil2)
+	tipoEfectivo := tipo1
+	if row.TipoOpManual {
+		tipoEfectivo = domain.NormalizeTipoOp(row.TipoOp)
+	}
+	signo1, signo2 := signosProyeccion(tipoEfectivo, moneda, perfil1, perfil2)
+	monto1 := math.Abs(row.Monto1) * float64(signo1)
+	monto2 := math.Abs(row.Monto2) * float64(signo2)
+	me1 := math.Abs(row.ME1) * float64(signo1)
+	me2 := math.Abs(row.ME2) * float64(signo2)
 	lote := strings.TrimSpace(row.LoteTasa)
 	fecha := fechaLocal(row.FechaOperacion)
 
@@ -258,6 +270,8 @@ func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil) Comprobante
 		URLImagen:        row.URLImagen,
 		LinkImg:          row.URLImagen,
 		URLR2Comprobante: row.URLImagen,
+		R2URL:            row.URLImagen,
+		FileURL:          row.URLImagen,
 
 		Grupo1:   row.Grupo1,
 		Grupo2:   row.Grupo2,
@@ -286,16 +300,16 @@ func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil) Comprobante
 
 		Tasa1:      row.Tasa1,
 		Tasa2:      row.Tasa2,
-		Monto1:     row.Monto1,
-		Monto2:     row.Monto2,
-		ME1:        row.ME1,
-		ME2:        row.ME2,
-		M1Socio:    row.ME1,
-		M2Socio:    row.ME2,
-		ME1Firmado: row.ME1,
-		ME2Firmado: row.ME2,
-		Polaridad1: polaridad(row.ME1),
-		Polaridad2: polaridad(row.ME2),
+		Monto1:     monto1,
+		Monto2:     monto2,
+		ME1:        me1,
+		ME2:        me2,
+		M1Socio:    me1,
+		M2Socio:    me2,
+		ME1Firmado: me1,
+		ME2Firmado: me2,
+		Polaridad1: polaridad(me1),
+		Polaridad2: polaridad(me2),
 
 		LoteTasa:         lote,
 		LoteTasaAsignado: lote,
@@ -423,9 +437,52 @@ func tipoOperacion(moneda string, perfil *Perfil) string {
 }
 
 type monedaRegla struct {
-	TipoOp string `json:"tipo_op"`
-	Tipo   string `json:"tipo"`
-	Def    string `json:"def"`
+	TipoOp    string `json:"tipo_op"`
+	Tipo      string `json:"tipo"`
+	Def       string `json:"def"`
+	PolarD    string `json:"polar_D"`
+	PolarP    string `json:"polar_P"`
+	Polaridad string `json:"polaridad"`
+}
+
+// signosProyeccion aplica el mismo sentido contable que la ingesta al leer
+// filas históricas que pudieron congelarse siempre positivas.
+func signosProyeccion(tipo, moneda string, perfil1, perfil2 *Perfil) (int, int) {
+	switch domain.NormalizeTipoOp(tipo) {
+	case "P":
+		return 1, -1
+	case "A":
+		if perfil1 != nil && strings.EqualFold(strings.TrimSpace(perfil1.Nombre), "FUNDDA") {
+			return -1, 1
+		}
+		return 1, -1
+	default:
+		return signoDeposito(perfil1, moneda), signoDeposito(perfil2, moneda)
+	}
+}
+
+func signoDeposito(perfil *Perfil, moneda string) int {
+	if perfil == nil || len(perfil.Monedas) == 0 {
+		return 1
+	}
+	var reglas map[string]monedaRegla
+	if err := json.Unmarshal(perfil.Monedas, &reglas); err != nil {
+		return 1
+	}
+	for codigo, regla := range reglas {
+		if domain.NormalizeCurrency(codigo, "") != domain.NormalizeCurrency(moneda, "") {
+			continue
+		}
+		for _, valor := range []string{regla.PolarD, regla.Polaridad} {
+			switch strings.TrimSpace(valor) {
+			case "-":
+				return -1
+			case "+":
+				return 1
+			}
+		}
+	}
+	return 1
 }
 
 func rolDe(perfil *Perfil) string {

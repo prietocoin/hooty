@@ -60,7 +60,11 @@ func (l *Liquidator) Liquidar(ctx context.Context, input domain.LiquidacionInput
 	if err != nil {
 		return domain.Comprobante{}, err
 	}
-	return ingest.CalcularLiquidacion(input, perfil1, perfil2, lote, l.now.Now())
+	fundda, err := l.fundda(ctx)
+	if err != nil {
+		return domain.Comprobante{}, err
+	}
+	return ingest.CalcularLiquidacionConFundda(input, perfil1, perfil2, fundda, lote, l.now.Now())
 }
 
 // Simular ejecuta la liquidación canónica sin persistir el comprobante.

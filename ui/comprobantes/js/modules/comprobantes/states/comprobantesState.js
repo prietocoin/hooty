@@ -22,9 +22,9 @@ import {
   eliminarComprobantePorHash,
   fetchComprobantePorHash
 } from '../services/comprobantesApiService.js?v=20261031_05';
-import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261031_04';
+import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261031_05';
 import { aplicarRangoHash } from '../services/comprobantesFilterService.js?v=20261031_02';
-import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261031_04';
+import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261031_05';
 import { capturarReporteEstadoCuenta } from '../services/comprobantesReporteService.js?v=20261027_01';
 import { obtenerSaldoAnteriorSocio, obtenerSujetoAuditado } from '../services/comprobantesSaldosService.js?v=20261031_02';
 import { formatearFechaLatina } from '../utils/comprobantesFechaUtils.js?v=20261031_02';
@@ -423,7 +423,13 @@ export function comprobantesState() {
 
     urlRecibo(item) {
       if (!item) return '';
-      return item.link_img || item.url_r2_comprobante || item.url_imagen || '';
+      const raw = item.link_img || item.url_r2_comprobante || item.url_imagen ||
+        item.r2_url || item.file_url || '';
+      const url = String(raw || '').trim();
+      if (!url) return '';
+      if (/^(https?:|data:|blob:)/i.test(url) || url.startsWith('//')) return url;
+      if (url.startsWith('/')) return url;
+      return '/' + url.replace(/^\.?\//, '');
     },
 
     abrirDetalle(item) {

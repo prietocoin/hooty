@@ -133,6 +133,45 @@ END $$`); err != nil {
 	return nil
 }
 
+// EnsureImageURLFallback rellena url_imagen desde columnas históricas
+// opcionales (r2_url/file_url) cuando estén presentes. No crea columnas nuevas
+// ni falla si el esquema solo tiene url_imagen.
+func EnsureImageURLFallback(ctx context.Context, pool *pgxpool.Pool) error {
+	if pool == nil {
+		return errors.New("postgres: pool es obligatorio para migrar url_imagen")
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: abrir migración url_imagen: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `
+DO $$
+DECLARE columna text;
+BEGIN
+    FOR columna IN SELECT unnest(ARRAY['r2_url', 'file_url']::text[]) LOOP
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'comprobantes'
+              AND column_name = columna
+        ) THEN
+            EXECUTE format(
+                'UPDATE comprobantes SET url_imagen = %I WHERE COALESCE(BTRIM(url_imagen), '''') = '''' AND NULLIF(BTRIM(%I), '''') IS NOT NULL',
+                columna, columna
+            );
+        END IF;
+    END LOOP;
+END $$`); err != nil {
+		return fmt.Errorf("postgres: rellenar url_imagen: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("postgres: confirmar migración url_imagen: %w", err)
+	}
+	return nil
+}
+
 // rateCheckAllowsZero reconoce una definición que ya admite el estado 0.
 func rateCheckAllowsZero(definition string) bool {
 	lower := strings.ToLower(definition)

@@ -244,6 +244,12 @@ func factorSpread(regla monedaRegla, tipoOp string) float64 {
 // signosLado resuelve el signo de cada socio con su propia polaridad. Solo la
 // regla de herencia o el abono (tipo A) pueden invertir un lado.
 func signosLado(perfil1, perfil2, efectivo1, efectivo2 domain.Perfil, currency, tipoOp string) (int, int) {
+	if tipoOp == "P" {
+		// En un pago, el Socio 1 recibe el ingreso y el Socio 2 es la
+		// contraparte que egresa. No se permite que ambos queden positivos
+		// aunque sus perfiles tengan la misma polaridad configurada.
+		return 1, -1
+	}
 	if tipoOp == "A" {
 		if strings.EqualFold(strings.TrimSpace(perfil1.Nombre), "FUNDDA") {
 			return -1, 1
@@ -326,5 +332,7 @@ func loteRate(lote domain.LoteTasas, currency string) (float64, bool) {
 
 // truncarTasaSnapshot aplica la regla financiera: dos decimales truncados.
 func truncarTasaSnapshot(value float64) float64 {
-	return domain.Truncar2(value)
+	// La tasa comercial se conserva con precisión suficiente para no convertir
+	// 0.025 (USD/VES) en 0.02. La presentación aplica su propia regla.
+	return domain.RoundRate(value)
 }
