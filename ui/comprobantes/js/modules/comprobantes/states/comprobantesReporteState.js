@@ -4,7 +4,7 @@
  * el filtro ni el listado principal del Dashboard.
  */
 
-import { cargarComprobantesFiltrados } from '../services/comprobantesCargaService.js?v=20261101_02';
+import { cargarComprobantesFiltrados } from '../services/comprobantesCargaService.js?v=20261101_03';
 import {
   aplicarRangoHash,
   resolverIndiceHash
@@ -23,7 +23,7 @@ import {
   formatearFechaLatina,
   obtenerRangoMesActualCaracas,
   sumarDiasISO
-} from '../utils/comprobantesFechaUtils.js?v=20261031_02';
+} from '../utils/comprobantesFechaUtils.js?v=20261101_03';
 import {
   aNumero as numero,
   formatearMontoPlano,

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -88,6 +89,39 @@ func TestComprobanteDTOExponeTipoManual(t *testing.T) {
 	dto = NewComprobanteDTO(row, perfil1, nil)
 	if dto.TipoOpManual || dto.IsManual || dto.TipoManual != "" {
 		t.Fatalf("fila automática no debe exponerse como manual: %+v", dto)
+	}
+}
+
+func TestComprobanteDTOPreservaTipoOpPersistido(t *testing.T) {
+	t.Parallel()
+
+	row := ComprobanteRow{
+		HashLargo: "c89b", HashCorto: "C89B", Instancia: "hooty",
+		MontoRecibo: 185000, MonedaRecibo: "ARS",
+		Socio1: "SOLANO", Socio2: "NELSY",
+		Tasa1: 1674.4, Tasa2: 1642.2, Monto1: 110.48, Monto2: -112.65,
+		ME1: 110.48, ME2: -112.65, TipoOp: "D",
+		URLImagen: "https://cdn.example/c89b.jpg", LoteTasa: "T095",
+		FechaOperacion: time.Date(2026, 10, 30, 20, 1, 42, 0, time.UTC),
+		CreadoEn:       time.Date(2026, 10, 30, 20, 2, 9, 0, time.UTC),
+		ActualizadoEn:  time.Date(2026, 11, 1, 10, 37, 33, 0, time.UTC),
+	}
+	perfil1 := &Perfil{Nombre: "SOLANO", MonedaBase: "USDT", Monedas: json.RawMessage(`{"ARS":{"tipo":"D"}}`)}
+	perfil2 := &Perfil{Nombre: "NELSY", MonedaBase: "USDT", Monedas: json.RawMessage(`{"ARS":{"tipo":"P"}}`)}
+
+	dto := NewComprobanteDTO(row, perfil1, perfil2)
+	if dto.TipoOp != "D" {
+		t.Fatalf("tipo_op persistido = %q, se esperaba D", dto.TipoOp)
+	}
+	if dto.TipoOp2 != "P" {
+		t.Fatalf("proyección del socio 2 = %q, se esperaba P", dto.TipoOp2)
+	}
+	raw, err := json.Marshal(dto)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"tipo_op":"D"`) {
+		t.Fatalf("el JSON no expone tipo_op persistido: %s", raw)
 	}
 }
 

@@ -62,10 +62,10 @@ export function fechaCaracasISO(item = {}) {
   const texto = String(raw).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
 
-  // Fila ya mapeada: la hora está expresada directamente en Caracas.
-  const mapeada = Boolean(item?.fecha_hora_input || item?.fecha_fmt || item?.dia_hora_humano);
+  // El backend serializa la hora de Caracas sin zona tanto en filas crudas
+  // como mapeadas; no se debe reinterpretar con la zona del navegador.
   const sinZona = texto.match(/^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(?::\d{2})?$/);
-  if (mapeada && sinZona) return sinZona[1];
+  if (sinZona) return sinZona[1];
 
   let fecha;
   if (/^\d+$/.test(texto)) {

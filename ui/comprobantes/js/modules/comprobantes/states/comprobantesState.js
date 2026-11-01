@@ -23,12 +23,12 @@ import {
   fetchComprobantePorHash,
   reprocesarComprobantePorHash
 } from '../services/comprobantesApiService.js?v=20261031_06';
-import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261101_02';
+import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261101_03';
 import { aplicarRangoHash } from '../services/comprobantesFilterService.js?v=20261031_02';
 import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261101_02';
 import { capturarReporteEstadoCuenta } from '../services/comprobantesReporteService.js?v=20261027_01';
 import { obtenerSaldoAnteriorSocio, obtenerSujetoAuditado } from '../services/comprobantesSaldosService.js?v=20261031_02';
-import { formatearFechaLatina } from '../utils/comprobantesFechaUtils.js?v=20261031_02';
+import { formatearFechaLatina } from '../utils/comprobantesFechaUtils.js?v=20261101_03';
 
 const FILTROS_STORAGE_KEY = 'comprobantes_filtros_activos';
 const FILTROS_VACIOS = Object.freeze({

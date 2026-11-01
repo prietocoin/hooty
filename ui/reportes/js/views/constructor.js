@@ -81,7 +81,7 @@ export function crearConstructor(ctx) {
           body.append(el('tr', {},
             el('td', {}, formatDate(row.fecha_operacion ?? row.fecha_hora_comprobante)),
             el('td', {}, row.socio_1 ?? row.nombre_socio_1 ?? '—'),
-            el('td', {}, row.tipo_op1 ?? '—'),
+            el('td', {}, row.tipo_op ?? row.tipo ?? '—'),
             el('td', {}, formatMoney(row.monto_recibo ?? row.monto,
               row.moneda_recibo ?? row.moneda)),
             el('td', {}, formatMoney(row.me1, 'USDT'))
@@ -125,7 +125,7 @@ export function crearConstructor(ctx) {
       tbody.append(el('tr', {},
         el('td', {}, formatDate(row.fecha_operacion ?? row.fecha_hora_comprobante)),
         el('td', {}, row.socio_1 ?? row.nombre_socio_1 ?? '—'),
-        el('td', {}, row.tipo_op1 ?? '—'),
+        el('td', {}, row.tipo_op ?? row.tipo ?? '—'),
         el('td', {}, formatMoney(row.monto_recibo ?? row.monto,
           row.moneda_recibo ?? row.moneda)),
         el('td', {}, formatMoney(row.me1, 'USDT'))

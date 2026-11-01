@@ -44,14 +44,14 @@ export async function cargarPaginaComprobantes(params = {}, opciones = {}) {
  */
 export async function cargarComprobantesFiltrados(params = {}, opciones = {}) {
   const maximo = Math.max(1, Number(opciones.maximo) || 500);
-  const loteActivo = opciones.loteActivo || 'T070';
   const orden = params.orden || 'fecha_desc';
   const { desdeHash = '', hastaHash = '' } = params;
 
   const raw = await fetchComprobantesHasta(params, maximo);
+  // El reporte es una copia fiel del payload de /api/v1/comprobantes: no pasa
+  // por el mapper de cards para no alterar tipo_op, tasas ni importes.
   const lista = Array.isArray(raw) ? raw : [];
-  const mapeados = lista.map(item => prepararEdicionComprobante(item, loteActivo));
-  const ordenados = ordenarComprobantes(mapeados, orden);
+  const ordenados = ordenarComprobantes(lista, orden);
   const acotados = aplicarRangoHash(ordenados, desdeHash, hastaHash);
   return acotados.slice(0, maximo);
 }
