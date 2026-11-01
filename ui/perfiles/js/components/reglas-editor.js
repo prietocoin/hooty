@@ -122,7 +122,7 @@ function renderColumnaOperacion({ regla, index, campo, tipo, base, etiqueta }) {
                   data-indice="${index}"
                   data-moneda="${escapeHTML(regla.codigo)}"
                   data-signo="${positivo ? '+' : '-'}"
-                  class="regla-polar ${esDeposito ? 'btn-pol-d btn-polaridad-d' : 'btn-pol-p btn-polaridad-p'} ${positivo ? 'is-pos' : 'is-neg'}"
+                  class="${esDeposito ? 'btn-pol-d regla-polar btn-polaridad-d' : 'btn-pol-p regla-polar btn-polaridad-p'} ${positivo ? 'is-pos' : 'is-neg'}"
                   style="width:20px;height:20px;min-width:20px;min-height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:4px;font-weight:bold;font-size:12px;line-height:1;cursor:pointer;position:relative;z-index:1;border:1px solid ${positivo ? 'rgba(16,185,129,.55)' : 'rgba(244,63,94,.55)'};background:${positivo ? 'rgba(16,185,129,.12)' : 'rgba(244,63,94,.12)'};color:${positivo ? '#34d399' : '#fb7185'};"
                   title="${tituloPolar}"
                   aria-label="${tituloPolar}">${positivo ? '+' : '−'}</button>
