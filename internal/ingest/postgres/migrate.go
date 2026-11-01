@@ -172,6 +172,23 @@ END $$`); err != nil {
 	return nil
 }
 
+// EnsureMaintenanceState crea el marcador que permite ejecutar una sola vez
+// la regularización histórica de comprobantes.
+func EnsureMaintenanceState(ctx context.Context, pool *pgxpool.Pool) error {
+	if pool == nil {
+		return errors.New("postgres: pool es obligatorio para maintenance state")
+	}
+	if _, err := pool.Exec(ctx, `
+CREATE TABLE IF NOT EXISTS hooty_maintenance_state (
+    key text PRIMARY KEY,
+    value text NOT NULL DEFAULT '',
+    updated_at timestamp without time zone NOT NULL DEFAULT NOW()
+)`); err != nil {
+		return fmt.Errorf("postgres: crear maintenance state: %w", err)
+	}
+	return nil
+}
+
 // rateCheckAllowsZero reconoce una definición que ya admite el estado 0.
 func rateCheckAllowsZero(definition string) bool {
 	lower := strings.ToLower(definition)

@@ -233,6 +233,79 @@ ORDER BY actualizado_en ASC`)
 	return count, errors.Join(failures...)
 }
 
+// ReprocessHistoricalOnce ejecuta la regularización completa una sola vez,
+// usando el marcador persistido de mantenimiento.
+func (l *Liquidator) ReprocessHistoricalOnce(ctx context.Context) (int, error) {
+	var done bool
+	err := l.pool.QueryRow(ctx, `
+SELECT EXISTS (SELECT 1 FROM hooty_maintenance_state WHERE key = 'historical_reprocess_v1')`).Scan(&done)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: leer estado de reprocesamiento: %w", err)
+	}
+	if done {
+		return 0, nil
+	}
+
+	count, err := l.ReprocessAll(ctx)
+	if err != nil {
+		return count, err
+	}
+	if _, err := l.pool.Exec(ctx, `
+INSERT INTO hooty_maintenance_state (key, value, updated_at)
+VALUES ('historical_reprocess_v1', 'done', NOW())
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`); err != nil {
+		return count, fmt.Errorf("postgres: marcar reprocesamiento histórico: %w", err)
+	}
+	return count, nil
+}
+
+// ReprocessStale repara al arrancar las filas no editadas que quedaron sin
+// imagen, sin tasas o sin liquidar. Es idempotente: cuando la fila ya está
+// completa deja de aparecer en la consulta.
+func (l *Liquidator) ReprocessStale(ctx context.Context) (int, error) {
+	rows, err := l.pool.Query(ctx, `
+SELECT hash_largo FROM comprobantes
+WHERE COALESCE(tipo_op_manual, FALSE) = FALSE
+  AND (
+       COALESCE(BTRIM(url_imagen), '') = ''
+    OR COALESCE(tasa_1, 0) <= 0
+    OR COALESCE(tasa_2, 0) <= 0
+    OR COALESCE(monto_1, 0) = 0
+    OR COALESCE(monto_2, 0) = 0
+    OR COALESCE(me1, 0) = 0
+    OR COALESCE(me2, 0) = 0
+  )
+ORDER BY actualizado_en ASC`)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: listar comprobantes incompletos: %w", err)
+	}
+	var hashes []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("postgres: leer hash incompleto: %w", err)
+		}
+		hashes = append(hashes, hash)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, fmt.Errorf("postgres: recorrer comprobantes incompletos: %w", err)
+	}
+	rows.Close()
+
+	count := 0
+	var failures []error
+	for _, hash := range hashes {
+		if _, err := l.Reprocess(ctx, hash); err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", hash, err))
+			continue
+		}
+		count++
+	}
+	return count, errors.Join(failures...)
+}
+
 // Simular ejecuta la liquidación canónica sin persistir el comprobante.
 func (l *Liquidator) Simular(ctx context.Context, input ingest.SimulacionInput) (ingest.SimulacionResult, error) {
 	perfil1, err := l.perfil(ctx, input.Socio1)

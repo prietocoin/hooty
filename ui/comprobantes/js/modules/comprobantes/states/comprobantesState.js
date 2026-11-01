@@ -701,7 +701,6 @@ export function comprobantesState() {
     async reprocesarComprobante(item) {
       const hash = String(item?.hash_largo || item?.id || '').trim();
       if (!hash) return;
-      if (!confirm('¿Reprocesar cálculo e imagen de este comprobante con los perfiles vigentes?')) return;
       try {
         await reprocesarComprobantePorHash(hash);
         window.dispatchEvent(new CustomEvent('comprobante-actualizado', { detail: { hash_largo: hash } }));

@@ -70,6 +70,9 @@ func run() error {
 	if err == nil {
 		err = postgres.EnsureImageURLFallback(migrateCtx, pool)
 	}
+	if err == nil {
+		err = postgres.EnsureMaintenanceState(migrateCtx, pool)
+	}
 	cancelMigrate()
 	if err != nil {
 		return err
@@ -202,6 +205,21 @@ func run() error {
 		}()
 	}
 	startServer()
+
+	// Regularización de arranque: no bloquea el HTTP. Solo toca filas no
+	// editadas manualmente que quedaron sin URL o sin liquidar.
+	go func() {
+		reprocessCtx, cancelReprocess := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancelReprocess()
+		count, err := liquidator.ReprocessHistoricalOnce(reprocessCtx)
+		if err != nil {
+			logger.Warn("hooty.reprocess.startup_error", "reprocesados", count, "error", err)
+			return
+		}
+		if count > 0 {
+			logger.Info("hooty.reprocess.startup", "reprocesados", count)
+		}
+	}()
 
 	// El proceso permanece vivo mientras el servidor escuche. Solo una señal
 	// real de parada (SIGINT/SIGTERM) o un fallo del listener terminan el run.
