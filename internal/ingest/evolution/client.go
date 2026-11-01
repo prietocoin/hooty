@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +29,7 @@ type Config struct {
 	APIKey   string
 	Instance string
 	Timeout  time.Duration
+	Logger   *slog.Logger
 }
 
 // Client implementa ingest.MediaFetcher.
@@ -36,6 +38,7 @@ type Client struct {
 	apiKey   string
 	instance string
 	http     *http.Client
+	log      *slog.Logger
 }
 
 // New valida la configuración y construye el cliente.
@@ -54,11 +57,15 @@ func New(cfg Config) (*Client, error) {
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 30 * time.Second
 	}
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
 	return &Client{
 		baseURL:  baseURL,
 		apiKey:   strings.TrimSpace(cfg.APIKey),
 		instance: strings.TrimSpace(cfg.Instance),
 		http:     &http.Client{Timeout: cfg.Timeout},
+		log:      cfg.Logger,
 	}, nil
 }
 
@@ -95,10 +102,13 @@ func (c *Client) Descargar(ctx context.Context, instance string, key, message js
 	}
 	var lastErr error
 	for _, path := range paths {
+		c.log.Debug("hooty.evolution.media_request", "path", path, "instance", target)
 		data, mime, retry, err := c.once(ctx, path, payload)
 		if err == nil {
+			c.log.Info("hooty.evolution.media_ok", "path", path, "mime", mime, "bytes", len(data))
 			return data, mime, nil
 		}
+		c.log.Warn("hooty.evolution.media_error", "path", path, "retry", retry, "error", err)
 		lastErr = err
 		if !retry {
 			return nil, "", err
@@ -123,21 +133,28 @@ func (c *Client) once(ctx context.Context, path string, body []byte) ([]byte, st
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
+			c.log.Error("hooty.evolution.media_transport_error", "path", path, "error", ctxErr)
 			return nil, "", false, ctxErr
 		}
+		c.log.Error("hooty.evolution.media_transport_error", "path", path, "error", err)
 		return nil, "", true, fmt.Errorf("evolution: descargar media: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, readErr := io.ReadAll(io.LimitReader(resp.Body, maxMediaResponseBytes))
 	if readErr != nil {
+		c.log.Error("hooty.evolution.media_read_error", "path", path, "error", readErr)
 		return nil, "", true, fmt.Errorf("evolution: leer media: %w", readErr)
 	}
 	if resp.StatusCode == http.StatusNotFound {
+		c.log.Warn("hooty.evolution.media_not_found", "path", path, "instance", c.instance)
 		return nil, "", true, ErrMediaUnavailable
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		retry := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
+		c.log.Error("hooty.evolution.media_status",
+			"path", path, "status", resp.StatusCode, "retry", retry,
+			"body", truncate(string(raw), 300))
 		return nil, "", retry, fmt.Errorf("evolution: estado %d: %s", resp.StatusCode, truncate(string(raw), 300))
 	}
 

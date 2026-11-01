@@ -120,24 +120,36 @@ func (s *Service) Recibir(ctx context.Context, event Evento) (domain.Decision, e
 	}
 
 	switch registro.Status {
+	case domain.StatusDuplicate:
+		s.log.Info("hooty.ingest.duplicate",
+			"hash", impacto.HashLargo,
+			"grupo", impacto.IDGrupo,
+		)
+		if err := s.repairImageFromEvent(ctx, event); err != nil {
+			s.log.Warn("hooty.ingest.image_repair_error", "hash", impacto.HashLargo, "error", err)
+		}
+		return decision, nil
 	case domain.StatusWaitingPair:
 		s.log.Info("hooty.ingest.waiting_pair",
 			"hash", impacto.HashLargo,
 			"grupo", impacto.IDGrupo,
 			"conteo", decision.Conteo,
 		)
-		return decision, nil
-	case domain.StatusDuplicate:
-		s.log.Info("hooty.ingest.duplicate",
-			"hash", impacto.HashLargo,
-			"grupo", impacto.IDGrupo,
-		)
+		if err := s.repairImageFromEvent(ctx, event); err != nil {
+			s.log.Warn("hooty.ingest.image_repair_error", "hash", impacto.HashLargo, "error", err)
+		}
 		return decision, nil
 	case domain.StatusPairReady:
 		if len(registro.Pair) != 2 {
 			return decision, fmt.Errorf("ingest: par_ready con %d impactos", len(registro.Pair))
 		}
 		if err := s.process(ctx, registro.Pair, event); err != nil {
+			s.log.Error("hooty.ingest.process_failed",
+				"hash", impacto.HashLargo,
+				"grupo_1", registro.Pair[0].IDGrupo,
+				"grupo_2", registro.Pair[1].IDGrupo,
+				"error", err,
+			)
 			// La reserva se libera para que un reintento del webhook (o un
 			// duplicado del segundo impacto) pueda volver a procesar el par.
 			s.releasePair(ctx, registro.Pair)
@@ -149,6 +161,52 @@ func (s *Service) Recibir(ctx context.Context, event Evento) (domain.Decision, e
 	default:
 		return decision, fmt.Errorf("ingest: estado desconocido %q", registro.Status)
 	}
+}
+
+// repairImageStore permite que un reenvío xN complete la imagen de un
+// comprobante ya existente sin volver a liquidar sus importes.
+type repairImageStore interface {
+	NeedsImage(ctx context.Context, hash string) (bool, error)
+	UpdateImageURL(ctx context.Context, hash, imageURL string) error
+}
+
+func (s *Service) repairImageFromEvent(ctx context.Context, event Evento) error {
+	store, ok := s.store.(repairImageStore)
+	if !ok {
+		return nil
+	}
+	needs, err := store.NeedsImage(ctx, event.HashLargo)
+	if err != nil || !needs {
+		return err
+	}
+	if len(event.Key) == 0 || len(event.Message) == 0 {
+		return errors.New("ingest: reenvío sin key/message para resolver imagen")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, s.timeout)
+	defer cancel()
+	s.log.Info("hooty.ingest.image_repair_start",
+		"hash", event.HashLargo, "grupo", event.IDGrupo, "instancia", event.Instancia)
+	image, mimeType, err := s.media.Descargar(ctx, event.Instancia, event.Key, event.Message)
+	if err != nil {
+		s.log.Error("hooty.ingest.media_repair_error", "hash", event.HashLargo, "error", err)
+		return fmt.Errorf("ingest: descargar reenvío xN: %w", err)
+	}
+	if len(image) == 0 {
+		return fmt.Errorf("ingest: reenvío xN sin bytes: %w", ErrMediaUnavailable)
+	}
+	mimeType = firstNonEmpty(mimeType, event.MimeType, "image/jpeg")
+	objectKey := "comprobantes/" + event.HashLargo + extensionFor(mimeType)
+	url, err := s.images.Subir(ctx, objectKey, image, mimeType)
+	if err != nil {
+		s.log.Error("hooty.ingest.r2_repair_error", "hash", event.HashLargo, "key", objectKey, "error", err)
+		return fmt.Errorf("ingest: subir reenvío xN a R2: %w", err)
+	}
+	if err := store.UpdateImageURL(ctx, event.HashLargo, url); err != nil {
+		return err
+	}
+	s.log.Info("hooty.ingest.image_repair_done", "hash", event.HashLargo, "url", url)
+	return nil
 }
 
 func (s *Service) releasePair(ctx context.Context, pair []domain.Impacto) {
@@ -185,10 +243,26 @@ func (s *Service) process(ctx context.Context, pair []domain.Impacto, event Even
 	defer cancel()
 
 	started := time.Now()
+	s.log.Info("hooty.ingest.media_download_start",
+		"hash", event.HashLargo,
+		"grupo", event.IDGrupo,
+		"instancia", event.Instancia,
+	)
 	image, mimeType, err := s.media.Descargar(ctx, event.Instancia, event.Key, event.Message)
 	if err != nil {
+		s.log.Error("hooty.ingest.media_download_error",
+			"hash", event.HashLargo,
+			"grupo", event.IDGrupo,
+			"instancia", event.Instancia,
+			"error", err,
+		)
 		return fmt.Errorf("ingest: descargar imagen del segundo impacto: %w", err)
 	}
+	s.log.Info("hooty.ingest.media_download_ok",
+		"hash", event.HashLargo,
+		"bytes", len(image),
+		"mime", mimeType,
+	)
 	if len(image) == 0 {
 		return fmt.Errorf("ingest: la imagen del segundo impacto llegó vacía: %w", ErrMediaUnavailable)
 	}
@@ -198,10 +272,26 @@ func (s *Service) process(ctx context.Context, pair []domain.Impacto, event Even
 	mimeType = firstNonEmpty(mimeType, event.MimeType, "image/jpeg")
 
 	objectKey := "comprobantes/" + event.HashLargo + extensionFor(mimeType)
+	s.log.Info("hooty.ingest.r2_upload_start",
+		"hash", event.HashLargo,
+		"key", objectKey,
+		"bytes", len(image),
+		"mime", mimeType,
+	)
 	url, err := s.images.Subir(ctx, objectKey, image, mimeType)
 	if err != nil {
+		s.log.Error("hooty.ingest.r2_upload_error",
+			"hash", event.HashLargo,
+			"key", objectKey,
+			"error", err,
+		)
 		return fmt.Errorf("ingest: subir imagen: %w", err)
 	}
+	if strings.TrimSpace(url) == "" {
+		s.log.Error("hooty.ingest.r2_upload_empty_url", "hash", event.HashLargo, "key", objectKey)
+		return errors.New("ingest: R2 devolvió una URL vacía")
+	}
+	s.log.Info("hooty.ingest.r2_upload_ok", "hash", event.HashLargo, "key", objectKey, "url", url)
 
 	extraccion, err := s.extractor.Extraer(ctx, image, mimeType, caption2)
 	if err != nil {

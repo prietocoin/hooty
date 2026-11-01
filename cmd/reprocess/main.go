@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -54,6 +55,7 @@ func run() error {
 		PublicDomain: cfg.R2PublicDomain,
 		Region:       cfg.R2Region,
 		Timeout:      cfg.R2Timeout,
+		Logger:       slog.Default(),
 	})
 	if err != nil {
 		return err

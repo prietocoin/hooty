@@ -12,9 +12,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hooty/internal/clock"
@@ -29,6 +31,8 @@ var ErrPairNotReserved = errors.New("postgres: el par no está reservado o ya fu
 // la transacción con pgxmock sin abrir PostgreSQL.
 type DB interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
 // Store implementa ingest.Store y la verificación del esquema.
@@ -296,4 +300,47 @@ func scanImpacto(row rowScanner) (domain.Impacto, error) {
 	}
 	impacto.RecibidoEn = clock.WallClock(recibidoEn)
 	return impacto, nil
+}
+
+// NeedsImage indica si el comprobante existe y aún no tiene URL de imagen.
+// Acepta hash completo o corto, igual que el reprocesador.
+func (s *Store) NeedsImage(ctx context.Context, hash string) (bool, error) {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return false, nil
+	}
+	var missing bool
+	err := s.pool.QueryRow(ctx, `
+SELECT COALESCE(BTRIM(url_imagen), '') = ''
+FROM comprobantes
+WHERE LOWER(hash_largo) = LOWER($1)
+   OR LOWER(hash_largo) LIKE LOWER($1) || '%'
+ORDER BY CASE WHEN LOWER(hash_largo) = LOWER($1) THEN 0 ELSE 1 END,
+         LENGTH(hash_largo), hash_largo
+LIMIT 1`, hash).Scan(&missing)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("postgres: consultar imagen pendiente: %w", err)
+	}
+	return missing, nil
+}
+
+// UpdateImageURL persiste la URL canónica resuelta por un reenvío xN.
+func (s *Store) UpdateImageURL(ctx context.Context, hash, imageURL string) error {
+	hash = strings.TrimSpace(hash)
+	imageURL = strings.TrimSpace(imageURL)
+	if hash == "" || imageURL == "" {
+		return nil
+	}
+	_, err := s.pool.Exec(ctx, `
+UPDATE comprobantes
+SET url_imagen = $2, actualizado_en = NOW()
+WHERE LOWER(hash_largo) = LOWER($1)
+   OR LOWER(hash_largo) LIKE LOWER($1) || '%'`, hash, imageURL)
+	if err != nil {
+		return fmt.Errorf("postgres: actualizar imagen del comprobante: %w", err)
+	}
+	return nil
 }

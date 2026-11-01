@@ -37,7 +37,7 @@ WHERE hash_largo = $1
   AND id_grupo <> $2
   AND procesado = FALSE
   AND pareja_id IS NULL
-ORDER BY recibido_en ASC, id ASC
+ORDER BY recibido_en DESC, id DESC
 FOR UPDATE SKIP LOCKED
 LIMIT 1`
 

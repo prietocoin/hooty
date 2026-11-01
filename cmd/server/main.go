@@ -93,6 +93,7 @@ func run() error {
 		APIKey:   cfg.EvolutionAPIKey,
 		Instance: cfg.EvolutionInst,
 		Timeout:  cfg.EvolutionTimeout,
+		Logger:   logger,
 	})
 	if err != nil {
 		return err
@@ -113,6 +114,7 @@ func run() error {
 		PublicDomain: cfg.R2PublicDomain,
 		Region:       cfg.R2Region,
 		Timeout:      cfg.R2Timeout,
+		Logger:       logger,
 	})
 	if err != nil {
 		return err

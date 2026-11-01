@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +29,7 @@ type Config struct {
 	Region       string
 	Timeout      time.Duration
 	Now          func() time.Time
+	Logger       *slog.Logger
 }
 
 // Store implementa ingest.ImageStore.
@@ -40,6 +42,7 @@ type Store struct {
 	region       string
 	http         *http.Client
 	now          func() time.Time
+	log          *slog.Logger
 }
 
 // New valida la configuración y construye el publicador.
@@ -63,6 +66,9 @@ func New(cfg Config) (*Store, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
 	region := strings.TrimSpace(cfg.Region)
 	if region == "" {
 		region = "auto"
@@ -76,6 +82,7 @@ func New(cfg Config) (*Store, error) {
 		region:       region,
 		http:         &http.Client{Timeout: cfg.Timeout},
 		now:          cfg.Now,
+		log:          cfg.Logger,
 	}, nil
 }
 
@@ -129,15 +136,22 @@ func (s *Store) Subir(ctx context.Context, key string, data []byte, mimeType str
 	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential="+s.accessKey+"/"+scope+
 		", SignedHeaders="+signedHeaders+", Signature="+signature)
 
+	s.log.Info("hooty.r2.put_start",
+		"bucket", s.bucket, "key", key, "bytes", len(data), "mime", mimeType)
 	resp, err := s.http.Do(req)
 	if err != nil {
+		s.log.Error("hooty.r2.put_error", "bucket", s.bucket, "key", key, "error", err)
 		return "", fmt.Errorf("r2: subir objeto: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		s.log.Error("hooty.r2.put_status",
+			"bucket", s.bucket, "key", key, "status", resp.StatusCode,
+			"body", strings.TrimSpace(string(body)))
 		return "", fmt.Errorf("r2: estado %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
+	s.log.Info("hooty.r2.put_ok", "bucket", s.bucket, "key", key, "status", resp.StatusCode)
 
 	if s.publicDomain != "" {
 		return s.publicDomain + "/" + escapePath(key), nil

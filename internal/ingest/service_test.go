@@ -2,14 +2,20 @@ package ingest_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"hooty/internal/clock"
 	"hooty/internal/domain"
 	"hooty/internal/ingest"
+	"hooty/internal/ingest/evolution"
+	"hooty/internal/ingest/r2"
 )
 
 type fakeStore struct {
@@ -523,5 +529,94 @@ func TestCalcularLiquidacionRechazaMismoSocio(t *testing.T) {
 		testNow)
 	if err == nil {
 		t.Fatal("dos grupos que resuelven al mismo socio deben fallar")
+	}
+}
+
+func TestIngestaDescargaSubeR2YGuardaURL(t *testing.T) {
+	t.Parallel()
+
+	const imageBody = "imagen-jpeg-real"
+	hash := "8a3ef79788979e878129e00ded237dcd"
+	var uploaded []byte
+	r2Server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			uploaded, _ = io.ReadAll(r.Body)
+			w.WriteHeader(http.StatusOK)
+		case http.MethodGet:
+			_, _ = w.Write([]byte(imageBody))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer r2Server.Close()
+
+	evolutionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("apikey") != "api-key" {
+			t.Errorf("apikey = %q", r.Header.Get("apikey"))
+		}
+		if r.URL.Path != "/message/getBase64FromMediaMessage/hooty" {
+			t.Errorf("ruta de media = %q", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"base64":   base64.StdEncoding.EncodeToString([]byte(imageBody)),
+			"mimetype": "image/jpeg",
+		})
+	}))
+	defer evolutionServer.Close()
+
+	media, err := evolution.New(evolution.Config{
+		BaseURL: evolutionServer.URL, APIKey: "api-key", Instance: "hooty", Timeout: 5 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	images, err := r2.New(r2.Config{
+		Endpoint: r2Server.URL, Bucket: "bucket", AccessKey: "access", SecretKey: "secret",
+		PublicDomain: r2Server.URL, Timeout: 5 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	store := &fakeStore{registro: domain.Registro{
+		Status: domain.StatusPairReady,
+		Conteo: 2,
+		Pair: []domain.Impacto{
+			{ID: 1, HashLargo: hash, IDGrupo: "120363000000000001@g.us", RecibidoEn: testNow.Add(-time.Minute)},
+			{ID: 2, HashLargo: hash, IDGrupo: "120363000000000002@g.us", RecibidoEn: testNow},
+		},
+	}}
+	extractor := &fakeExtractor{result: domain.Extraccion{
+		Monto: 100, Moneda: "USD", Banco: "BANCO", Titular: "TITULAR", Referencia: "REF",
+	}}
+	liq := &fakeLiquidator{comp: validSettlement()}
+	svc, err := ingest.NewService(store, media, images, extractor, liq,
+		clock.Fixed{T: testNow}, ingest.Options{ProcessingTimeout: 5 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.Recibir(context.Background(), testEvent()); err != nil {
+		t.Fatalf("ingesta: %v", err)
+	}
+	if string(uploaded) != imageBody {
+		t.Fatalf("R2 recibió %q", uploaded)
+	}
+	if len(store.guardados) != 1 {
+		t.Fatalf("guardados = %d", len(store.guardados))
+	}
+	wantURL := r2Server.URL + "/comprobantes/" + hash + ".jpg"
+	if store.guardados[0].URLImagen != wantURL {
+		t.Fatalf("url_imagen = %q, se esperaba %q", store.guardados[0].URLImagen, wantURL)
+	}
+	resp, err := http.Get(wantURL)
+	if err != nil {
+		t.Fatalf("GET imagen: %v", err)
+	}
+	defer resp.Body.Close()
+	served, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK || string(served) != imageBody {
+		t.Fatalf("imagen R2 %d %q", resp.StatusCode, served)
 	}
 }
