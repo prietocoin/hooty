@@ -9,7 +9,7 @@ import {
   formatearTasaComercial,
   resolverTasaSocio,
   resolverTipoComprobante
-} from './comprobantesTasasUtils.js?v=20261031_04';
+} from './comprobantesTasasUtils.js?v=20261101_02';
 
 export {
   formatearTasaComercial,
@@ -19,7 +19,7 @@ export {
   resolverMonedaSocio,
   resolverSubtotalSocio,
   normalizarTasaComercial
-} from './comprobantesTasasUtils.js?v=20261031_04';
+} from './comprobantesTasasUtils.js?v=20261101_02';
 
 /**
  * Monto plano de la interfaz: 2 decimales truncados, sin comas de miles.

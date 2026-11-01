@@ -95,10 +95,6 @@ function normalizarLetraTipo(valor) {
   return letra === 'A' || letra === 'P' || letra === 'D' ? letra : '';
 }
 
-function letraTipo(valor) {
-  return normalizarLetraTipo(valor) || 'D';
-}
-
 /**
  * Tipo automático del socio indicado, calculado por el backend desde su
  * perfil. Para el encabezado manda siempre el Socio 1 (`tipo_op1`).
@@ -188,15 +184,21 @@ export function prepararEdicionComprobante(item = {}, loteActivo = 'T070') {
   const me1 = numero(c.me1 ?? item.me1 ?? c.m1_socio ?? item.m1_socio ?? monto1, 0);
   const me2 = numero(c.me2 ?? item.me2 ?? c.m2_socio ?? item.m2_socio ?? monto2, 0);
 
-  // 6. NATURALEZA: el tipo manual es sagrado. Si no hay edición manual, el
-  // encabezado usa exclusivamente el tipo automático del Socio 1 calculado
-  // desde su perfil; guardar el comprobante nunca fuerza una 'D'.
+  // 6. NATURALEZA: `tipo_op` persistido en la tabla es la fuente única para
+  // cards y reporte. Los tipos automáticos del perfil solo rellenan filas
+  // históricas que no tengan la columna persistida.
   const manual = tipoManualDe(c, item);
   const automatico1 = tipoAutomatico(c, item, 1);
   const automatico2 = tipoAutomatico(c, item, 2);
-  const tipo1 = manual || automatico1 || automatico2 || 'D';
-  const tipo2 = automatico2 || automatico1 || 'D';
-  const letra = manual || automatico1 || tipo1;
+  const tipoPersistido = normalizarLetraTipo(c.tipo_op ?? item.tipo_op)
+    || normalizarLetraTipo(c.tipo ?? item.tipo)
+    || manual
+    || automatico1
+    || automatico2
+    || 'D';
+  const tipo1 = tipoPersistido;
+  const tipo2 = tipoPersistido;
+  const letra = tipoPersistido;
 
   // 7. IMAGEN
   const rawImg = c.url_imagen || item.url_imagen ||

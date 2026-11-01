@@ -8,7 +8,7 @@ import {
   formatMonto, formatTasa, obtenerME1, obtenerME2, obtenerMonto1, obtenerMonto2,
   obtenerTasaSocioCalculada, claseInsignia, formatDiaHora,
   resolverTipoComprobante, resolverTasaSocio
-} from '../utils/comprobantesFormatters.js?v=20261031_05';
+} from '../utils/comprobantesFormatters.js?v=20261101_02';
 
 import { apiUrl } from '../../../../../shared/js/api-base.js?v=20261031_02';
 import { notify } from '../../../../../shared/js/toast.js?v=20261031_02';
@@ -23,9 +23,9 @@ import {
   fetchComprobantePorHash,
   reprocesarComprobantePorHash
 } from '../services/comprobantesApiService.js?v=20261031_06';
-import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261031_06';
+import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261101_02';
 import { aplicarRangoHash } from '../services/comprobantesFilterService.js?v=20261031_02';
-import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261031_05';
+import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261101_02';
 import { capturarReporteEstadoCuenta } from '../services/comprobantesReporteService.js?v=20261027_01';
 import { obtenerSaldoAnteriorSocio, obtenerSujetoAuditado } from '../services/comprobantesSaldosService.js?v=20261031_02';
 import { formatearFechaLatina } from '../utils/comprobantesFechaUtils.js?v=20261031_02';

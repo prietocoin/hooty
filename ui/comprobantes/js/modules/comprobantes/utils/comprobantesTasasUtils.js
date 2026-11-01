@@ -42,35 +42,22 @@ export function resolverMonedaTasa(item = {}) {
 }
 
 /**
- * Tipo de operación congelado por el backend. Se acepta el alias histórico
- * `tipo_manual`, pero nunca se consulta la tabla de perfiles. Para el socio 2
- * se prefiere `tipo_op2` cuando existe.
+ * Tipo de operación persistido en `comprobantes.tipo_op`. Es la fuente única
+ * de verdad para cards y reporte: no se reconstruye desde el perfil ni desde
+ * el caption. `tipo` y `tipo_op1/2` quedan solo como respaldo de filas legadas.
  */
-export function resolverTipoComprobante(item = {}, posicion = 1) {
-  const esSocio2 = Number(posicion) === 2;
-  const manualRaw = item?.tipo_manual;
-  const esManual = item?.tipo_op_manual === true
-    || item?.tipo_op_manual === 'true'
-    || item?.tipo_editado === true
-    || item?.isManual === true
-    || Boolean(manualRaw);
+export function resolverTipoComprobante(item = {}) {
+  const normalizar = (valor) => {
+    const letra = String(valor || '').trim().split('-')[0].toUpperCase();
+    return letra === 'A' || letra === 'P' || letra === 'D' ? letra : '';
+  };
 
-  if (esManual) {
-    const letraManual = String(manualRaw || item?.tipo_op || item?.tipo || '')
-      .trim().split('-')[0].toUpperCase();
-    if (letraManual === 'A' || letraManual === 'P' || letraManual === 'D') {
-      return letraManual;
-    }
-  }
-
-  // Sin edición manual mandan los tipos automáticos del perfil. Para el
-  // encabezado (posición 1) la fuente es siempre el Socio 1: tipo_op1.
-  const automatico = esSocio2
-    ? (item?.tipo_op2 || item?.tipo_op1)
-    : (item?.tipo_op1 || item?.tipo_op2);
-  const bruto = automatico || item?.tipo_op || item?.tipo || 'D';
-  const letra = String(bruto).trim().split('-')[0].toUpperCase();
-  return letra === 'A' || letra === 'P' || letra === 'D' ? letra : 'D';
+  return normalizar(item?.tipo_op)
+    || normalizar(item?.tipo)
+    || normalizar(item?.tipo_manual)
+    || normalizar(item?.tipo_op1)
+    || normalizar(item?.tipo_op2)
+    || 'D';
 }
 
 /**

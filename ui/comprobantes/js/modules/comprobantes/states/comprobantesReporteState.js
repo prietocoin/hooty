@@ -4,7 +4,7 @@
  * el filtro ni el listado principal del Dashboard.
  */
 
-import { cargarComprobantesFiltrados } from '../services/comprobantesCargaService.js?v=20261031_06';
+import { cargarComprobantesFiltrados } from '../services/comprobantesCargaService.js?v=20261101_02';
 import {
   aplicarRangoHash,
   resolverIndiceHash
@@ -15,9 +15,8 @@ import { normalizarSocio, obtenerPosicionSocio } from '../utils/comprobantesSoci
 import {
   resolverMonedaSocio,
   resolverSubtotalSocio,
-  resolverTasaSocio,
-  resolverTipoComprobante
-} from '../utils/comprobantesTasasUtils.js?v=20261031_04';
+  resolverTasaSocio
+} from '../utils/comprobantesTasasUtils.js?v=20261101_02';
 import {
   dentroRangoCaracas,
   fechaCaracasISO,
@@ -507,8 +506,11 @@ export function createComprobantesReporteState() {
     },
 
     reporteTipoItem(item) {
-      // El tipo del lado auditado, congelado por el backend.
-      return resolverTipoComprobante(item, this.reportePosicionItem(item));
+      // Copia literal de la columna persistida. No se consulta el perfil ni el
+      // catálogo de socios: cards y reporte imprimen el mismo valor de la BD.
+      const tipo = String(item?.tipo_op ?? item?.tipo ?? '')
+        .trim().split('-')[0].toUpperCase();
+      return tipo === 'A' || tipo === 'P' || tipo === 'D' ? tipo : 'D';
     },
 
     reporteHashItem(item) {
