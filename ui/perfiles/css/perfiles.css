@@ -472,10 +472,80 @@ html {
 .regla-cell-label.is-dep { color: #22d3ee; }
 .regla-cell-label.is-pago { color: #fb7185; }
 
+.regla-cell-tasa-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  min-width: 0;
+}
+
 .regla-cell-tasa {
   color: #64748b;
   font-size: 8px;
   line-height: 1;
+}
+
+/* Micro-botón de polaridad: 20px, verde para suma y rojo para resta. */
+.regla-polar.btn-pol-d,
+.regla-polar.btn-pol-p,
+.regla-polar.btn-polaridad-d,
+.regla-polar.btn-polaridad-p {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  flex: 0 0 20px;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: 1px solid;
+  border-radius: 5px;
+  background: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s ease, color .15s ease, transform .1s ease;
+}
+
+.regla-polar.is-pos {
+  border-color: rgba(16, 185, 129, .55);
+  background: rgba(16, 185, 129, .12);
+  color: #34d399;
+}
+
+.regla-polar.is-neg {
+  border-color: rgba(244, 63, 94, .55);
+  background: rgba(244, 63, 94, .12);
+  color: #fb7185;
+}
+
+.regla-polar:hover {
+  background: rgba(148, 163, 184, .12);
+}
+
+.regla-polar.is-pos:hover {
+  background: rgba(16, 185, 129, .22);
+}
+
+.regla-polar.is-neg:hover {
+  background: rgba(244, 63, 94, .22);
+}
+
+.regla-polar:active {
+  transform: scale(.94);
+}
+
+.regla-polar:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 1px;
 }
 
 .regla-cell-bottom {

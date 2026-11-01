@@ -4,10 +4,10 @@ import { state } from '../store.js?v=20261024_99_FIX_TASAS';
 import {
   esHerencia, nuevaRegla, payloadGuardar, reglasSegunModo
 } from '../domain.js?v=20261031_04';
-import { renderModalSocio } from '../components/modal-socio.js?v=20261031_07';
+import { renderModalSocio } from '../components/modal-socio.js?v=20261101_03';
 import {
   baseMoneda, formatearResultadoSpread, renderReglasEditor, tasaResultante
-} from '../components/reglas-editor.js?v=20261031_07';
+} from '../components/reglas-editor.js?v=20261101_03';
 import { renderReglasHerencia } from '../components/reglas-herencia.js?v=20261031_04';
 import { notificarSociosActualizados } from '../../../shared/js/sync.js';
 
@@ -89,12 +89,36 @@ export function crearEditor({ recargar = async () => {}, alertar = globalThis.al
     renderReglas();
   }
 
+  async function persistirPolaridad(regla, clave, anterior, nuevo) {
+    // Un perfil nuevo aún no existe en perfiles_glaukov: se persiste con el
+    // botón Guardar del modal. En perfiles existentes el clic guarda al momento.
+    if (!String(state.socioEdicion?.nombre || '').trim()) return;
+    try {
+      await api.guardar(payloadGuardar(state.socioEdicion, state.reglas));
+      // Refresca la copia del directorio para que al reabrir el socio se lea
+      // la polaridad recién persistida, sin esperar a recargar la página.
+      await recargar();
+      notificarSociosActualizados('perfiles');
+    } catch (err) {
+      // Solo revierte si el usuario no volvió a cambiar el signo mientras
+      // estaba en vuelo la petición.
+      if (regla[clave] === nuevo) {
+        regla[clave] = anterior;
+        renderReglas();
+      }
+      avisarErrorGuardado(err);
+    }
+  }
+
   function alternarSigno(indice, tipo) {
     const regla = state.reglas[indice];
     if (!regla) return;
-    if (tipo === 'dep') regla.polar_D = regla.polar_D === '+' ? '-' : '+';
-    if (tipo === 'pago') regla.polar_P = regla.polar_P === '-' ? '+' : '-';
+    const clave = tipo === 'dep' ? 'polar_D' : 'polar_P';
+    const anterior = regla[clave] === '+' ? '+' : '-';
+    const nuevo = anterior === '+' ? '-' : '+';
+    regla[clave] = nuevo;
     renderReglas();
+    void persistirPolaridad(regla, clave, anterior, nuevo);
   }
 
   function avisarErrorGuardado(err) {

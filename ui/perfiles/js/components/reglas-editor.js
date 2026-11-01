@@ -100,18 +100,34 @@ function renderDef(regla, index) {
 
 function renderColumnaOperacion({ regla, index, campo, tipo, base, etiqueta }) {
   const esDeposito = tipo === 'D';
+  const polar = esDeposito ? regla.polar_D : regla.polar_P;
+  const positivo = polar === '+';
   const porcentaje = esDeposito ? regla.deposito : regla.pago;
   const resultado = tasaResultante(base, porcentaje, tipo);
   const claseCelda = esDeposito ? 'regla-cell--dep' : 'regla-cell--pago';
   const claseEtiqueta = esDeposito ? 'is-dep' : 'is-pago';
   const claseResultado = esDeposito ? 'is-dep' : 'is-pago';
   const nombre = esDeposito ? 'depósito' : 'pago';
+  const tituloPolar = positivo
+    ? `Polaridad de ${nombre}: suma (+). Clic para restar (−)`
+    : `Polaridad de ${nombre}: resta (−). Clic para sumar (+)`;
 
   return `
     <div class="regla-cell ${claseCelda}">
       <div class="regla-cell-top">
         <span class="regla-cell-label ${claseEtiqueta}">${etiqueta}</span>
-        <span class="regla-cell-tasa">Tasa</span>
+        <span class="regla-cell-tasa-wrap">
+          <button type="button"
+                  data-accion="${esDeposito ? 'toggle-dep' : 'toggle-pago'}"
+                  data-indice="${index}"
+                  data-moneda="${escapeHTML(regla.codigo)}"
+                  data-signo="${positivo ? '+' : '-'}"
+                  class="regla-polar ${esDeposito ? 'btn-pol-d btn-polaridad-d' : 'btn-pol-p btn-polaridad-p'} ${positivo ? 'is-pos' : 'is-neg'}"
+                  style="width:20px;height:20px;min-width:20px;min-height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:4px;font-weight:bold;font-size:12px;line-height:1;cursor:pointer;position:relative;z-index:1;border:1px solid ${positivo ? 'rgba(16,185,129,.55)' : 'rgba(244,63,94,.55)'};background:${positivo ? 'rgba(16,185,129,.12)' : 'rgba(244,63,94,.12)'};color:${positivo ? '#34d399' : '#fb7185'};"
+                  title="${tituloPolar}"
+                  aria-label="${tituloPolar}">${positivo ? '+' : '−'}</button>
+          <span class="regla-cell-tasa">Tasa</span>
+        </span>
       </div>
       <div class="regla-cell-bottom">
         <input type="number" step="any" inputmode="decimal"
