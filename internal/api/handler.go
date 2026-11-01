@@ -51,7 +51,7 @@ type Handler struct {
 
 // Reprocessor recalcula un comprobante histórico con los módulos canónicos.
 type Reprocessor interface {
-	Reprocess(ctx context.Context, hash string) error
+	Reprocess(ctx context.Context, hash string) (string, error)
 	ReprocessAll(ctx context.Context) (int, error)
 }
 
@@ -360,7 +360,8 @@ func (h *Handler) ReprocessComprobante(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.reprocessor.Reprocess(r.Context(), hash); err != nil {
+	fullHash, err := h.reprocessor.Reprocess(r.Context(), hash)
+	if err != nil {
 		switch {
 		case errors.Is(err, ingest.ErrComprobanteNotFound):
 			writeError(w, http.StatusNotFound, "not_found")
@@ -373,7 +374,7 @@ func (h *Handler) ReprocessComprobante(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := h.store.GetComprobante(r.Context(), hash)
+	row, err := h.store.GetComprobante(r.Context(), fullHash)
 	if err != nil {
 		h.log.Error("hooty.api.reprocesar_leer", "hash", hash, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -421,7 +422,7 @@ func (h *Handler) ReprocessComprobantes(w http.ResponseWriter, r *http.Request) 
 			if hash == "" {
 				continue
 			}
-			if err := h.reprocessor.Reprocess(r.Context(), hash); err != nil {
+			if _, err := h.reprocessor.Reprocess(r.Context(), hash); err != nil {
 				errores = append(errores, hash+": "+err.Error())
 				continue
 			}

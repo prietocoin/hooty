@@ -73,7 +73,7 @@ func run() error {
 	var failures []error
 	count := 0
 	for _, hash := range hashes {
-		if err := liquidator.Reprocess(ctx, hash); err != nil {
+		if _, err := liquidator.Reprocess(ctx, hash); err != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", hash, err))
 			continue
 		}

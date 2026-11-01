@@ -636,6 +636,44 @@ func TestApplyComprobantePatchTipoOp(t *testing.T) {
 	}
 }
 
+func TestReprocessComprobanteEndpoint(t *testing.T) {
+	t.Parallel()
+
+	reprocessor := &fakeReprocessor{hash: "8a3e"}
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).WithReprocessor(reprocessor).Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/comprobantes/8a3e/reprocesar", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if reprocessor.calls != 1 || reprocessor.lastHash != "8a3e" {
+		t.Fatalf("reprocesador no invocado: %+v", reprocessor)
+	}
+	var dto ComprobanteDTO
+	if err := json.Unmarshal(rec.Body.Bytes(), &dto); err != nil || dto.HashLargo != "8a3e" {
+		t.Fatalf("DTO inesperado: %v %s", err, rec.Body.String())
+	}
+}
+
+type fakeReprocessor struct {
+	hash     string
+	lastHash string
+	calls    int
+}
+
+func (f *fakeReprocessor) Reprocess(_ context.Context, hash string) (string, error) {
+	f.calls++
+	f.lastHash = hash
+	return f.hash, nil
+}
+
+func (f *fakeReprocessor) ReprocessAll(context.Context) (int, error) {
+	return 0, nil
+}
+
 func TestResolveNewsletterEndpoint(t *testing.T) {
 	t.Parallel()
 

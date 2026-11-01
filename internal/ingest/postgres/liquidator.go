@@ -87,12 +87,11 @@ func (l *Liquidator) Liquidar(ctx context.Context, input domain.LiquidacionInput
 }
 
 // Reprocess recalcula un comprobante histórico no editado manualmente y
-// persiste T1/T2, montos, ME y tipo de operación. La imagen se resuelve contra
-// R2 sin bloquear el recálculo financiero si el objeto no puede verificarse.
-func (l *Liquidator) Reprocess(ctx context.Context, hash string) error {
+// persiste T1/T2, montos, ME y tipo de operación. Acepta hash completo o corto.
+func (l *Liquidator) Reprocess(ctx context.Context, hash string) (string, error) {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
-		return ErrReprocessNotFound
+		return "", ErrReprocessNotFound
 	}
 
 	var (
@@ -111,35 +110,38 @@ SELECT hash_largo, COALESCE(hash_corto, ''), COALESCE(instancia, 'hooty'),
        COALESCE(tipo_op_manual, FALSE), fecha_operacion
 FROM comprobantes
 WHERE LOWER(hash_largo) = LOWER($1)
+   OR LOWER(hash_largo) LIKE LOWER($1) || '%'
+ORDER BY CASE WHEN LOWER(hash_largo) = LOWER($1) THEN 0 ELSE 1 END,
+         LENGTH(hash_largo), hash_largo
 LIMIT 1`, hash).Scan(
 		&hashLargo, &hashCorto, &instancia, &moneda, &monto, &banco, &titular, &referencia, &urlImagen,
 		&grupo1, &grupo2, &caption1, &caption2, &loteTasa, &manual, &fecha,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrReprocessNotFound
+		return "", ErrReprocessNotFound
 	}
 	if err != nil {
-		return fmt.Errorf("postgres: leer comprobante a reprocesar: %w", err)
+		return "", fmt.Errorf("postgres: leer comprobante a reprocesar: %w", err)
 	}
 	if manual {
-		return ErrManualType
+		return "", ErrManualType
 	}
 
 	perfil1, err := l.perfil(ctx, grupo1)
 	if err != nil {
-		return err
+		return "", err
 	}
 	perfil2, err := l.perfil(ctx, grupo2)
 	if err != nil {
-		return err
+		return "", err
 	}
 	lote, err := l.lote(ctx, loteTasa)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fundda, err := l.fundda(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	resolvedURL := ""
@@ -173,7 +175,7 @@ LIMIT 1`, hash).Scan(
 		FechaOperacion: fecha,
 	}, perfil1, perfil2, fundda, lote, now)
 	if err != nil {
-		return fmt.Errorf("postgres: recalcular comprobante %s: %w", hashLargo, err)
+		return "", fmt.Errorf("postgres: recalcular comprobante %s: %w", hashLargo, err)
 	}
 
 	tag, err := l.pool.Exec(ctx, `
@@ -187,12 +189,12 @@ WHERE LOWER(hash_largo) = LOWER($9)
 		comprobante.Tasa1, comprobante.Tasa2, comprobante.Monto1, comprobante.Monto2,
 		comprobante.ME1, comprobante.ME2, comprobante.TipoOp, resolvedURL, hashLargo)
 	if err != nil {
-		return fmt.Errorf("postgres: guardar reprocesamiento %s: %w", hashLargo, err)
+		return "", fmt.Errorf("postgres: guardar reprocesamiento %s: %w", hashLargo, err)
 	}
 	if tag.RowsAffected() != 1 {
-		return ErrManualType
+		return "", ErrManualType
 	}
-	return nil
+	return hashLargo, nil
 }
 
 // ReprocessAll reprocesa todas las filas no editadas manualmente.
@@ -222,7 +224,7 @@ ORDER BY actualizado_en ASC`)
 	count := 0
 	var failures []error
 	for _, hash := range hashes {
-		if err := l.Reprocess(ctx, hash); err != nil {
+		if _, err := l.Reprocess(ctx, hash); err != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", hash, err))
 			continue
 		}

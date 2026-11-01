@@ -25,6 +25,11 @@ func (s *Store) PublicURL(value string) string {
 	if s.publicDomain != "" {
 		return s.publicDomain + "/" + escapePath(key)
 	}
+	return s.endpointURL(key)
+}
+
+func (s *Store) endpointURL(key string) string {
+	key = strings.TrimLeft(strings.TrimSpace(key), "/")
 	return s.endpoint.Scheme + "://" + s.endpoint.Host + "/" + s.bucket + "/" + escapePath(key)
 }
 
@@ -63,12 +68,17 @@ func (s *Store) ResolveImageURL(ctx context.Context, hash, current string) (stri
 	}
 
 	for _, candidate := range candidates {
-		url := s.PublicURL(candidate)
-		if url == "" {
-			continue
+		urls := []string{s.PublicURL(candidate)}
+		if s.publicDomain != "" {
+			urls = append(urls, s.endpointURL(candidate))
 		}
-		if s.exists(ctx, url) {
-			return url, nil
+		for _, url := range urls {
+			if url == "" {
+				continue
+			}
+			if s.exists(ctx, url) {
+				return url, nil
+			}
 		}
 	}
 	if raw != "" {
