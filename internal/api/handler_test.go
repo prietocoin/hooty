@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -584,6 +585,28 @@ type fakePublisher struct {
 	calls  int
 	images []publisher.Envio
 	err    error
+
+	reportSocio   string
+	reportData    []byte
+	reportMime    string
+	reportFile    string
+	reportCaption string
+}
+
+func (f *fakePublisher) SendReport(_ context.Context, socio string, data []byte,
+	mimeType, fileName, caption string) (publisher.Result, error) {
+	f.reportSocio = socio
+	f.reportData = data
+	f.reportMime = mimeType
+	f.reportFile = fileName
+	f.reportCaption = caption
+	f.calls++
+	if f.err != nil {
+		return publisher.Result{}, f.err
+	}
+	return publisher.Result{Procesados: 1, Detalle: []publisher.Detalle{{
+		Socio: socio, Status: "ok",
+	}}}, nil
 }
 
 func (f *fakePublisher) Publish(_ context.Context, isPrueba bool) (publisher.Result, error) {
@@ -663,6 +686,49 @@ func TestReprocessComprobanteEndpoint(t *testing.T) {
 	var dto ComprobanteDTO
 	if err := json.Unmarshal(rec.Body.Bytes(), &dto); err != nil || dto.HashLargo != "8a3e" {
 		t.Fatalf("DTO inesperado: %v %s", err, rec.Body.String())
+	}
+}
+
+func TestSendReportImageDecodificaDataURLYDespacha(t *testing.T) {
+	t.Parallel()
+
+	sender := &fakePublisher{}
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).WithReportSender(sender).Register(mux)
+
+	payload := `{"socio":"GENERAL","caption":"Estado de cuenta","fileName":"estado.jpg",` +
+		`"mimeType":"image/jpeg","base64":"data:image/jpeg;base64,` +
+		base64.StdEncoding.EncodeToString([]byte("jpeg-data")) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/reportes/imagen", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if sender.reportSocio != "GENERAL" || string(sender.reportData) != "jpeg-data" {
+		t.Fatalf("reporte despachado inesperado: %q %q", sender.reportSocio, sender.reportData)
+	}
+	if sender.reportMime != "image/jpeg" || sender.reportFile != "estado.jpg" {
+		t.Fatalf("metadata inesperada: %q %q", sender.reportMime, sender.reportFile)
+	}
+}
+
+func TestSendReportImageRechazaBase64Invalido(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	newTestHandler(testStore()).WithReportSender(&fakePublisher{}).Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/reportes/imagen",
+		strings.NewReader(`{"socio":"GENERAL","base64":"%%%no-base64%%%"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
 	}
 }
 

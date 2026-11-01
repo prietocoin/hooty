@@ -63,3 +63,40 @@ func TestEvolutionSenderReportaHTTPError(t *testing.T) {
 		t.Fatalf("se esperaba error HTTP con cuerpo, obtuve %v", err)
 	}
 }
+
+func TestEvolutionSenderSendMediaUsaPostYMetadataDelReporte(t *testing.T) {
+	t.Parallel()
+
+	var metodo, ruta, apiKey, contentType string
+	var cuerpo sendMediaRequest
+	servidor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		metodo = r.Method
+		ruta = r.URL.Path
+		apiKey = r.Header.Get("apikey")
+		contentType = r.Header.Get("Content-Type")
+		_ = json.NewDecoder(r.Body).Decode(&cuerpo)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+	}))
+	defer servidor.Close()
+
+	sender, err := NewEvolutionSender(servidor.URL, "clave", "Glauk", time.Second)
+	if err != nil {
+		t.Fatalf("sender inválido: %v", err)
+	}
+	if err := sender.SendMedia(context.Background(), "120363@g.us",
+		[]byte("jpeg"), "image/jpeg", "estado-cuenta.jpg", "Estado de cuenta"); err != nil {
+		t.Fatalf("envío de reporte rechazado: %v", err)
+	}
+	if metodo != http.MethodPost || ruta != "/message/sendMedia/Glauk" {
+		t.Fatalf("petición inesperada: %s %s", metodo, ruta)
+	}
+	if apiKey != "clave" || contentType != "application/json" {
+		t.Fatalf("headers inesperados: apikey=%q content-type=%q", apiKey, contentType)
+	}
+	if cuerpo.MediaType != "image" || cuerpo.MimeType != "image/jpeg" ||
+		cuerpo.FileName != "estado-cuenta.jpg" || cuerpo.Media != "anBlZw==" ||
+		cuerpo.Caption != "Estado de cuenta" {
+		t.Fatalf("payload inesperado: %+v", cuerpo)
+	}
+}

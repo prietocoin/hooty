@@ -160,6 +160,25 @@ func TestMuxSirveUIYNoRompeAPI(t *testing.T) {
 	}
 }
 
+func TestMuxReporteImagenNoResponde405(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(newTestMux(t))
+	defer server.Close()
+
+	req, _ := http.NewRequest(http.MethodPost, server.URL+"/api/v1/reportes/imagen",
+		strings.NewReader(`{"socio":"GENERAL","base64":""}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /api/v1/reportes/imagen: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusMethodNotAllowed {
+		t.Fatal("la ruta POST /api/v1/reportes/imagen no debe responder 405")
+	}
+}
+
 func TestMuxConservaWebhookYHealth(t *testing.T) {
 	t.Parallel()
 

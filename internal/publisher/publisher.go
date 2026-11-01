@@ -62,6 +62,15 @@ type Sender interface {
 	Send(ctx context.Context, chatID string, png []byte, caption string) error
 }
 
+// MediaSender entrega un archivo genérico (JPEG, PNG, PDF, ...) a un chat_id.
+// EvolutionSender lo implementa mediante POST /message/sendMedia/{instance}.
+type MediaSender interface {
+	SendMedia(ctx context.Context, chatID string, data []byte, mimeType, fileName, caption string) error
+}
+
+// ErrSocioNotFound indica que el destinatario no existe en la vista perfil.
+var ErrSocioNotFound = errors.New("publisher: socio no encontrado")
+
 // Renderer convierte una cartelera en PNG.
 type Renderer interface {
 	Render(Cartelera) ([]byte, error)
@@ -335,6 +344,38 @@ func (p *Publisher) PublishSocio(ctx context.Context, socioNombre string, isPrue
 	return resultado, nil
 }
 
+// SendReport despacha una imagen ya renderizada por el cliente (estado de
+// cuenta) al chat del socio indicado. No depende de un lote de tasas.
+func (p *Publisher) SendReport(ctx context.Context, socioNombre string, data []byte,
+	mimeType, fileName, caption string) (Result, error) {
+	if len(data) == 0 {
+		return Result{}, errors.New("publisher: el reporte llegó vacío")
+	}
+	socio, err := p.resolverSocio(ctx, socioNombre)
+	if err != nil {
+		return Result{}, err
+	}
+	chatID := strings.TrimSpace(socio.ChatID)
+	if chatID == "" {
+		return Result{}, fmt.Errorf("publisher: el socio %q no tiene chat_id", socio.Nombre)
+	}
+	sender, ok := p.sender.(MediaSender)
+	if !ok {
+		return Result{}, errors.New("publisher: el sender no admite media genérica")
+	}
+	detalle := Detalle{Socio: socio.Nombre, ChatID: chatID, Status: "ok"}
+	if err := sender.SendMedia(ctx, chatID, data, mimeType, fileName, caption); err != nil {
+		detalle.Status = "error"
+		detalle.Error = err.Error()
+		p.log.Error("hooty.publish.report_error",
+			"socio", socio.Nombre, "chat_id", chatID, "error", err)
+		return Result{Fallidos: 1, Detalle: []Detalle{detalle}}, err
+	}
+	p.log.Info("hooty.publish.report_ok",
+		"socio", socio.Nombre, "chat_id", chatID, "mime", mimeType, "bytes", len(data))
+	return Result{Procesados: 1, Detalle: []Detalle{detalle}}, nil
+}
+
 func (p *Publisher) resolverSocio(ctx context.Context, nombre string) (Socio, error) {
 	nombre = strings.TrimSpace(nombre)
 	if nombre != "" {
@@ -359,7 +400,7 @@ func (p *Publisher) resolverSocio(ctx context.Context, nombre string) (Socio, er
 			return socio, nil
 		}
 	}
-	return Socio{}, fmt.Errorf("publisher: no se encontró el socio %q", nombre)
+	return Socio{}, fmt.Errorf("%w: %q", ErrSocioNotFound, nombre)
 }
 
 func (p *Publisher) enviarImagen(ctx context.Context, socio Socio, loteID string, png []byte, prueba bool) Detalle {

@@ -148,9 +148,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	sender.WithLogger(logger)
 	ratePublisher := publisher.New(readRepository, sender, publisher.NewCarteleraRenderer(),
 		cfg.TestGroup, logger)
-	readAPI := api.NewHandler(readRepository, logger, liquidator).WithPublisher(ratePublisher).WithNewsletterResolver(media).WithReprocessor(liquidator)
+	readAPI := api.NewHandler(readRepository, logger, liquidator).WithPublisher(ratePublisher).
+		WithReportSender(ratePublisher).WithNewsletterResolver(media).WithReprocessor(liquidator)
 
 	webhook := ingest.NewHTTPHandler(service, ingest.HTTPOptions{
 		Token:           cfg.WebhookToken,

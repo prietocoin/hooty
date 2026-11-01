@@ -41,6 +41,20 @@ func (f *fakeSender) Send(_ context.Context, chatID string, png []byte, _ string
 	return nil
 }
 
+func (f *fakeSender) SendMedia(_ context.Context, chatID string, data []byte,
+	_ string, _ string, _ string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, chatID)
+	if chatID == f.failOn {
+		return errors.New("webhook respondió HTTP 500")
+	}
+	if len(data) == 0 {
+		return errors.New("media vacía")
+	}
+	return nil
+}
+
 func (f *fakeSender) chatIDs() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -227,5 +241,42 @@ func TestPublishPruebaSinGrupoFalla(t *testing.T) {
 	}
 	if len(sender.chatIDs()) != 0 {
 		t.Fatal("no debe enviarse nada sin grupo de pruebas")
+	}
+}
+
+func TestSendReportDespachaMediaAlChatDelSocio(t *testing.T) {
+	t.Parallel()
+
+	sender := &fakeSender{}
+	p := New(fakeSource{
+		socios: []Socio{
+			{Nombre: "GENERAL", ChatID: "general@g.us"},
+			{Nombre: "ANA", ChatID: "ana@g.us"},
+		},
+	}, sender, fakeRenderer{}, "", nil)
+
+	resultado, err := p.SendReport(context.Background(), "GENERAL",
+		[]byte("jpeg"), "image/jpeg", "estado-cuenta.jpg", "Estado de cuenta")
+	if err != nil {
+		t.Fatalf("envío de reporte: %v", err)
+	}
+	if resultado.Procesados != 1 || len(resultado.Detalle) != 1 {
+		t.Fatalf("resultado inesperado: %+v", resultado)
+	}
+	destinos := sender.chatIDs()
+	if len(destinos) != 1 || destinos[0] != "general@g.us" {
+		t.Fatalf("destino inesperado: %v", destinos)
+	}
+}
+
+func TestSendReportSocioInexistenteDevuelveSentinel(t *testing.T) {
+	t.Parallel()
+
+	p := New(fakeSource{socios: []Socio{{Nombre: "ANA", ChatID: "ana@g.us"}}},
+		&fakeSender{}, fakeRenderer{}, "", nil)
+	_, err := p.SendReport(context.Background(), "NOEXISTE",
+		[]byte("jpeg"), "image/jpeg", "reporte.jpg", "Estado de cuenta")
+	if !errors.Is(err, ErrSocioNotFound) {
+		t.Fatalf("se esperaba ErrSocioNotFound, obtuve %v", err)
 	}
 }

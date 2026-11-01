@@ -42,12 +42,13 @@ type Store interface {
 
 // Handler atiende las rutas GET /api/v1/*.
 type Handler struct {
-	store       Store
-	log         *slog.Logger
-	simulator   Simulator
-	publisher   RatePublisher
-	newsletters NewsletterResolver
-	reprocessor Reprocessor
+	store        Store
+	log          *slog.Logger
+	simulator    Simulator
+	publisher    RatePublisher
+	reportSender ReportSender
+	newsletters  NewsletterResolver
+	reprocessor  Reprocessor
 }
 
 // Reprocessor recalcula un comprobante histórico con los módulos canónicos.
@@ -70,6 +71,18 @@ type RatePublisher interface {
 // ImagePublisher recibe las carteleras que el frontend generó con html2canvas.
 type ImagePublisher interface {
 	PublishImages(ctx context.Context, isPrueba bool, envios []publisher.Envio) (publisher.Result, error)
+}
+
+// ReportSender despacha una imagen de estado de cuenta a un socio concreto.
+type ReportSender interface {
+	SendReport(ctx context.Context, socio string, data []byte,
+		mimeType, fileName, caption string) (publisher.Result, error)
+}
+
+// WithReportSender conecta el despacho de estados de cuenta por Evolution.
+func (h *Handler) WithReportSender(sender ReportSender) *Handler {
+	h.reportSender = sender
+	return h
 }
 
 // Previewer renderiza una cartelera individual con el mismo generador oficial.
@@ -161,6 +174,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/tasas/lote/{id}/{$}", h.DeleteLote)
 	mux.HandleFunc("GET /api/v1/reportes/filtros", h.ReportFilters)
 	mux.HandleFunc("GET /api/v1/reportes/filtros/{$}", h.ReportFilters)
+	mux.HandleFunc("POST /api/v1/reportes/imagen", h.SendReportImage)
+	mux.HandleFunc("POST /api/v1/reportes/imagen/{$}", h.SendReportImage)
 	mux.HandleFunc("GET /api/v1/admin/canales/resolver", h.ResolveNewsletter)
 	mux.HandleFunc("GET /api/v1/admin/canales/resolver/{$}", h.ResolveNewsletter)
 }
@@ -201,6 +216,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.RestaurarPlantilla(w, r)
 	case r.Method == http.MethodPost && (path == "/api/v1/notificaciones/tasas" || path == "/api/v1/tasas/notificar-remesas"):
 		h.NotifyRates(w, r)
+	case r.Method == http.MethodPost && path == "/api/v1/reportes/imagen":
+		h.SendReportImage(w, r)
 	case r.Method == http.MethodPost:
 		w.Header().Set("Allow", "GET, PUT, POST, DELETE, OPTIONS")
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -935,6 +952,114 @@ func (h *Handler) DeleteLote(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"message": "Lote " + id + " eliminado correctamente.",
 	})
+}
+
+// SendReportImage responde POST /api/v1/reportes/imagen. Recibe el JPEG/PNG
+// rasterizado por el cliente y lo despacha por Evolution API v2 usando
+// POST /message/sendMedia/{instance}.
+func (h *Handler) SendReportImage(w http.ResponseWriter, r *http.Request) {
+	if h.reportSender == nil {
+		writeError(w, http.StatusServiceUnavailable, "report_sender_unavailable")
+		return
+	}
+
+	var body struct {
+		Socio    string `json:"socio"`
+		Caption  string `json:"caption"`
+		FileName string `json:"fileName"`
+		MimeType string `json:"mimeType"`
+		Base64   string `json:"base64"`
+		Media    string `json:"media"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<20)).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_report_payload")
+		return
+	}
+
+	raw := body.Base64
+	if strings.TrimSpace(raw) == "" {
+		raw = body.Media
+	}
+	data, mimeData, err := decodeReportBase64(raw)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(data) == 0 {
+		writeError(w, http.StatusBadRequest, "el reporte llegó vacío")
+		return
+	}
+
+	mimeType := strings.TrimSpace(body.MimeType)
+	if mimeType == "" {
+		mimeType = mimeData
+	}
+	if mimeType == "" {
+		mimeType = http.DetectContentType(data)
+	}
+	if !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		writeError(w, http.StatusBadRequest, "el reporte debe ser una imagen")
+		return
+	}
+
+	socio := strings.TrimSpace(body.Socio)
+	if socio == "" {
+		socio = "GENERAL"
+	}
+	fileName := strings.TrimSpace(body.FileName)
+	if fileName == "" || strings.ContainsAny(fileName, `/\`) {
+		fileName = "estado-cuenta-" + strconv.FormatInt(time.Now().Unix(), 10) + ".jpg"
+	}
+	caption := strings.TrimSpace(body.Caption)
+	if caption == "" {
+		caption = "Estado de cuenta " + socio
+	}
+
+	resultado, err := h.reportSender.SendReport(r.Context(), socio, data, mimeType, fileName, caption)
+	if err != nil {
+		h.log.Error("hooty.api.reporte_imagen",
+			"socio", socio, "mime", mimeType, "file_name", fileName,
+			"bytes", len(data), "error", err)
+		if errors.Is(err, publisher.ErrSocioNotFound) {
+			writeError(w, http.StatusNotFound, "socio no encontrado")
+			return
+		}
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	h.log.Info("hooty.api.reporte_imagen_ok",
+		"socio", socio, "mime", mimeType, "file_name", fileName, "bytes", len(data))
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "data": resultado})
+}
+
+func decodeReportBase64(raw string) ([]byte, string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, "", errors.New("base64 es obligatorio")
+	}
+	mimeType := ""
+	if strings.HasPrefix(raw, "data:") {
+		coma := strings.Index(raw, ",")
+		if coma < 0 {
+			return nil, "", errors.New("data URL inválida")
+		}
+		meta := raw[len("data:"):coma]
+		if fin := strings.Index(meta, ";"); fin >= 0 {
+			meta = meta[:fin]
+		}
+		mimeType = strings.TrimSpace(meta)
+		raw = raw[coma+1:]
+	}
+	raw = strings.ReplaceAll(raw, "\n", "")
+	raw = strings.ReplaceAll(raw, "\r", "")
+	data, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		data, err = base64.RawStdEncoding.DecodeString(raw)
+	}
+	if err != nil {
+		return nil, "", errors.New("base64 inválido")
+	}
+	return data, mimeType, nil
 }
 
 func (h *Handler) ReportFilters(w http.ResponseWriter, r *http.Request) {
