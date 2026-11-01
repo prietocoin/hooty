@@ -4,7 +4,7 @@
  * backend. No aplica spreads, no redondea y no reconstruye la polaridad.
  */
 
-import { aNumero as numero, formatearTasaPlana } from './comprobantesNumerosUtils.js?v=20261031_02';
+import { aNumero as numero } from './comprobantesNumerosUtils.js?v=20261031_02';
 
 /**
  * La tasa del backend ya está truncada por el snapshot. Solo se valida que sea
@@ -16,11 +16,40 @@ export function normalizarTasaComercial(valor) {
 }
 
 /**
+ * Regla estricta de presentación de tasas:
+ *   > 99.99        -> entero truncado
+ *   1.00 - 99.99   -> 2 decimales truncados
+ *   < 1.00         -> 3 cifras significativas truncadas
+ * Nunca redondea.
+ */
+export function formatearTasaRegla(valor) {
+  const num = Number(valor);
+  if (!num || isNaN(num) || num <= 0) return '';
+
+  if (num > 99.99) {
+    return Math.trunc(num).toString();
+  }
+
+  if (num >= 1) {
+    const factor = 100;
+    return (Math.trunc(num * factor) / factor).toFixed(2);
+  }
+
+  const str = num.toString();
+  const match = str.match(/^0\.0*/);
+  if (!match) return num.toString();
+  const ceros = match[0].length - 2;
+  const factor = Math.pow(10, ceros + 3);
+  return (Math.trunc(num * factor) / factor).toString();
+}
+
+/**
  * Formatea la tasa en formato decimal plano, sin comas de miles.
  * Es presentación: el valor viene del backend.
  */
 export function formatearTasaComercial(valor) {
-  return formatearTasaPlana(numero(valor, NaN));
+  const num = numero(valor, NaN);
+  return Number.isFinite(num) && num > 0 ? formatearTasaRegla(num) : '0.00';
 }
 
 /**

@@ -6,7 +6,7 @@
  */
 
 const CACHE_PREFIX = 'hooty-comprobantes-';
-const CACHE_VERSION = `${CACHE_PREFIX}20261101_03`;
+const CACHE_VERSION = `${CACHE_PREFIX}20261101_05`;
 
 self.addEventListener('install', () => {
   // Toma el control sin esperar a que se cierren las pestañas abiertas.

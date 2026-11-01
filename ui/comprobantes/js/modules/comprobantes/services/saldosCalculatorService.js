@@ -2,7 +2,7 @@
  * @file saldosCalculatorService.js
  * @description Servicio matemático puro para cálculo algebraico de saldos y movimientos desde comprobantes.
  */
-import { filtrarComprobantesPorRango } from '../utils/saldosFilterUtils.js?v=20261031_02';
+import { filtrarComprobantesPorRango } from '../utils/saldosFilterUtils.js?v=20261101_05';
 import { truncar2 } from '../utils/comprobantesNumerosUtils.js?v=20261031_02';
 import {
   normalizarSocio,
