@@ -12,7 +12,7 @@ func TestTipoOperacionIngestaUsaPerfilSocio1(t *testing.T) {
 
 	perfil := domain.Perfil{
 		Nombre: "CHASAN", MonedaBase: "USD",
-		Monedas: json.RawMessage(`{"ARS":{"tipo_op":"P","tipo":"D"},"COP":{"tipo":"D"}}`),
+		Monedas: json.RawMessage(`{"ARS":{"tipo":"P"},"COP":{"tipo":"D"}}`),
 	}
 	if got := tipoOperacion(perfil, "USD"); got != "A" {
 		t.Fatalf("moneda base debe ser A, fue %q", got)
@@ -29,6 +29,44 @@ func TestTipoOperacionIngestaUsaPerfilSocio1(t *testing.T) {
 	perfil.Monedas = json.RawMessage(`{"ARS":{"tipo":"A"}}`)
 	if got := tipoOperacion(perfil, "ARS"); got != "P" {
 		t.Fatalf("una moneda distinta a la base no puede ser A, fue %q", got)
+	}
+}
+
+func TestSimularLiquidacionTruncaMontoConTasaExplicita(t *testing.T) {
+	t.Parallel()
+
+	perfil1 := domain.Perfil{
+		Nombre: "TORRES", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"activo":true,"tipo":"P","base":19.32,"polar_D":"+","polar_P":"-","porcentaje":{"deposito":0,"pago":0}}}`),
+	}
+	perfil2 := domain.Perfil{
+		Nombre: "NELSY", MonedaBase: "USD",
+		Monedas: json.RawMessage(`{"ARS":{"activo":true,"tipo":"P","base":19.32,"polar_D":"+","polar_P":"+","porcentaje":{"deposito":0,"pago":0}}}`),
+	}
+	lote := domain.LoteTasas{ID: "T070", Tasas: map[string]float64{"USD": 1, "ARS": 19.32}}
+
+	resultado, err := SimularLiquidacion(SimulacionInput{
+		MonedaRecibo: "ARS",
+		MontoRecibo:  2000,
+		Socio1:       "TORRES",
+		Socio2:       "NELSY",
+		Tasa1:        19.32,
+		Tasa2:        19.32,
+	}, perfil1, perfil2, domain.Perfil{}, lote)
+	if err != nil {
+		t.Fatalf("simulación válida rechazada: %v", err)
+	}
+	if resultado.Tasa1 != 19.32 || resultado.Monto1 != -103.51 || resultado.ME1 != -103.51 {
+		t.Fatalf("lado 1 debe truncar 2000/19.32 a -103.51: %+v", resultado)
+	}
+}
+
+func TestCalcularMontoLadoTruncaDosDecimales(t *testing.T) {
+	t.Parallel()
+
+	monto, me := calcularMontoLado(-1, 2000, 19.32, 1)
+	if monto != -103.51 || me != -103.51 {
+		t.Fatalf("monto/me = %v/%v, se esperaba -103.51/-103.51", monto, me)
 	}
 }
 
