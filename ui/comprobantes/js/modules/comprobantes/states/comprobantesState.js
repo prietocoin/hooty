@@ -20,9 +20,10 @@ import {
 
 import {
   eliminarComprobantePorHash,
-  fetchComprobantePorHash
-} from '../services/comprobantesApiService.js?v=20261031_05';
-import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261031_05';
+  fetchComprobantePorHash,
+  reprocesarComprobantePorHash
+} from '../services/comprobantesApiService.js?v=20261031_06';
+import { cargarPaginaComprobantes } from '../services/comprobantesCargaService.js?v=20261031_06';
 import { aplicarRangoHash } from '../services/comprobantesFilterService.js?v=20261031_02';
 import { prepararEdicionComprobante, obtenerInsigniaRol } from '../services/comprobantesMapperService.js?v=20261031_05';
 import { capturarReporteEstadoCuenta } from '../services/comprobantesReporteService.js?v=20261027_01';
@@ -694,6 +695,20 @@ export function comprobantesState() {
       } catch (err) {
         console.error('[comprobantesState ❌ Error al enviar reporte]:', err);
         alert('❌ Error al enviar el reporte: ' + err.message);
+      }
+    },
+
+    async reprocesarComprobante(item) {
+      const hash = String(item?.hash_largo || item?.id || '').trim();
+      if (!hash) return;
+      if (!confirm('¿Reprocesar cálculo e imagen de este comprobante con los perfiles vigentes?')) return;
+      try {
+        await reprocesarComprobantePorHash(hash);
+        window.dispatchEvent(new CustomEvent('comprobante-actualizado', { detail: { hash_largo: hash } }));
+        notify('Comprobante reprocesado correctamente.', { type: 'success' });
+      } catch (err) {
+        console.error('[comprobantesState ❌ Error al reprocesar]:', err);
+        notify(`No se pudo reprocesar: ${err.message || 'error del servidor'}`, { type: 'error' });
       }
     },
 

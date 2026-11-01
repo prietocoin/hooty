@@ -21,12 +21,31 @@ import (
 // vistas canónicas perfil y tasa (ADR-003).
 //
 // No duplica fórmulas: delega el cálculo puro en ingest.CalcularLiquidacion y
-// solo se ocupa de leer PostgreSQL.
+// solo se ocupa de leer y persistir PostgreSQL.
 type Liquidator struct {
 	pool      *pgxpool.Pool
 	now       clock.Clock
 	tasaOrder string
+	images    ImageResolver
 }
+
+// ImageResolver reconstruye o valida la URL pública de una imagen existente.
+type ImageResolver interface {
+	ResolveImageURL(ctx context.Context, hash, current string) (string, error)
+}
+
+// WithImageResolver conecta el resolvedor de R2 al reprocesamiento histórico.
+func (l *Liquidator) WithImageResolver(resolver ImageResolver) *Liquidator {
+	l.images = resolver
+	return l
+}
+
+var (
+	// ErrManualType impide sobrescribir una edición manual del operador.
+	ErrManualType = ingest.ErrManualType
+	// ErrReprocessNotFound indica que el hash no existe.
+	ErrReprocessNotFound = ingest.ErrComprobanteNotFound
+)
 
 // NewLiquidator construye el adaptador financiero y detecta la columna de
 // orden de la vista tasa sin asumir que expone `id`.
@@ -65,6 +84,151 @@ func (l *Liquidator) Liquidar(ctx context.Context, input domain.LiquidacionInput
 		return domain.Comprobante{}, err
 	}
 	return ingest.CalcularLiquidacionConFundda(input, perfil1, perfil2, fundda, lote, l.now.Now())
+}
+
+// Reprocess recalcula un comprobante histórico no editado manualmente y
+// persiste T1/T2, montos, ME y tipo de operación. La imagen se resuelve contra
+// R2 sin bloquear el recálculo financiero si el objeto no puede verificarse.
+func (l *Liquidator) Reprocess(ctx context.Context, hash string) error {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return ErrReprocessNotFound
+	}
+
+	var (
+		hashLargo, hashCorto, instancia, moneda, banco, titular, referencia, urlImagen string
+		grupo1, grupo2, caption1, caption2, loteTasa                                   string
+		manual                                                                         bool
+		monto                                                                          float64
+		fecha                                                                          time.Time
+	)
+	err := l.pool.QueryRow(ctx, `
+SELECT hash_largo, COALESCE(hash_corto, ''), COALESCE(instancia, 'hooty'),
+       COALESCE(moneda_recibo, ''), COALESCE(monto_recibo, 0),
+       COALESCE(banco, ''), COALESCE(titular, ''), COALESCE(referencia, ''),
+       COALESCE(url_imagen, ''), COALESCE(grupo_1, ''), COALESCE(grupo_2, ''),
+       COALESCE(caption_1, ''), COALESCE(caption_2, ''), COALESCE(lote_tasa, ''),
+       COALESCE(tipo_op_manual, FALSE), fecha_operacion
+FROM comprobantes
+WHERE LOWER(hash_largo) = LOWER($1)
+LIMIT 1`, hash).Scan(
+		&hashLargo, &hashCorto, &instancia, &moneda, &monto, &banco, &titular, &referencia, &urlImagen,
+		&grupo1, &grupo2, &caption1, &caption2, &loteTasa, &manual, &fecha,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrReprocessNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("postgres: leer comprobante a reprocesar: %w", err)
+	}
+	if manual {
+		return ErrManualType
+	}
+
+	perfil1, err := l.perfil(ctx, grupo1)
+	if err != nil {
+		return err
+	}
+	perfil2, err := l.perfil(ctx, grupo2)
+	if err != nil {
+		return err
+	}
+	lote, err := l.lote(ctx, loteTasa)
+	if err != nil {
+		return err
+	}
+	fundda, err := l.fundda(ctx)
+	if err != nil {
+		return err
+	}
+
+	resolvedURL := ""
+	if l.images != nil {
+		resolvedURL, err = l.images.ResolveImageURL(ctx, hashLargo, urlImagen)
+		if err != nil {
+			resolvedURL = ""
+		}
+	}
+	calculationURL := resolvedURL
+	if strings.TrimSpace(calculationURL) == "" {
+		calculationURL = strings.TrimSpace(urlImagen)
+	}
+	if calculationURL == "" {
+		// Comprobante.Validate exige una URL; se usa un marcador temporal y no
+		// se persiste porque el UPDATE conserva url_imagen cuando llega vacío.
+		calculationURL = "r2://" + hashLargo
+	}
+
+	now := l.now.Now()
+	comprobante, err := ingest.CalcularLiquidacionConFundda(domain.LiquidacionInput{
+		HashLargo:      hashLargo,
+		HashCorto:      hashCorto,
+		Instancia:      instancia,
+		Extraccion:     domain.Extraccion{Monto: monto, Moneda: moneda, Banco: banco, Titular: titular, Referencia: referencia},
+		URLImagen:      calculationURL,
+		Grupo1:         grupo1,
+		Grupo2:         grupo2,
+		Caption1:       caption1,
+		Caption2:       caption2,
+		FechaOperacion: fecha,
+	}, perfil1, perfil2, fundda, lote, now)
+	if err != nil {
+		return fmt.Errorf("postgres: recalcular comprobante %s: %w", hashLargo, err)
+	}
+
+	tag, err := l.pool.Exec(ctx, `
+UPDATE comprobantes
+SET tasa_1 = $1, tasa_2 = $2, monto_1 = $3, monto_2 = $4,
+    me1 = $5, me2 = $6, tipo_op = $7,
+    url_imagen = COALESCE(NULLIF($8, ''), url_imagen),
+    actualizado_en = NOW()
+WHERE LOWER(hash_largo) = LOWER($9)
+  AND COALESCE(tipo_op_manual, FALSE) = FALSE`,
+		comprobante.Tasa1, comprobante.Tasa2, comprobante.Monto1, comprobante.Monto2,
+		comprobante.ME1, comprobante.ME2, comprobante.TipoOp, resolvedURL, hashLargo)
+	if err != nil {
+		return fmt.Errorf("postgres: guardar reprocesamiento %s: %w", hashLargo, err)
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrManualType
+	}
+	return nil
+}
+
+// ReprocessAll reprocesa todas las filas no editadas manualmente.
+func (l *Liquidator) ReprocessAll(ctx context.Context) (int, error) {
+	rows, err := l.pool.Query(ctx, `
+SELECT hash_largo FROM comprobantes
+WHERE COALESCE(tipo_op_manual, FALSE) = FALSE
+ORDER BY actualizado_en ASC`)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: listar comprobantes a reprocesar: %w", err)
+	}
+	var hashes []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("postgres: leer hash a reprocesar: %w", err)
+		}
+		hashes = append(hashes, hash)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, fmt.Errorf("postgres: recorrer comprobantes a reprocesar: %w", err)
+	}
+	rows.Close()
+
+	count := 0
+	var failures []error
+	for _, hash := range hashes {
+		if err := l.Reprocess(ctx, hash); err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", hash, err))
+			continue
+		}
+		count++
+	}
+	return count, errors.Join(failures...)
 }
 
 // Simular ejecuta la liquidación canónica sin persistir el comprobante.

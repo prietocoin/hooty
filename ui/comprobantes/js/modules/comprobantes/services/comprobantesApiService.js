@@ -383,6 +383,30 @@ export async function eliminarComprobantePorHash(hashLargo) {
   }
 }
 
+/**
+ * Fuerza el reprocesamiento canónico de un comprobante histórico: perfiles,
+ * contrato, tasas, montos firmados e imagen R2.
+ */
+export async function reprocesarComprobantePorHash(hashLargo) {
+  const idValido = obtenerIdentificadorValido(hashLargo);
+  if (!idValido) {
+    throw new Error('No se proporcionó un hash válido para reprocesar');
+  }
+  const res = await fetch(apiUrl(`${API_RUTA}/${encodeURIComponent(idValido)}/reprocesar`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' }
+  });
+  const raw = await res.text();
+  let data = {};
+  if (raw) {
+    try { data = JSON.parse(raw); } catch { data = {}; }
+  }
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || raw || `HTTP Error: ${res.status}`);
+  }
+  return data;
+}
+
 export {
   guardarCambiosComprobante as actualizarComprobanteApi,
   solicitarRelecturaIA as releerIaApi

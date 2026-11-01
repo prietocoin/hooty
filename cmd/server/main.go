@@ -122,6 +122,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	liquidator.WithImageResolver(images)
 	service, err := ingest.NewService(store, media, images, extractor, liquidator, clock.System{}, ingest.Options{
 		Logger:            logger,
 		ProcessingTimeout: cfg.ProcessingTimeout,
@@ -141,7 +142,7 @@ func run() error {
 	}
 	ratePublisher := publisher.New(readRepository, sender, publisher.NewCarteleraRenderer(),
 		cfg.TestGroup, logger)
-	readAPI := api.NewHandler(readRepository, logger, liquidator).WithPublisher(ratePublisher).WithNewsletterResolver(media)
+	readAPI := api.NewHandler(readRepository, logger, liquidator).WithPublisher(ratePublisher).WithNewsletterResolver(media).WithReprocessor(liquidator)
 
 	webhook := ingest.NewHTTPHandler(service, ingest.HTTPOptions{
 		Token:           cfg.WebhookToken,

@@ -46,6 +46,13 @@ type Handler struct {
 	simulator   Simulator
 	publisher   RatePublisher
 	newsletters NewsletterResolver
+	reprocessor Reprocessor
+}
+
+// Reprocessor recalcula un comprobante histórico con los módulos canónicos.
+type Reprocessor interface {
+	Reprocess(ctx context.Context, hash string) error
+	ReprocessAll(ctx context.Context) (int, error)
 }
 
 // NewsletterResolver resuelve el JID de un canal de WhatsApp a partir de su
@@ -104,6 +111,12 @@ func (h *Handler) WithNewsletterResolver(r NewsletterResolver) *Handler {
 	return h
 }
 
+// WithReprocessor habilita el recálculo de comprobantes históricos.
+func (h *Handler) WithReprocessor(r Reprocessor) *Handler {
+	h.reprocessor = r
+	return h
+}
+
 // Register monta las rutas completas con método en el ServeMux principal.
 //
 // Go 1.22+ exige registrar el método en el patrón para que ServeMux haga el
@@ -117,6 +130,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/comprobantes/{hash}", h.UpdateComprobante)
 	mux.HandleFunc("PUT /api/v1/comprobantes/{hash}/{$}", h.UpdateComprobante)
 	mux.HandleFunc("POST /api/v1/comprobantes/simular", h.Simular)
+	mux.HandleFunc("POST /api/v1/comprobantes/reprocesar", h.ReprocessComprobantes)
+	mux.HandleFunc("POST /api/v1/comprobantes/reprocesar/{$}", h.ReprocessComprobantes)
+	mux.HandleFunc("POST /api/v1/comprobantes/{hash}/reprocesar", h.ReprocessComprobante)
+	mux.HandleFunc("POST /api/v1/comprobantes/{hash}/reprocesar/{$}", h.ReprocessComprobante)
 	mux.HandleFunc("GET /api/v1/perfiles", h.ListPerfiles)
 	mux.HandleFunc("GET /api/v1/perfiles/{$}", h.ListPerfiles)
 	mux.HandleFunc("POST /api/v1/perfiles/guardar", h.SavePerfil)
@@ -165,6 +182,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && path == "/api/v1/comprobantes/simular":
 		h.Simular(w, r)
+	case r.Method == http.MethodPost && path == "/api/v1/comprobantes/reprocesar":
+		h.ReprocessComprobantes(w, r)
+	case r.Method == http.MethodPost && strings.HasPrefix(path, "/api/v1/comprobantes/") && strings.HasSuffix(path, "/reprocesar"):
+		h.ReprocessComprobante(w, r)
 	case r.Method == http.MethodGet && path == "/api/v1/admin/canales/resolver":
 		h.ResolveNewsletter(w, r)
 	case r.Method == http.MethodPost && path == "/api/v1/perfiles/guardar":
@@ -321,6 +342,99 @@ func (h *Handler) GetComprobante(w http.ResponseWriter, r *http.Request) {
 	index := MapPerfiles(perfiles)
 	writeJSON(w, http.StatusOK, NewComprobanteDTO(row,
 		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)], index[socioKey("FUNDDA")]))
+}
+
+func (h *Handler) ReprocessComprobante(w http.ResponseWriter, r *http.Request) {
+	if h.reprocessor == nil {
+		writeError(w, http.StatusServiceUnavailable, "reprocessor_unavailable")
+		return
+	}
+	raw := r.PathValue("hash")
+	if raw == "" {
+		raw = strings.TrimPrefix(r.URL.Path, "/api/v1/comprobantes/")
+		raw = strings.TrimSuffix(strings.TrimRight(raw, "/"), "/reprocesar")
+	}
+	hash, err := url.PathUnescape(strings.TrimSpace(raw))
+	if err != nil || hash == "" || strings.Contains(hash, "/") {
+		writeError(w, http.StatusBadRequest, "invalid_hash")
+		return
+	}
+
+	if err := h.reprocessor.Reprocess(r.Context(), hash); err != nil {
+		switch {
+		case errors.Is(err, ingest.ErrComprobanteNotFound):
+			writeError(w, http.StatusNotFound, "not_found")
+		case errors.Is(err, ingest.ErrManualType):
+			writeError(w, http.StatusConflict, "manual_type")
+		default:
+			h.log.Error("hooty.api.reprocesar", "hash", hash, "error", err)
+			writeError(w, http.StatusBadGateway, "reprocess_failed")
+		}
+		return
+	}
+
+	row, err := h.store.GetComprobante(r.Context(), hash)
+	if err != nil {
+		h.log.Error("hooty.api.reprocesar_leer", "hash", hash, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	perfiles, err := h.store.ListPerfiles(r.Context())
+	if err != nil {
+		h.log.Error("hooty.api.reprocesar_perfiles", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	index := MapPerfiles(perfiles)
+	writeJSON(w, http.StatusOK, NewComprobanteDTO(row,
+		index[socioKey(row.Socio1)], index[socioKey(row.Socio2)], index[socioKey("FUNDDA")]))
+}
+
+func (h *Handler) ReprocessComprobantes(w http.ResponseWriter, r *http.Request) {
+	if h.reprocessor == nil {
+		writeError(w, http.StatusServiceUnavailable, "reprocessor_unavailable")
+		return
+	}
+
+	var body struct {
+		Hashes []string `json:"hashes"`
+	}
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_json")
+			return
+		}
+	}
+
+	reprocesados := 0
+	errores := make([]string, 0)
+	if len(body.Hashes) == 0 {
+		count, err := h.reprocessor.ReprocessAll(r.Context())
+		reprocesados = count
+		if err != nil {
+			h.log.Error("hooty.api.reprocesar_todos", "error", err)
+			errores = append(errores, err.Error())
+		}
+	} else {
+		for _, hash := range body.Hashes {
+			hash = strings.TrimSpace(hash)
+			if hash == "" {
+				continue
+			}
+			if err := h.reprocessor.Reprocess(r.Context(), hash); err != nil {
+				errores = append(errores, hash+": "+err.Error())
+				continue
+			}
+			reprocesados++
+		}
+	}
+
+	h.log.Info("hooty.api.reprocesar_lote", "reprocesados", reprocesados, "errores", len(errores))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":      len(errores) == 0,
+		"reprocesados": reprocesados,
+		"errores":      errores,
+	})
 }
 
 // Simular resuelve tasas y montos con el motor canónico, sin persistir.
