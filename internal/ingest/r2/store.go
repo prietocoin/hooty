@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -73,17 +74,43 @@ func New(cfg Config) (*Store, error) {
 	if region == "" {
 		region = "auto"
 	}
+	publicDomain := normalizePublicBase(cfg.PublicDomain)
+	if publicDomain == "" {
+		publicDomain = publicBaseFromEnv()
+	}
 	return &Store{
 		endpoint:     endpoint,
 		bucket:       strings.TrimSpace(cfg.Bucket),
 		accessKey:    strings.TrimSpace(cfg.AccessKey),
 		secretKey:    strings.TrimSpace(cfg.SecretKey),
-		publicDomain: strings.TrimRight(strings.TrimSpace(cfg.PublicDomain), "/"),
+		publicDomain: publicDomain,
 		region:       region,
 		http:         &http.Client{Timeout: cfg.Timeout},
 		now:          cfg.Now,
 		log:          cfg.Logger,
 	}, nil
+}
+
+// normalizePublicBase garantiza un dominio público absoluto y sin barra final.
+// Si la variable de entorno llega sin esquema se asume HTTPS.
+func normalizePublicBase(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	return strings.TrimRight(raw, "/")
+}
+
+// publicBaseFromEnv aplica el contrato de producción: R2_PUBLIC_BASE_URL es la
+// variable canónica y R2_PUBLIC_DOMAIN queda como compatibilidad histórica.
+func publicBaseFromEnv() string {
+	if value := strings.TrimSpace(os.Getenv("R2_PUBLIC_BASE_URL")); value != "" {
+		return normalizePublicBase(value)
+	}
+	return normalizePublicBase(os.Getenv("R2_PUBLIC_DOMAIN"))
 }
 
 // Subir hace un PUT firmado. La clave se normaliza sin barra inicial.
@@ -153,10 +180,22 @@ func (s *Store) Subir(ctx context.Context, key string, data []byte, mimeType str
 	}
 	s.log.Info("hooty.r2.put_ok", "bucket", s.bucket, "key", key, "status", resp.StatusCode)
 
-	if s.publicDomain != "" {
-		return s.publicDomain + "/" + escapePath(key), nil
+	publicURL := s.publicObjectURL(key)
+	if publicURL == "" {
+		// El endpoint S3 (*.r2.cloudflarestorage.com) es interno: nunca debe
+		// terminar en url_imagen. Sin base pública el PUT no se considera útil.
+		return "", errors.New("r2: R2_PUBLIC_BASE_URL o R2_PUBLIC_DOMAIN es obligatorio para construir la URL pública")
 	}
-	return s.endpoint.Scheme + "://" + s.endpoint.Host + "/" + s.bucket + "/" + escapePath(key), nil
+	return publicURL, nil
+}
+
+// publicObjectURL construye la URL expuesta desde una clave de objeto.
+func (s *Store) publicObjectURL(key string) string {
+	key = strings.TrimLeft(strings.TrimSpace(key), "/")
+	if key == "" || s.publicDomain == "" {
+		return ""
+	}
+	return s.publicDomain + "/" + escapePath(key)
 }
 
 func sign(secret, date, region, stringToSign string) string {

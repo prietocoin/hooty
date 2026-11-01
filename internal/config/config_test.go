@@ -36,6 +36,20 @@ func TestLoadDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadLeeR2PublicBaseURL(t *testing.T) {
+	validEnv(t)
+	t.Setenv("R2_PUBLIC_BASE_URL", "pub-49b9c87f6e6a418ba42de5ba36ddc73e.r2.dev/")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := "https://pub-49b9c87f6e6a418ba42de5ba36ddc73e.r2.dev"
+	if cfg.R2PublicDomain != want {
+		t.Fatalf("R2PublicDomain = %q, se esperaba %q", cfg.R2PublicDomain, want)
+	}
+}
+
 func TestLoadRechazaURLInvalida(t *testing.T) {
 	validEnv(t)
 	t.Setenv("DATABASE_URL", "mysql://localhost/db")

@@ -83,7 +83,7 @@ func Load() (Config, error) {
 		R2Bucket:       env("R2_BUCKET_NAME", "remesas-img"),
 		R2AccessKey:    strings.TrimSpace(os.Getenv("R2_ACCESS_KEY_ID")),
 		R2SecretKey:    strings.TrimSpace(os.Getenv("R2_SECRET_ACCESS_KEY")),
-		R2PublicDomain: strings.TrimRight(env("R2_PUBLIC_DOMAIN", ""), "/"),
+		R2PublicDomain: normalizePublicBase(env("R2_PUBLIC_BASE_URL", env("R2_PUBLIC_DOMAIN", ""))),
 		R2Region:       env("R2_REGION", "auto"),
 		R2Timeout:      envDuration("R2_TIMEOUT", 60*time.Second),
 
@@ -215,6 +215,19 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// normalizePublicBase acepta el dominio público con o sin esquema y lo deja
+// absoluto, en HTTPS cuando no se especifica protocolo, y sin barra final.
+func normalizePublicBase(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	return strings.TrimRight(raw, "/")
 }
 
 func envDuration(key string, fallback time.Duration) time.Duration {

@@ -71,6 +71,9 @@ func run() error {
 		err = postgres.EnsureImageURLFallback(migrateCtx, pool)
 	}
 	if err == nil {
+		err = postgres.EnsurePublicImageURLs(migrateCtx, pool, cfg.R2PublicDomain, cfg.R2Bucket)
+	}
+	if err == nil {
 		err = postgres.EnsureMaintenanceState(migrateCtx, pool)
 	}
 	cancelMigrate()

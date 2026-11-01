@@ -46,6 +46,9 @@ func run() error {
 	if err := pool.Ping(ctx); err != nil {
 		return fmt.Errorf("conectar PostgreSQL: %w", err)
 	}
+	if err := postgres.EnsurePublicImageURLs(ctx, pool, cfg.R2PublicDomain, cfg.R2Bucket); err != nil {
+		return err
+	}
 
 	images, err := r2.New(r2.Config{
 		Endpoint:     cfg.R2Endpoint,

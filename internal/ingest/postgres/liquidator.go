@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -99,6 +100,7 @@ func (l *Liquidator) Reprocess(ctx context.Context, hash string) (string, error)
 		grupo1, grupo2, caption1, caption2, loteTasa                                   string
 		manual                                                                         bool
 		monto                                                                          float64
+		prevTasa1, prevTasa2, prevMonto1, prevMonto2, prevME1, prevME2                 float64
 		fecha                                                                          time.Time
 	)
 	err := l.pool.QueryRow(ctx, `
@@ -107,7 +109,10 @@ SELECT hash_largo, COALESCE(hash_corto, ''), COALESCE(instancia, 'hooty'),
        COALESCE(banco, ''), COALESCE(titular, ''), COALESCE(referencia, ''),
        COALESCE(url_imagen, ''), COALESCE(grupo_1, ''), COALESCE(grupo_2, ''),
        COALESCE(caption_1, ''), COALESCE(caption_2, ''), COALESCE(lote_tasa, ''),
-       COALESCE(tipo_op_manual, FALSE), fecha_operacion
+       COALESCE(tipo_op_manual, FALSE), fecha_operacion,
+       COALESCE(tasa_1, 0), COALESCE(tasa_2, 0),
+       COALESCE(monto_1, 0), COALESCE(monto_2, 0),
+       COALESCE(me1, 0), COALESCE(me2, 0)
 FROM comprobantes
 WHERE LOWER(hash_largo) = LOWER($1)
    OR LOWER(hash_largo) LIKE LOWER($1) || '%'
@@ -116,6 +121,7 @@ ORDER BY CASE WHEN LOWER(hash_largo) = LOWER($1) THEN 0 ELSE 1 END,
 LIMIT 1`, hash).Scan(
 		&hashLargo, &hashCorto, &instancia, &moneda, &monto, &banco, &titular, &referencia, &urlImagen,
 		&grupo1, &grupo2, &caption1, &caption2, &loteTasa, &manual, &fecha,
+		&prevTasa1, &prevTasa2, &prevMonto1, &prevMonto2, &prevME1, &prevME2,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrReprocessNotFound
@@ -177,6 +183,11 @@ LIMIT 1`, hash).Scan(
 	if err != nil {
 		return "", fmt.Errorf("postgres: recalcular comprobante %s: %w", hashLargo, err)
 	}
+	if err := completarMinimosContables(&comprobante,
+		ladoPrevio{tasa: prevTasa1, monto: prevMonto1, me: prevME1},
+		ladoPrevio{tasa: prevTasa2, monto: prevMonto2, me: prevME2}); err != nil {
+		return "", fmt.Errorf("postgres: comprobante %s no cumple chk_equivalentes_minimos: %w", hashLargo, err)
+	}
 
 	tag, err := l.pool.Exec(ctx, `
 UPDATE comprobantes
@@ -195,6 +206,54 @@ WHERE LOWER(hash_largo) = LOWER($9)
 		return "", ErrManualType
 	}
 	return hashLargo, nil
+}
+
+// ladoPrevio conserva los importes que ya satisfacían el CHECK de la tabla.
+type ladoPrevio struct {
+	tasa  float64
+	monto float64
+	me    float64
+}
+
+// completarMinimosContables garantiza que el UPDATE nunca escriba ceros que
+// violen chk_equivalentes_minimos. Si el recálculo no pudo resolver un lado
+// (tasa 0 por falta de regla o de tasa base), se conserva el importe válido ya
+// persistido; si tampoco existe, la fila se rechaza y ReprocessAll continúa con
+// las demás.
+func completarMinimosContables(c *domain.Comprobante, prev1, prev2 ladoPrevio) error {
+	if err := completarLado("1", &c.Tasa1, &c.Monto1, &c.ME1, prev1); err != nil {
+		return err
+	}
+	return completarLado("2", &c.Tasa2, &c.Monto2, &c.ME2, prev2)
+}
+
+func completarLado(label string, tasa, monto, me *float64, prev ladoPrevio) error {
+	const minimo = 0.01
+
+	if *tasa == 0 {
+		// Lado sin regla/tasa: hereda el snapshot válido anterior.
+		if prev.tasa > 0 && math.Abs(prev.monto) >= minimo {
+			*tasa = prev.tasa
+			*monto = prev.monto
+			if math.Abs(prev.me) >= minimo {
+				*me = prev.me
+			}
+		}
+	} else if math.Abs(*monto) < minimo {
+		*monto = prev.monto
+	}
+
+	if math.Abs(*me) < minimo && math.Abs(*monto) >= minimo {
+		// Equivalente no resoluble por falta de tasa base: se usa el importe
+		// del lado como equivalente mínimo no nulo.
+		*me = *monto
+	}
+	if math.Abs(*monto) < minimo || math.Abs(*me) < minimo {
+		return domain.Validationf(
+			"el lado %s no tiene montos equivalentes válidos (tasa=%g monto=%g me=%g)",
+			label, *tasa, *monto, *me)
+	}
+	return nil
 }
 
 // ReprocessAll reprocesa todas las filas no editadas manualmente.
@@ -238,7 +297,7 @@ ORDER BY actualizado_en ASC`)
 func (l *Liquidator) ReprocessHistoricalOnce(ctx context.Context) (int, error) {
 	var done bool
 	err := l.pool.QueryRow(ctx, `
-SELECT EXISTS (SELECT 1 FROM hooty_maintenance_state WHERE key = 'historical_reprocess_v1')`).Scan(&done)
+SELECT EXISTS (SELECT 1 FROM hooty_maintenance_state WHERE key = 'historical_reprocess_v2')`).Scan(&done)
 	if err != nil {
 		return 0, fmt.Errorf("postgres: leer estado de reprocesamiento: %w", err)
 	}
@@ -252,7 +311,7 @@ SELECT EXISTS (SELECT 1 FROM hooty_maintenance_state WHERE key = 'historical_rep
 	}
 	if _, err := l.pool.Exec(ctx, `
 INSERT INTO hooty_maintenance_state (key, value, updated_at)
-VALUES ('historical_reprocess_v1', 'done', NOW())
+VALUES ('historical_reprocess_v2', 'done', NOW())
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`); err != nil {
 		return count, fmt.Errorf("postgres: marcar reprocesamiento histórico: %w", err)
 	}

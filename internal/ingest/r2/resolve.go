@@ -7,25 +7,53 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
-// PublicURL devuelve la URL pública de un objeto. Si el valor recibido ya es
-// una URL absoluta se conserva; si es una clave, se reconstruye con el dominio
-// público configurado (o con el endpoint S3 como respaldo).
+// PublicURL devuelve la URL pública de un objeto. Si el valor recibido es una
+// URL absoluta del endpoint S3 interno se reescribe con el dominio público;
+// las URLs externas se conservan. Nunca devuelve *.r2.cloudflarestorage.com
+// cuando hay una base pública configurada.
 func (s *Store) PublicURL(value string) string {
 	raw := strings.TrimSpace(value)
 	if raw == "" {
 		return ""
 	}
 	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
+		if parsed, err := url.Parse(raw); err == nil && esEndpointS3(parsed, s.endpoint) {
+			if key := s.keyFromEndpointPath(parsed.Path); key != "" {
+				if rewritten := s.publicObjectURL(key); rewritten != "" {
+					return rewritten
+				}
+			}
+		}
 		return raw
 	}
-	key := strings.TrimLeft(raw, "/")
-	if s.publicDomain != "" {
-		return s.publicDomain + "/" + escapePath(key)
+	return s.publicObjectURL(raw)
+}
+
+// esEndpointS3 reconoce tanto el endpoint configurado como cualquier host
+// interno de Cloudflare R2 que nunca debe exponerse.
+func esEndpointS3(parsed, endpoint *url.URL) bool {
+	if parsed == nil || endpoint == nil {
+		return false
 	}
-	return s.endpointURL(key)
+	if strings.EqualFold(parsed.Host, endpoint.Host) {
+		return true
+	}
+	return strings.HasSuffix(strings.ToLower(parsed.Hostname()), ".r2.cloudflarestorage.com")
+}
+
+// keyFromEndpointPath extrae la clave de un path estilo S3
+// (/<bucket>/<clave>) sin depender de la forma exacta del endpoint.
+func (s *Store) keyFromEndpointPath(path string) string {
+	path = strings.TrimLeft(strings.TrimSpace(path), "/")
+	prefix := s.bucket + "/"
+	if strings.HasPrefix(path, prefix) {
+		path = strings.TrimPrefix(path, prefix)
+	}
+	return path
 }
 
 func (s *Store) endpointURL(key string) string {
@@ -55,7 +83,7 @@ func (s *Store) ResolveImageURL(ctx context.Context, hash, current string) (stri
 
 	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
 		if s.exists(ctx, raw) {
-			return raw, nil
+			return s.PublicURL(raw), nil
 		}
 	} else if raw != "" {
 		add(strings.TrimLeft(raw, "/"))
@@ -68,23 +96,27 @@ func (s *Store) ResolveImageURL(ctx context.Context, hash, current string) (stri
 	}
 
 	for _, candidate := range candidates {
-		urls := []string{s.PublicURL(candidate)}
-		if s.publicDomain != "" {
-			urls = append(urls, s.endpointURL(candidate))
+		publicURL := s.PublicURL(candidate)
+		if publicURL == "" {
+			continue
 		}
-		for _, url := range urls {
-			if url == "" {
-				continue
-			}
-			if s.exists(ctx, url) {
-				return url, nil
+		if s.exists(ctx, publicURL) {
+			return publicURL, nil
+		}
+		// El endpoint S3 solo se usa para verificar; la URL devuelta siempre
+		// es la pública.
+		if s.publicDomain != "" {
+			if endpoint := s.endpointURL(candidate); endpoint != publicURL && s.exists(ctx, endpoint) {
+				return publicURL, nil
 			}
 		}
 	}
 	if raw != "" {
 		// Se conserva la referencia original aunque el HEAD no sea concluyente:
 		// puede ser una URL firmada de corta duración o un bucket privado.
-		return s.PublicURL(raw), nil
+		if resolved := s.PublicURL(raw); resolved != "" {
+			return resolved, nil
+		}
 	}
 	return "", fmt.Errorf("r2: no se encontró la imagen del comprobante %q", hash)
 }

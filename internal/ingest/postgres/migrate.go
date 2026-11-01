@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -187,6 +188,93 @@ CREATE TABLE IF NOT EXISTS hooty_maintenance_state (
 		return fmt.Errorf("postgres: crear maintenance state: %w", err)
 	}
 	return nil
+}
+
+// EnsurePublicImageURLs reescribe las URLs históricas que apuntan al endpoint
+// S3 interno (*.r2.cloudflarestorage.com) con la base pública configurada.
+// Es idempotente y no toca imágenes de otros dominios.
+func EnsurePublicImageURLs(ctx context.Context, pool *pgxpool.Pool, publicBase, bucket string) error {
+	if pool == nil {
+		return errors.New("postgres: pool es obligatorio para migrar URLs públicas")
+	}
+	base := normalizePublicBase(publicBase)
+	if base == "" {
+		return nil
+	}
+	rows, err := pool.Query(ctx, `
+SELECT hash_largo, COALESCE(url_imagen, '')
+FROM comprobantes
+WHERE url_imagen ~* '^https?://[^/]+\.r2\.cloudflarestorage\.com/'`)
+	if err != nil {
+		return fmt.Errorf("postgres: listar URLs internas de R2: %w", err)
+	}
+	defer rows.Close()
+
+	type cambio struct {
+		hash string
+		url  string
+	}
+	var cambios []cambio
+	for rows.Next() {
+		var hash, actual string
+		if err := rows.Scan(&hash, &actual); err != nil {
+			return fmt.Errorf("postgres: leer URL interna de R2: %w", err)
+		}
+		if nueva := rebuildPublicImageURL(actual, base, bucket); nueva != "" && nueva != actual {
+			cambios = append(cambios, cambio{hash: hash, url: nueva})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("postgres: recorrer URLs internas de R2: %w", err)
+	}
+	rows.Close()
+
+	for _, item := range cambios {
+		if _, err := pool.Exec(ctx, `
+UPDATE comprobantes
+SET url_imagen = $2, actualizado_en = NOW()
+WHERE hash_largo = $1`, item.hash, item.url); err != nil {
+			return fmt.Errorf("postgres: reescribir URL pública de %s: %w", item.hash, err)
+		}
+	}
+	return nil
+}
+
+// rebuildPublicImageURL convierte una URL del endpoint S3 interno en la URL
+// pública canónica. Devuelve el valor original si no es una URL de R2.
+func rebuildPublicImageURL(raw, publicBase, bucket string) string {
+	raw = strings.TrimSpace(raw)
+	base := normalizePublicBase(publicBase)
+	if raw == "" || base == "" {
+		return raw
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return raw
+	}
+	if !strings.HasSuffix(strings.ToLower(parsed.Hostname()), ".r2.cloudflarestorage.com") {
+		return raw
+	}
+	key := strings.TrimLeft(parsed.EscapedPath(), "/")
+	if bucket = strings.TrimSpace(bucket); bucket != "" {
+		key = strings.TrimPrefix(key, bucket+"/")
+	}
+	if key == "" {
+		return raw
+	}
+	return base + "/" + key
+}
+
+// normalizePublicBase deja una base absoluta y sin barra final.
+func normalizePublicBase(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	return strings.TrimRight(raw, "/")
 }
 
 // rateCheckAllowsZero reconoce una definición que ya admite el estado 0.
