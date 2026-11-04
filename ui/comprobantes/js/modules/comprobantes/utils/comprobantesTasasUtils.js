@@ -101,13 +101,14 @@ export function resolverMonedaSocio(item = {}, posicion = 1) {
 }
 
 /**
- * Subtotal firmado del socio, copiado directamente del snapshot del backend.
- * No se multiplica por `polaridad_1/2`: el signo ya está en `me1`/`me2`.
+ * Subtotal firmado del socio en su moneda local (PEN, COP, etc.), copiado del
+ * snapshot del backend. No se usa `me1`/`me2`: esos campos son el equivalente
+ * en dólares y no deben etiquetarse con la moneda del socio.
  */
 export function resolverSubtotalSocio(item = {}, posicion = 1) {
   const esSocio2 = Number(posicion) === 2;
   const bruto = esSocio2
-    ? (item?.me2 ?? item?.m2_socio ?? item?.monto_2 ?? item?.monto2)
-    : (item?.me1 ?? item?.m1_socio ?? item?.monto_1 ?? item?.monto1);
+    ? (item?.monto_socio_2 ?? item?.monto_2 ?? item?.monto2 ?? item?.me2 ?? item?.m2_socio)
+    : (item?.monto_socio_1 ?? item?.monto_1 ?? item?.monto1 ?? item?.me1 ?? item?.m1_socio);
   return numero(bruto, 0);
 }

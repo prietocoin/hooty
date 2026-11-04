@@ -4,7 +4,7 @@
  */
 
 import { formatearMontoPlano } from './comprobantesNumerosUtils.js?v=20261031_02';
-import { formatearTasaComercial } from './comprobantesTasasUtils.js?v=20261101_05';
+import { formatearTasaComercial } from './comprobantesTasasUtils.js?v=20261104_01';
 
 export function formatMonto(val) {
   return formatearMontoPlano(val);

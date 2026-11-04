@@ -8,7 +8,7 @@
  * manifest, el apple-touch-icon y los metas apple-mobile-web-app.
  */
 
-const SW_VERSION = '20261101_08';
+const SW_VERSION = '20261104_01';
 const INSTALL_BANNER_ID = 'glauk-pwa-install';
 const DISMISS_KEY = 'glauk.pwa.install.dismissed';
 
