@@ -18,6 +18,8 @@ type SimulacionInput struct {
 	LoteTasa     string  `json:"lote_tasa"`
 	Tasa1        float64 `json:"tasa_1"`
 	Tasa2        float64 `json:"tasa_2"`
+	Caption1     string  `json:"caption_1"`
+	Caption2     string  `json:"caption_2"`
 }
 
 // SimulacionResult es el contrato de POST /api/v1/comprobantes/simular.
@@ -102,7 +104,7 @@ func SimularLiquidacion(input SimulacionInput, perfil1, perfil2, fundda domain.P
 	}
 	efectivo1 := perfilEfectivo(perfil1, fundda)
 	efectivo2 := perfilEfectivo(perfil2, fundda)
-	tipoOp := tipoOperacion(efectivo1, currency)
+	tipoOp := tipoOperacion(efectivo1, currency, domain.CaptionAbonoIrisEfectivo(input.Caption1, input.Caption2))
 
 	tasa1 := input.Tasa1
 	if tasa1 <= 0 {
@@ -179,8 +181,17 @@ func buscarRegla(reglas map[string]monedaRegla, code string) (monedaRegla, bool)
 
 // tipoOperacion replica la regla canónica: A si la divisa es la base del socio
 // 1; si no, el tipo contractual de su perfil; por defecto P.
-func tipoOperacion(perfil1 domain.Perfil, currency string) string {
-	if currency == monedaBase(perfil1) {
+//
+// Excepción IRIS/COP: la coincidencia con la moneda base no fuerza A. Solo es
+// abono si el caption es exactamente A/a; en cualquier otro caso se aplica el
+// tipo contractual (D/P).
+func tipoOperacion(perfil1 domain.Perfil, currency, caption string) string {
+	irisCop := domain.EsIrisCOP(perfil1.Nombre, currency)
+	if irisCop {
+		if domain.EsCaptionAbonoIris(caption) {
+			return "A"
+		}
+	} else if currency == monedaBase(perfil1) {
 		return "A"
 	}
 	regla, ok := buscarRegla(reglasDe(perfil1), currency)

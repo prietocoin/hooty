@@ -248,8 +248,9 @@ func NewComprobanteDTO(row ComprobanteRow, perfil1, perfil2 *Perfil, funddaOpt .
 	monedaBase2 := monedaBaseDe(perfil2)
 	rol1 := rolDe(perfil1)
 	rol2 := rolDe(perfil2)
-	tipo1 := tipoOperacion(moneda, perfil1)
-	tipo2 := tipoOperacion(moneda, perfil2)
+	captionEfectivo := domain.CaptionAbonoIrisEfectivo(row.Caption1, row.Caption2)
+	tipo1 := tipoOperacion(moneda, perfil1, captionEfectivo)
+	tipo2 := tipoOperacion(moneda, perfil2, captionEfectivo)
 	tipoEfectivo := tipo1
 	if row.TipoOpManual {
 		tipoEfectivo = domain.NormalizeTipoOp(row.TipoOp)
@@ -415,13 +416,18 @@ func tipoManual(row ComprobanteRow) string {
 	return domain.NormalizeTipoOp(row.TipoOp)
 }
 
-func tipoOperacion(moneda string, perfil *Perfil) string {
+func tipoOperacion(moneda string, perfil *Perfil, caption string) string {
 	if perfil == nil {
 		return "P"
 	}
 	moneda = domain.NormalizeCurrency(moneda, "")
 	base := domain.NormalizeCurrency(perfil.MonedaBase, "")
-	if moneda != "" && base != "" && moneda == base {
+	irisCop := domain.EsIrisCOP(perfil.Nombre, moneda)
+	if irisCop {
+		if domain.EsCaptionAbonoIris(caption) {
+			return "A"
+		}
+	} else if moneda != "" && base != "" && moneda == base {
 		return "A"
 	}
 	if len(perfil.Monedas) == 0 {

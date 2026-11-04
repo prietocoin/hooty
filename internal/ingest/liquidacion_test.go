@@ -14,21 +14,51 @@ func TestTipoOperacionIngestaUsaPerfilSocio1(t *testing.T) {
 		Nombre: "CHASAN", MonedaBase: "USD",
 		Monedas: json.RawMessage(`{"ARS":{"tipo":"P"},"COP":{"tipo":"D"}}`),
 	}
-	if got := tipoOperacion(perfil, "USD"); got != "A" {
+	if got := tipoOperacion(perfil, "USD", ""); got != "A" {
 		t.Fatalf("moneda base debe ser A, fue %q", got)
 	}
-	if got := tipoOperacion(perfil, "ARS"); got != "P" {
+	if got := tipoOperacion(perfil, "ARS", ""); got != "P" {
 		t.Fatalf("ARS debe leer el tipo del perfil, fue %q", got)
 	}
-	if got := tipoOperacion(perfil, "COP"); got != "D" {
+	if got := tipoOperacion(perfil, "COP", ""); got != "D" {
 		t.Fatalf("COP debe leer D del perfil, fue %q", got)
 	}
-	if got := tipoOperacion(perfil, "BRL"); got != "P" {
+	if got := tipoOperacion(perfil, "BRL", ""); got != "P" {
 		t.Fatalf("sin regla el tipo natural debe ser P, fue %q", got)
 	}
 	perfil.Monedas = json.RawMessage(`{"ARS":{"tipo":"A"}}`)
-	if got := tipoOperacion(perfil, "ARS"); got != "P" {
+	if got := tipoOperacion(perfil, "ARS", ""); got != "P" {
 		t.Fatalf("una moneda distinta a la base no puede ser A, fue %q", got)
+	}
+}
+
+func TestTipoOperacionIrisCopCaptionEstricto(t *testing.T) {
+	t.Parallel()
+
+	perfil := domain.Perfil{
+		Nombre: "IRIS", MonedaBase: "COP",
+		Monedas: json.RawMessage(`{"COP":{"tipo":"D"}}`),
+	}
+	casos := []struct {
+		caption string
+		quiero  string
+	}{
+		{"A", "A"},
+		{"a", "A"},
+		{"  A  ", "A"},
+		{"Abono", "D"},
+		{"A 50", "D"},
+		{"", "D"},
+	}
+	for _, caso := range casos {
+		if got := tipoOperacion(perfil, "COP", caso.caption); got != caso.quiero {
+			t.Fatalf("caption %q: tipoOperacion = %q, quiero %q", caso.caption, got, caso.quiero)
+		}
+	}
+
+	perfil.Monedas = json.RawMessage(`{"COP":{"tipo":"P"}}`)
+	if got := tipoOperacion(perfil, "COP", "Abono"); got != "P" {
+		t.Fatalf("sin caption exacto debe seguir el contrato P, obtuve %q", got)
 	}
 }
 

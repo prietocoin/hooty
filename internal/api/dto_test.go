@@ -25,10 +25,34 @@ func TestTipoOperacion(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tipoOperacion(tc.moneda, tc.perfil); got != tc.want {
+			if got := tipoOperacion(tc.moneda, tc.perfil, ""); got != tc.want {
 				t.Fatalf("tipoOperacion = %q, se esperaba %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestTipoOperacionIrisCopCaptionEstricto(t *testing.T) {
+	t.Parallel()
+
+	perfil := &Perfil{
+		Nombre: "IRIS", MonedaBase: "COP",
+		Monedas: json.RawMessage(`{"COP":{"tipo":"D"}}`),
+	}
+	casos := []struct {
+		caption string
+		quiero  string
+	}{
+		{"A", "A"},
+		{"a", "A"},
+		{"Abono", "D"},
+		{"A 50", "D"},
+		{"", "D"},
+	}
+	for _, caso := range casos {
+		if got := tipoOperacion("COP", perfil, caso.caption); got != caso.quiero {
+			t.Fatalf("caption %q: tipoOperacion = %q, quiero %q", caso.caption, got, caso.quiero)
+		}
 	}
 }
 

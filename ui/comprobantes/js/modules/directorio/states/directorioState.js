@@ -19,7 +19,7 @@ import { notificarSociosActualizados } from '../../../../../shared/js/sync.js';
 import {
   construirCatalogoSocios,
   establecerCatalogoSocios
-} from '../../comprobantes/services/comprobantesNaturalezaService.js';
+} from '../../comprobantes/services/comprobantesNaturalezaService.js?v=20261101_09';
 
 export function createDirectorioState() {
   return {

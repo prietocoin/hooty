@@ -54,6 +54,8 @@ func CalcularLiquidacionConFundda(input domain.LiquidacionInput, perfil1, perfil
 	resultado, err := SimularLiquidacion(SimulacionInput{
 		MonedaRecibo: currency,
 		MontoRecibo:  amount,
+		Caption1:     input.Caption1,
+		Caption2:     input.Caption2,
 	}, perfil1, perfil2, fundda, lote)
 	if err != nil {
 		return domain.Comprobante{}, fmt.Errorf("liquidación: %w", err)
@@ -64,22 +66,26 @@ func CalcularLiquidacionConFundda(input domain.LiquidacionInput, perfil1, perfil
 		fechaOperacion = now
 	}
 	comprobante := domain.Comprobante{
-		HashLargo:      input.HashLargo,
-		HashCorto:      input.HashCorto,
-		Instancia:      input.Instancia,
-		MontoRecibo:    domain.Round2(amount),
-		MonedaRecibo:   currency,
-		Banco:          input.Extraccion.Banco,
-		Titular:        input.Extraccion.Titular,
-		Referencia:     input.Extraccion.Referencia,
-		URLImagen:      input.URLImagen,
-		Grupo1:         input.Grupo1,
-		Grupo2:         input.Grupo2,
-		Caption1:       input.Caption1,
-		Caption2:       input.Caption2,
-		Socio1:         perfil1.Nombre,
-		Socio2:         perfil2.Nombre,
-		TipoOp:         tipoOperacion(perfilEfectivo(perfil1, fundda), currency),
+		HashLargo:    input.HashLargo,
+		HashCorto:    input.HashCorto,
+		Instancia:    input.Instancia,
+		MontoRecibo:  domain.Round2(amount),
+		MonedaRecibo: currency,
+		Banco:        input.Extraccion.Banco,
+		Titular:      input.Extraccion.Titular,
+		Referencia:   input.Extraccion.Referencia,
+		URLImagen:    input.URLImagen,
+		Grupo1:       input.Grupo1,
+		Grupo2:       input.Grupo2,
+		Caption1:     input.Caption1,
+		Caption2:     input.Caption2,
+		Socio1:       perfil1.Nombre,
+		Socio2:       perfil2.Nombre,
+		TipoOp: tipoOperacion(
+			perfilEfectivo(perfil1, fundda),
+			currency,
+			domain.CaptionAbonoIrisEfectivo(input.Caption1, input.Caption2),
+		),
 		Tasa1:          resultado.Tasa1,
 		Tasa2:          resultado.Tasa2,
 		Monto1:         resultado.Monto1,

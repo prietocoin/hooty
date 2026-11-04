@@ -115,16 +115,30 @@ export function resolverNaturaleza(comprobante = {}, catalogoSocios = {}) {
 
   const moneda = String(comprobante?.moneda_recibo || comprobante?.moneda || '').trim().toUpperCase();
   const monedaNatural = String(configSocio1?.moneda_natural || '').trim().toUpperCase();
-  const caption = String(
+  const captionRaw = String(
     comprobante?.caption_1 || comprobante?.caption_2 ||
     comprobante?.caption || comprobante?.descripcion || ''
-  ).trim().toUpperCase();
+  ).trim();
+  const caption = captionRaw.toUpperCase();
 
   const tieneCaptionA = /\bA\b/.test(caption)
     || caption.includes('TIPO: A')
     || caption.includes('ABONO');
 
   const esIris = normalizarSocio(socio1) === 'IRIS';
+  const esIrisCop = esIris && moneda === 'COP';
+
+  // IRIS + COP es la única excepción estricta: solo es abono si el caption es
+  // exactamente A o a. "Abono", "A 50" o vacío siguen el contrato D/P.
+  if (esIrisCop) {
+    const captionIris1 = String(comprobante?.caption_1 || '').trim();
+    const captionIris2 = String(comprobante?.caption_2 || '').trim();
+    if (/^\s*[Aa]\s*$/.test(captionIris1) || /^\s*[Aa]\s*$/.test(captionIris2)) {
+      return 'A';
+    }
+    const contractual = resolverPorTabla(configSocio1, moneda, comprobante);
+    return contractual === 'A' ? 'D' : contractual;
+  }
 
   // PASO 1: coincidencia con la moneda natural del socio 1 (abono automático).
   // IRIS queda excluido: no se le fuerza un abono por coincidir con su moneda
