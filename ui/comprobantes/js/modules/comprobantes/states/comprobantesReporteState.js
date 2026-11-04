@@ -16,7 +16,7 @@ import {
   resolverMonedaSocio,
   resolverSubtotalSocio,
   resolverTasaSocio
-} from '../utils/comprobantesTasasUtils.js?v=20261101_05';
+} from '../utils/comprobantesTasasUtils.js?v=20261104_02';
 import {
   dentroRangoCaracas,
   fechaCaracasISO,

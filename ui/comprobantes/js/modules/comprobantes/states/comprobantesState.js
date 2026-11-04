@@ -8,7 +8,7 @@ import {
   formatMonto, formatTasa, obtenerME1, obtenerME2, obtenerMonto1, obtenerMonto2,
   obtenerTasaSocioCalculada, claseInsignia, formatDiaHora,
   resolverTipoComprobante, resolverTasaSocio
-} from '../utils/comprobantesFormatters.js?v=20261101_05';
+} from '../utils/comprobantesFormatters.js?v=20261104_02';
 
 import { apiUrl } from '../../../../../shared/js/api-base.js?v=20261031_02';
 import { notify } from '../../../../../shared/js/toast.js?v=20261031_02';
@@ -16,7 +16,7 @@ import { notify } from '../../../../../shared/js/toast.js?v=20261031_02';
 import {
   calcularSociosPendientesConsolidado,
   calcularMovimientoFiltradoTotal
-} from '../services/saldosCalculatorService.js?v=20261031_02';
+} from '../services/saldosCalculatorService.js?v=20261104_02';
 
 import {
   eliminarComprobantePorHash,
