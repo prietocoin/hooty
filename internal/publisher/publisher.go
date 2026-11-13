@@ -144,16 +144,16 @@ func (p *Publisher) Publish(ctx context.Context, isPrueba bool) (Result, error) 
 		if len(socios) == 0 {
 			return resultado, errors.New("publisher: no hay socios activos ON para publicar")
 		}
-
-		// La prueba valida el lote, no la lista completa de socios: enviar un
-		// cartel por cada socio al mismo grupo multiplica el trabajo y puede
-		// agotar el timeout de la petición. Se envía un representante.
-		destino := socios[0]
-		destino.ChatID = p.testChatID
-		resultado.Detalle = []Detalle{p.enviar(ctx, destino, lote, true)}
+		destinos := make([]Socio, len(socios))
+		for i, socio := range socios {
+			destinos[i] = socio
+			destinos[i].ChatID = p.testChatID
+		}
+		resultado.Detalle = p.publishSocios(ctx, destinos, lote, true)
 		resultado.Procesados, resultado.Fallidos = contarDetalles(resultado.Detalle)
+		ordenarDetalle(resultado.Detalle)
 		if resultado.Procesados == 0 {
-			return resultado, errors.New("publisher: falló el envío de prueba")
+			return resultado, errors.New("publisher: fallaron todos los envíos de prueba")
 		}
 		return resultado, nil
 	}
