@@ -13,11 +13,26 @@ export class ApiError extends Error {
   }
 }
 
-function mensajeHttp(estado) {
+function extracto(texto) {
+  return String(texto || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+}
+
+function mensajeHttp(estado, texto = '') {
   if (estado === 404) return 'Endpoint no disponible en Hooty v2';
   if (estado === 405) return 'Método no permitido por Hooty v2';
-  if (estado >= 500) return 'Hooty no pudo leer la base de datos';
-  return `Error HTTP ${estado}`;
+  const detalle = extracto(texto);
+  if (estado >= 500) {
+    return detalle
+      ? `Hooty respondió HTTP ${estado}: ${detalle}`
+      : `Hooty respondió HTTP ${estado} sin detalle (posible timeout del servidor o del proxy)`;
+  }
+  return detalle ? `Error HTTP ${estado}: ${detalle}` : `Error HTTP ${estado}`;
 }
 
 async function solicitarJson(ruta, opciones = {}) {
@@ -51,7 +66,11 @@ async function solicitarJson(ruta, opciones = {}) {
   }
 
   if (!respuesta.ok || datos.success === false) {
-    throw new ApiError(datos.error || mensajeHttp(respuesta.status), respuesta.status, ruta);
+    const detalle = typeof datos.error === 'string' ? datos.error.trim() : '';
+    const mensaje = detalle
+      ? (respuesta.status >= 400 ? `HTTP ${respuesta.status}: ${detalle}` : detalle)
+      : mensajeHttp(respuesta.status, texto || respuesta.statusText);
+    throw new ApiError(mensaje, respuesta.status, ruta);
   }
   return datos;
 }
