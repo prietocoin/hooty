@@ -109,7 +109,7 @@ func testPublisher(testChat string, sender *fakeSender) *Publisher {
 	}, sender, fakeRenderer{}, testChat, nil)
 }
 
-func TestPublishPruebaEnviaCartelesIndividualesAlGrupoDePrueba(t *testing.T) {
+func TestPublishPruebaEnviaUnSoloCartelAlGrupoDePrueba(t *testing.T) {
 	t.Parallel()
 
 	sender := &fakeSender{}
@@ -118,15 +118,13 @@ func TestPublishPruebaEnviaCartelesIndividualesAlGrupoDePrueba(t *testing.T) {
 		t.Fatalf("publicación de prueba rechazada: %v", err)
 	}
 	destinos := sender.chatIDs()
-	if len(destinos) != 2 {
-		t.Fatalf("debe enviar un cartel por socio al grupo test: %v", destinos)
+	if len(destinos) != 1 {
+		t.Fatalf("debe enviar un solo cartel de prueba, obtuve: %v", destinos)
 	}
-	for _, destino := range destinos {
-		if destino != "prueba@g.us" {
-			t.Fatalf("destino de prueba incorrecto: %v", destinos)
-		}
+	if destinos[0] != "prueba@g.us" {
+		t.Fatalf("destino de prueba incorrecto: %v", destinos)
 	}
-	if resultado.Procesados != 2 || !resultado.Prueba {
+	if resultado.Procesados != 1 || resultado.Fallidos != 0 || !resultado.Prueba {
 		t.Fatalf("resultado inesperado: %+v", resultado)
 	}
 }
@@ -160,7 +158,7 @@ func (r *concurrentRenderer) maxConcurrent() int {
 	return r.max
 }
 
-func TestPublishPruebaParalelizaLosCarteles(t *testing.T) {
+func TestPublishProduccionParalelizaLosCarteles(t *testing.T) {
 	t.Parallel()
 
 	socios := make([]Socio, 12)
@@ -176,15 +174,15 @@ func TestPublishPruebaParalelizaLosCarteles(t *testing.T) {
 		socios: socios,
 	}, &fakeSender{}, renderer, "prueba@g.us", nil)
 
-	resultado, err := p.Publish(context.Background(), true)
+	resultado, err := p.Publish(context.Background(), false)
 	if err != nil {
-		t.Fatalf("publicación de prueba rechazada: %v", err)
+		t.Fatalf("publicación de producción rechazada: %v", err)
 	}
 	if resultado.Procesados != len(socios) {
 		t.Fatalf("procesados = %d, esperaba %d", resultado.Procesados, len(socios))
 	}
 	if maximo := renderer.maxConcurrent(); maximo < 2 {
-		t.Fatalf("el modo prueba debe renderizar en paralelo; máximo concurrente = %d", maximo)
+		t.Fatalf("la publicación debe renderizar en paralelo; máximo concurrente = %d", maximo)
 	}
 }
 
