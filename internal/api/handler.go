@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -50,6 +51,7 @@ type Handler struct {
 	reportSender ReportSender
 	newsletters  NewsletterResolver
 	reprocessor  Reprocessor
+	publishJobs  *publishJobs
 }
 
 // Reprocessor recalcula un comprobante histórico con los módulos canónicos.
@@ -106,7 +108,7 @@ func NewHandler(store Store, logger *slog.Logger, simuladores ...Simulator) *Han
 	if logger == nil {
 		logger = slog.Default()
 	}
-	handler := &Handler{store: store, log: logger}
+	handler := &Handler{store: store, log: logger, publishJobs: newPublishJobs()}
 	if len(simuladores) > 0 {
 		handler.simulator = simuladores[0]
 	}
@@ -118,6 +120,113 @@ func NewHandler(store Store, logger *slog.Logger, simuladores ...Simulator) *Han
 func (h *Handler) WithPublisher(p RatePublisher) *Handler {
 	h.publisher = p
 	return h
+}
+
+const (
+	// publishJobTimeout acota el trabajo en segundo plano. No depende del
+	// timeout de la petición HTTP ni de la conexión del navegador.
+	publishJobTimeout = 10 * time.Minute
+	// publishJobRetention conserva los últimos trabajos para consultar estado.
+	publishJobRetention = 20
+)
+
+// publishJob es el estado observable de una publicación en segundo plano.
+type publishJob struct {
+	ID          string              `json:"job_id"`
+	Estado      string              `json:"estado"`
+	Prueba      bool                `json:"prueba"`
+	IDTasa      string              `json:"id_tasa,omitempty"`
+	Procesados  int                 `json:"procesados"`
+	Fallidos    int                 `json:"fallidos"`
+	Notificado  bool                `json:"notificado"`
+	Detalle     []publisher.Detalle `json:"detalle,omitempty"`
+	Error       string              `json:"error,omitempty"`
+	IniciadoEn  time.Time           `json:"iniciado_en"`
+	TerminadoEn *time.Time          `json:"terminado_en,omitempty"`
+}
+
+// publishJobs serializa las publicaciones: una a la vez por proceso. Así un
+// reintento del navegador no duplica envíos mientras la anterior sigue viva.
+type publishJobs struct {
+	mu     sync.Mutex
+	jobs   map[string]*publishJob
+	actual string
+}
+
+func newPublishJobs() *publishJobs {
+	return &publishJobs{jobs: map[string]*publishJob{}}
+}
+
+// start devuelve el trabajo en curso o crea uno nuevo. El segundo valor indica
+// si el trabajo fue creado por esta llamada.
+func (m *publishJobs) start(prueba bool) (publishJob, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if actual := m.jobs[m.actual]; actual != nil && actual.Estado == "en_proceso" {
+		return *actual, false
+	}
+
+	id := "pub-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	job := &publishJob{
+		ID:         id,
+		Estado:     "en_proceso",
+		Prueba:     prueba,
+		IniciadoEn: time.Now().UTC(),
+	}
+	m.jobs[id] = job
+	m.actual = id
+	m.limpiar()
+	return *job, true
+}
+
+func (m *publishJobs) finish(id string, resultado publisher.Result, err error, notificado bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	job := m.jobs[id]
+	if job == nil {
+		return
+	}
+	terminado := time.Now().UTC()
+	job.TerminadoEn = &terminado
+	job.Notificado = notificado
+	job.IDTasa = resultado.IDTasa
+	job.Procesados = resultado.Procesados
+	job.Fallidos = resultado.Fallidos
+	job.Detalle = resultado.Detalle
+	if err != nil {
+		job.Estado = "error"
+		job.Error = err.Error()
+		return
+	}
+	job.Estado = "ok"
+}
+
+func (m *publishJobs) get(id string) (publishJob, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	job := m.jobs[id]
+	if job == nil {
+		return publishJob{}, false
+	}
+	return *job, true
+}
+
+// limpiar se llama con m.mu tomado.
+func (m *publishJobs) limpiar() {
+	if len(m.jobs) <= publishJobRetention {
+		return
+	}
+	for id, job := range m.jobs {
+		if id == m.actual || job.Estado == "en_proceso" {
+			continue
+		}
+		delete(m.jobs, id)
+		if len(m.jobs) <= publishJobRetention/2 {
+			return
+		}
+	}
 }
 
 // WithNewsletterResolver habilita la utilidad de resolución de canales.
@@ -171,6 +280,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/tasas/guardar-lote/{$}", h.SaveLote)
 	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote", h.PublishLote)
 	mux.HandleFunc("PUT /api/v1/tasas/publicar-lote/{$}", h.PublishLote)
+	mux.HandleFunc("GET /api/v1/tasas/publicar-lote/estado/{id}", h.PublishStatus)
+	mux.HandleFunc("GET /api/v1/tasas/publicar-lote/estado/{id}/{$}", h.PublishStatus)
 	mux.HandleFunc("PUT /api/v1/tasas/disparar", h.PublishSocio)
 	mux.HandleFunc("PUT /api/v1/tasas/disparar/{$}", h.PublishSocio)
 	mux.HandleFunc("DELETE /api/v1/tasas/lote/{id}", h.DeleteLote)
@@ -255,6 +366,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.ListPerfiles(w, r)
 	case path == "/api/v1/tasas/monitor":
 		h.LatestTasa(w, r)
+	case strings.HasPrefix(path, "/api/v1/tasas/publicar-lote/estado/"):
+		h.PublishStatus(w, r)
 	case path == "/api/v1/tasas/lote-por-fecha":
 		h.LotePorFecha(w, r)
 	case path == "/api/v1/tasas/preview" || strings.HasPrefix(path, "/api/v1/tasas/preview/"):
@@ -836,32 +949,47 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.publisher != nil {
-		var (
-			resultado publisher.Result
-			err       error
-		)
-		if len(envios) > 0 {
-			if images, ok := h.publisher.(ImagePublisher); ok {
-				resultado, err = images.PublishImages(r.Context(), isPrueba, envios)
-			} else {
-				resultado, err = h.publisher.Publish(r.Context(), isPrueba)
-			}
-		} else {
-			resultado, err = h.publisher.Publish(r.Context(), isPrueba)
+		job, iniciada := h.publishJobs.start(isPrueba)
+		if iniciada {
+			// El trabajo se desacopla del contexto HTTP: el proxy puede cerrar
+			// la conexión, pero los envíos a Evolution deben terminar.
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), publishJobTimeout)
+			go func() {
+				defer cancel()
+
+				var (
+					resultado publisher.Result
+					err       error
+				)
+				if len(envios) > 0 {
+					if images, ok := h.publisher.(ImagePublisher); ok {
+						resultado, err = images.PublishImages(ctx, isPrueba, envios)
+					} else {
+						resultado, err = h.publisher.Publish(ctx, isPrueba)
+					}
+				} else {
+					resultado, err = h.publisher.Publish(ctx, isPrueba)
+				}
+				if err != nil {
+					h.log.Error("hooty.api.tasas_publicar", "job", job.ID, "prueba", isPrueba, "error", err)
+					h.publishJobs.finish(job.ID, resultado, err, false)
+					return
+				}
+				notificado := h.notificarLote(ctx, resultado.IDTasa)
+				h.publishJobs.finish(job.ID, resultado, nil, notificado)
+			}()
 		}
-		if err != nil {
-			h.log.Error("hooty.api.tasas_publicar", "prueba", isPrueba, "error", err)
-			writeError(w, http.StatusBadGateway, err.Error())
-			return
+
+		mensaje := "Publicación iniciada"
+		if !iniciada {
+			mensaje = "Ya hay una publicación en curso"
 		}
-		notificado := h.notificarLote(r.Context(), resultado.IDTasa)
-		writeJSON(w, http.StatusOK, map[string]any{
-			"id_tasa":    resultado.IDTasa,
-			"procesados": resultado.Procesados,
-			"fallidos":   resultado.Fallidos,
-			"prueba":     resultado.Prueba,
-			"detalle":    resultado.Detalle,
-			"notificado": notificado,
+		writeJSON(w, http.StatusAccepted, map[string]any{
+			"success": true,
+			"estado":  "en_proceso",
+			"job_id":  job.ID,
+			"prueba":  job.Prueba,
+			"mensaje": mensaje,
 		})
 		return
 	}
@@ -882,6 +1010,40 @@ func (h *Handler) PublishLote(w http.ResponseWriter, r *http.Request) {
 		"procesados": procesados,
 		"prueba":     isPrueba,
 		"notificado": notificado,
+	})
+}
+
+// PublishStatus responde GET /api/v1/tasas/publicar-lote/estado/{id} con el
+// avance de una publicación en segundo plano.
+func (h *Handler) PublishStatus(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		resto := strings.TrimPrefix(strings.TrimRight(r.URL.Path, "/"),
+			"/api/v1/tasas/publicar-lote/estado/")
+		id = strings.TrimSpace(resto)
+	}
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "job_id es obligatorio")
+		return
+	}
+	job, ok := h.publishJobs.get(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "publicación no encontrada")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":      true,
+		"job_id":       job.ID,
+		"estado":       job.Estado,
+		"prueba":       job.Prueba,
+		"id_tasa":      job.IDTasa,
+		"procesados":   job.Procesados,
+		"fallidos":     job.Fallidos,
+		"notificado":   job.Notificado,
+		"detalle":      job.Detalle,
+		"error":        job.Error,
+		"iniciado_en":  job.IniciadoEn,
+		"terminado_en": job.TerminadoEn,
 	})
 }
 

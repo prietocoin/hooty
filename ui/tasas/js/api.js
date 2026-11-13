@@ -75,6 +75,26 @@ async function solicitarJson(ruta, opciones = {}) {
   return datos;
 }
 
+const PUBLICACION_INTERVALO_MS = 2000;
+const PUBLICACION_ESPERA_MAX_MS = 10 * 60 * 1000;
+
+async function esperarPublicacion(jobId) {
+  const limite = Date.now() + PUBLICACION_ESPERA_MAX_MS;
+  while (Date.now() < limite) {
+    await new Promise((resolver) => setTimeout(resolver, PUBLICACION_INTERVALO_MS));
+    const estado = await solicitarJson(`/publicar-lote/estado/${encodeURIComponent(jobId)}`);
+    if (estado.estado === 'error') {
+      throw new ApiError(estado.error || 'La publicación falló', 502, '/publicar-lote');
+    }
+    if (estado.estado !== 'en_proceso') return estado;
+  }
+  throw new ApiError(
+    'La publicación sigue en curso; revisa el estado antes de reintentar',
+    0,
+    '/publicar-lote'
+  );
+}
+
 export const api = {
   /** Lectura canónica del lote vigente y sus tasas. */
   monitor() {
@@ -124,14 +144,20 @@ export const api = {
     });
   },
 
-  publicarLote(modoPruebaGlobal) {
-    return solicitarJson('/publicar-lote', {
+  async publicarLote(modoPruebaGlobal) {
+    const inicio = await solicitarJson('/publicar-lote', {
       method: WRITE_METHOD,
       body: JSON.stringify({
         is_prueba: Boolean(modoPruebaGlobal),
         modo_prueba_global: Boolean(modoPruebaGlobal)
       })
     });
+    if (inicio.estado !== 'en_proceso' || !inicio.job_id) return inicio;
+    return esperarPublicacion(inicio.job_id);
+  },
+
+  estadoPublicacion(jobId) {
+    return solicitarJson(`/publicar-lote/estado/${encodeURIComponent(jobId)}`);
   },
 
   async previewBlob(socio = '', prueba = false) {

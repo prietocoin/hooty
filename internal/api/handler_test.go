@@ -953,22 +953,71 @@ func TestNotificarTasasInsertaEvento(t *testing.T) {
 	}
 }
 
+func waitPublishJob(t *testing.T, h *Handler, id string) {
+	t.Helper()
+	limite := time.Now().Add(2 * time.Second)
+	for {
+		h.publishJobs.mu.Lock()
+		job := h.publishJobs.jobs[id]
+		listo := job != nil && job.Estado != "en_proceso"
+		h.publishJobs.mu.Unlock()
+		if listo {
+			return
+		}
+		if time.Now().After(limite) {
+			t.Fatalf("la publicación %s no terminó a tiempo", id)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestPublicarLoteLeeIsPruebaYDespacha(t *testing.T) {
 	t.Parallel()
 
 	despachador := &fakePublisher{}
+	handler := NewHandler(testStore(), nil).WithPublisher(despachador)
 	mux := http.NewServeMux()
-	NewHandler(testStore(), nil).WithPublisher(despachador).Register(mux)
+	handler.Register(mux)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/tasas/publicar-lote",
 		strings.NewReader(`{"is_prueba":true,"modo_prueba_global":false}`))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("publicar status = %d, body=%s", rec.Code, rec.Body.String())
 	}
+	var inicio struct {
+		JobID  string `json:"job_id"`
+		Estado string `json:"estado"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &inicio); err != nil {
+		t.Fatalf("respuesta inicial inválida: %v", err)
+	}
+	if inicio.JobID == "" || inicio.Estado != "en_proceso" {
+		t.Fatalf("trabajo inicial inesperado: %+v", inicio)
+	}
+
+	waitPublishJob(t, handler, inicio.JobID)
 	if despachador.calls != 1 || !despachador.prueba {
 		t.Fatalf("is_prueba no llegó al despachador: %+v", despachador)
+	}
+
+	req = httptest.NewRequest(http.MethodGet,
+		"/api/v1/tasas/publicar-lote/estado/"+inicio.JobID, nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("estado status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var estado struct {
+		Estado     string `json:"estado"`
+		Procesados int    `json:"procesados"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &estado); err != nil {
+		t.Fatalf("estado inválido: %v", err)
+	}
+	if estado.Estado != "ok" || estado.Procesados != 1 {
+		t.Fatalf("estado final inesperado: %+v", estado)
 	}
 }
 
@@ -976,16 +1025,25 @@ func TestPublicarLoteDespachaCartelerasDelCliente(t *testing.T) {
 	t.Parallel()
 
 	despachador := &fakePublisher{}
+	handler := NewHandler(testStore(), nil).WithPublisher(despachador)
 	mux := http.NewServeMux()
-	NewHandler(testStore(), nil).WithPublisher(despachador).Register(mux)
+	handler.Register(mux)
 
 	body := `{"is_prueba":false,"carteleras":[{"socio":"ANA","chat_id":"ana@g.us","imagen":"data:image/png;base64,iVBORw0KGgo="}]}`
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/tasas/publicar-lote", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("publicar con imágenes status = %d, body=%s", rec.Code, rec.Body.String())
 	}
+	var inicio struct {
+		JobID string `json:"job_id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &inicio); err != nil {
+		t.Fatalf("respuesta inicial inválida: %v", err)
+	}
+	waitPublishJob(t, handler, inicio.JobID)
+
 	if len(despachador.images) != 1 {
 		t.Fatalf("carteleras recibidas = %d", len(despachador.images))
 	}

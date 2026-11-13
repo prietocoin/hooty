@@ -1,5 +1,5 @@
 import { qs } from '../../../shared/js/dom.js';
-import { api } from '../api.js?v=20261113_01';
+import { api } from '../api.js?v=20261113_02';
 import { fusionarTasas } from '../config.js';
 import { state } from '../state.js?v=20261030_02';
 import { abrirModal, cerrarModal } from '../ui/modal.js';
@@ -89,7 +89,9 @@ export function initMonitor() {
     showToast(prueba ? '🧪 Publicando lote de prueba...' : '⚡ Publicando carteleras oficiales...');
     try {
       const datos = await api.publicarLote(prueba);
-      showToast(`🚀 Publicado a ${datos.procesados ?? 0} socios ON`);
+      const fallidos = Number(datos.fallidos) || 0;
+      const resumen = fallidos > 0 ? ` · ${fallidos} fallidos` : '';
+      showToast(`🚀 Publicado a ${datos.procesados ?? 0} socios ON${resumen}`);
     } catch (error) {
       showToast(`❌ Error al publicar: ${error.message}`);
     } finally {
