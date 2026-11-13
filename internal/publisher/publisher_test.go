@@ -3,9 +3,11 @@ package publisher
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 	"testing"
+	"time"
 )
 
 type fakeSource struct {
@@ -126,6 +128,63 @@ func TestPublishPruebaEnviaCartelesIndividualesAlGrupoDePrueba(t *testing.T) {
 	}
 	if resultado.Procesados != 2 || !resultado.Prueba {
 		t.Fatalf("resultado inesperado: %+v", resultado)
+	}
+}
+
+type concurrentRenderer struct {
+	mu     sync.Mutex
+	active int
+	max    int
+	delay  time.Duration
+}
+
+func (r *concurrentRenderer) Render(Cartelera) ([]byte, error) {
+	r.mu.Lock()
+	r.active++
+	if r.active > r.max {
+		r.max = r.active
+	}
+	r.mu.Unlock()
+
+	time.Sleep(r.delay)
+
+	r.mu.Lock()
+	r.active--
+	r.mu.Unlock()
+	return []byte("png"), nil
+}
+
+func (r *concurrentRenderer) maxConcurrent() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.max
+}
+
+func TestPublishPruebaParalelizaLosCarteles(t *testing.T) {
+	t.Parallel()
+
+	socios := make([]Socio, 12)
+	for i := range socios {
+		socios[i] = Socio{
+			Nombre: fmt.Sprintf("SOCIO%02d", i),
+			ChatID: fmt.Sprintf("socio%d@g.us", i),
+		}
+	}
+	renderer := &concurrentRenderer{delay: 20 * time.Millisecond}
+	p := New(fakeSource{
+		lote:   Lote{ID: "T096", Tasas: map[string]float64{"USD": 1}},
+		socios: socios,
+	}, &fakeSender{}, renderer, "prueba@g.us", nil)
+
+	resultado, err := p.Publish(context.Background(), true)
+	if err != nil {
+		t.Fatalf("publicación de prueba rechazada: %v", err)
+	}
+	if resultado.Procesados != len(socios) {
+		t.Fatalf("procesados = %d, esperaba %d", resultado.Procesados, len(socios))
+	}
+	if maximo := renderer.maxConcurrent(); maximo < 2 {
+		t.Fatalf("el modo prueba debe renderizar en paralelo; máximo concurrente = %d", maximo)
 	}
 }
 

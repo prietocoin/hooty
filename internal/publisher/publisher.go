@@ -119,6 +119,11 @@ func New(source Source, sender Sender, renderer Renderer, testChatID string, log
 	}
 }
 
+// maxPublishWorkers acota cuántos carteles se renderizan y envían a la vez.
+// Tanto el render como el POST a Evolution son costosos; hacerlo en serie con
+// todos los socios agota el timeout HTTP de la petición de publicación.
+const maxPublishWorkers = 5
+
 // Publish despacha según el modo. En prueba solo existe un destino: el grupo de
 // pruebas. En producción se envía una cartelera a cada socio activo.
 func (p *Publisher) Publish(ctx context.Context, isPrueba bool) (Result, error) {
@@ -139,20 +144,14 @@ func (p *Publisher) Publish(ctx context.Context, isPrueba bool) (Result, error) 
 		if len(socios) == 0 {
 			return resultado, errors.New("publisher: no hay socios activos ON para publicar")
 		}
-		for _, socio := range socios {
-			destino := socio
-			destino.ChatID = p.testChatID
-			detalle := p.enviar(ctx, destino, lote, true)
-			resultado.Detalle = append(resultado.Detalle, detalle)
-			if detalle.Status == "ok" {
-				resultado.Procesados++
-			} else {
-				resultado.Fallidos++
-			}
+		destinos := make([]Socio, len(socios))
+		for i, socio := range socios {
+			destinos[i] = socio
+			destinos[i].ChatID = p.testChatID
 		}
-		sort.Slice(resultado.Detalle, func(i, j int) bool {
-			return resultado.Detalle[i].Socio < resultado.Detalle[j].Socio
-		})
+		resultado.Detalle = p.publishSocios(ctx, destinos, lote, true)
+		resultado.Procesados, resultado.Fallidos = contarDetalles(resultado.Detalle)
+		ordenarDetalle(resultado.Detalle)
 		if resultado.Procesados == 0 {
 			return resultado, errors.New("publisher: fallaron todos los envíos de prueba")
 		}
@@ -167,34 +166,49 @@ func (p *Publisher) Publish(ctx context.Context, isPrueba bool) (Result, error) 
 		return resultado, errors.New("publisher: no hay socios activos ON para publicar")
 	}
 
+	resultado.Detalle = p.publishSocios(ctx, socios, lote, false)
+	resultado.Procesados, resultado.Fallidos = contarDetalles(resultado.Detalle)
+	ordenarDetalle(resultado.Detalle)
+	if resultado.Procesados == 0 {
+		return resultado, errors.New("publisher: fallaron todos los envíos")
+	}
+	return resultado, nil
+}
+
+// publishSocios renderiza y envía en paralelo, preservando el orden de entrada
+// en la rebanada de detalles para que el resultado sea estable.
+func (p *Publisher) publishSocios(ctx context.Context, socios []Socio, lote Lote, prueba bool) []Detalle {
 	detalles := make([]Detalle, len(socios))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 5)
+	sem := make(chan struct{}, maxPublishWorkers)
 	for i, socio := range socios {
 		wg.Add(1)
 		go func(index int, destino Socio) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			detalles[index] = p.enviar(ctx, destino, lote, false)
+			detalles[index] = p.enviar(ctx, destino, lote, prueba)
 		}(i, socio)
 	}
 	wg.Wait()
-	resultado.Detalle = detalles
+	return detalles
+}
+
+func contarDetalles(detalles []Detalle) (procesados, fallidos int) {
 	for _, detalle := range detalles {
 		if detalle.Status == "ok" {
-			resultado.Procesados++
+			procesados++
 		} else {
-			resultado.Fallidos++
+			fallidos++
 		}
 	}
-	sort.Slice(resultado.Detalle, func(i, j int) bool {
-		return resultado.Detalle[i].Socio < resultado.Detalle[j].Socio
+	return procesados, fallidos
+}
+
+func ordenarDetalle(detalles []Detalle) {
+	sort.Slice(detalles, func(i, j int) bool {
+		return detalles[i].Socio < detalles[j].Socio
 	})
-	if resultado.Procesados == 0 {
-		return resultado, errors.New("publisher: fallaron todos los envíos")
-	}
-	return resultado, nil
 }
 
 func (p *Publisher) enviar(ctx context.Context, socio Socio, lote Lote, prueba bool) Detalle {
